@@ -165,71 +165,13 @@ CREATE TABLE IF NOT EXISTS `hf_users` (
 -- ------------------------------------------------------------------------------
 -- 7. Alter Base Church Tables (`acc_contribution` & `acc_promises`)
 -- Links accounting receipts and promises back to Harvest Festival article items
+-- (If article_id is already present, these lines can be safely skipped)
 -- ------------------------------------------------------------------------------
+ALTER TABLE `acc_contribution` ADD COLUMN `article_id` int(11) DEFAULT 0;
+ALTER TABLE `acc_contribution` ADD INDEX `idx_article_id` (`article_id`);
 
--- Add article_id to acc_contribution if not already present
-SET @col_exists = 0;
-SELECT COUNT(*) INTO @col_exists 
-FROM information_schema.COLUMNS 
-WHERE TABLE_SCHEMA = DATABASE() 
-  AND TABLE_NAME = 'acc_contribution' 
-  AND COLUMN_NAME = 'article_id';
-
-SET @stmt = IF(@col_exists = 0, 
-  'ALTER TABLE `acc_contribution` ADD COLUMN `article_id` int(11) DEFAULT 0', 
-  'SELECT "Column article_id already exists on acc_contribution"'
-);
-PREPARE exec_sql FROM @stmt;
-EXECUTE exec_sql;
-DEALLOCATE PREPARE exec_sql;
-
--- Add index on article_id in acc_contribution
-SET @idx_exists = 0;
-SELECT COUNT(*) INTO @idx_exists 
-FROM information_schema.STATISTICS 
-WHERE TABLE_SCHEMA = DATABASE() 
-  AND TABLE_NAME = 'acc_contribution' 
-  AND INDEX_NAME = 'idx_article_id';
-
-SET @stmt = IF(@idx_exists = 0, 
-  'ALTER TABLE `acc_contribution` ADD INDEX `idx_article_id` (`article_id`)', 
-  'SELECT "Index idx_article_id already exists on acc_contribution"'
-);
-PREPARE exec_sql FROM @stmt;
-EXECUTE exec_sql;
-DEALLOCATE PREPARE exec_sql;
-
--- Add article_id to acc_promises if not already present
-SET @col_exists = 0;
-SELECT COUNT(*) INTO @col_exists 
-FROM information_schema.COLUMNS 
-WHERE TABLE_SCHEMA = DATABASE() 
-  AND TABLE_NAME = 'acc_promises' 
-  AND COLUMN_NAME = 'article_id';
-
-SET @stmt = IF(@col_exists = 0, 
-  'ALTER TABLE `acc_promises` ADD COLUMN `article_id` int(11) DEFAULT 0', 
-  'SELECT "Column article_id already exists on acc_promises"'
-);
-PREPARE exec_sql FROM @stmt;
-EXECUTE exec_sql;
-DEALLOCATE PREPARE exec_sql;
-
--- Add index on article_id in acc_promises
-SET @idx_exists = 0;
-SELECT COUNT(*) INTO @idx_exists 
-FROM information_schema.STATISTICS 
-WHERE TABLE_SCHEMA = DATABASE() 
-  AND TABLE_NAME = 'acc_promises' 
-  AND INDEX_NAME = 'idx_article_id';
-
-SET @stmt = IF(@idx_exists = 0, 
-  'ALTER TABLE `acc_promises` ADD INDEX `idx_article_id` (`article_id`)', 
-  'SELECT "Index idx_article_id already exists on acc_promises"'
-);
-PREPARE exec_sql FROM @stmt;
-EXECUTE exec_sql;
-DEALLOCATE PREPARE exec_sql;
+ALTER TABLE `acc_promises` ADD COLUMN `article_id` int(11) DEFAULT 0;
+ALTER TABLE `acc_promises` ADD INDEX `idx_article_id` (`article_id`);
 
 -- ------------------------------------------------------------------------------
 -- 8. Seed Default Categories

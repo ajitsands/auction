@@ -656,34 +656,6 @@ function DashboardView({ stats, year, onNavigate, onOpenNewArticle, onOpenImport
                 </div>
             </div>
 
-            {/* Quick Actions & Welcome Banner */}
-            <div className="card" style={{ marginBottom: '28px', background: 'linear-gradient(135deg, var(--bg-card), var(--bg-card-hover))' }}>
-                <div className="card-body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '24px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap' }}>
-                        <img 
-                            src="/images/logo/red_full_logo.png" 
-                            alt="Auction Portal" 
-                            style={{ height: '64px', maxWidth: '420px', objectFit: 'contain' }} 
-                            onError={(e) => { e.target.src = '/images/logo/login-page-logo.png'; }}
-                        />
-                        <div>
-                            <h2 style={{ fontSize: '20px', marginBottom: '6px' }}>Harvest Festival & Article Auction Hub ({year})</h2>
-                            <p style={{ color: 'var(--text-secondary)' }}>
-                                Manage article inventory with unique tags, conduct live member bidding, generate instant printed receipts, track payment collections, and monitor receivables.
-                            </p>
-                        </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                        <button className="btn btn-orange" onClick={onOpenImport}>
-                            <i className="material-icons">cloud_upload</i> Import Excel / CSV
-                        </button>
-                        <button className="btn btn-success" onClick={() => onNavigate('auction')}>
-                            <i className="material-icons">gavel</i> Live Auction Desk
-                        </button>
-                    </div>
-                </div>
-            </div>
-
             {/* Visual Overview Columns */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px' }}>
                 <div className="card">

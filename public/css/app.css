@@ -1770,7 +1770,7 @@ select.form-control option {
 @media print {
     @page {
         size: A4 portrait;
-        margin: 8mm 10mm;
+        margin: 5mm 8mm;
     }
 
     html, body {
@@ -1861,7 +1861,7 @@ select.form-control option {
         position: static !important;
         display: block !important;
         width: 100% !important;
-        max-width: 800px !important;
+        max-width: 780px !important;
         margin: 0 auto !important;
         padding: 0 !important;
         background: #ffffff !important;
@@ -1870,22 +1870,26 @@ select.form-control option {
         overflow: visible !important;
     }
 
+    /* Half-A4 sheet copy */
     .hf-receipt-sheet {
         position: static !important;
         display: block !important;
         width: 100% !important;
-        max-width: 800px !important;
-        margin: 0 auto 14px auto !important;
+        max-width: 780px !important;
+        margin: 0 auto !important;
         padding: 0 !important;
         background: #ffffff !important;
         color: #000000 !important;
         page-break-inside: avoid !important;
         break-inside: avoid !important;
+        font-size: 11.5px !important;
     }
 
     .hf-receipt-box {
-        border-radius: 20px !important;
+        border-radius: 14px !important;
         border: 1px solid #646464 !important;
+        padding: 4px 10px !important;
+        margin-bottom: 4px !important;
         background: #ffffff !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
@@ -1903,18 +1907,34 @@ select.form-control option {
         print-color-adjust: exact !important;
     }
 
+    /* Tear / Cut Divider between Half-A4 Copies on same page */
     .hf-receipt-divider {
-        page-break-before: always !important;
-        break-before: page !important;
+        page-break-before: auto !important;
+        break-before: auto !important;
+        page-break-after: auto !important;
+        break-after: auto !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
         display: block !important;
-        height: 1px !important;
+        width: 100% !important;
+        height: 12px !important;
         border: none !important;
-        margin: 0 !important;
+        border-top: 1px dashed #777777 !important;
+        margin: 6px 0 !important;
         padding: 0 !important;
+        text-align: center !important;
+        position: relative !important;
     }
 
     .hf-receipt-divider span {
-        display: none !important;
+        display: inline-block !important;
+        position: relative !important;
+        top: -8px !important;
+        background: #ffffff !important;
+        padding: 0 8px !important;
+        font-size: 9.5px !important;
+        color: #555555 !important;
+        font-family: Arial, sans-serif !important;
     }
 }
 

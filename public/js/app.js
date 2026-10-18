@@ -3909,27 +3909,27 @@ function HfReceiptVoucherCopy({ receipt, copyType = 'Member Copy', showLetterhea
     const cleanReceiptNo = String(rawReceiptRef).replace(/[^0-9]/g, '') || String(rawReceiptRef).replace(/^HRCPT\s*[-#]?\s*/i, '').replace(/^#/, '').trim();
 
     return (
-        <div className="hf-receipt-sheet" style={{ background: '#ffffff', color: '#000000', fontFamily: 'Arial, Consolas, "Courier New", monospace', fontSize: '13px' }}>
+        <div className="hf-receipt-sheet" style={{ background: '#ffffff', color: '#000000', fontFamily: 'Arial, Consolas, "Courier New", monospace', fontSize: '11.5px', lineHeight: '1.25' }}>
             {showLetterhead ? (
-                <div style={{ textAlign: 'center', marginBottom: '12px', paddingTop: '4px' }}>
+                <div style={{ textAlign: 'center', marginBottom: '4px', paddingTop: '2px' }}>
                     <img 
                         src="/images/logo/red_full_logo.png" 
                         alt="St. Mary's Indian Orthodox Cathedral" 
-                        style={{ height: '44px', maxWidth: '380px', objectFit: 'contain' }}
+                        style={{ height: '34px', maxWidth: '340px', objectFit: 'contain' }}
                         onError={(e) => { e.target.src = '/images/logo/login-page-logo.png'; }}
                     />
                 </div>
             ) : (
-                <div style={{ height: '60px' }}></div>
+                <div style={{ height: '36px' }}></div>
             )}
 
             {/* Top rounded box matching #rcorners2 in staging_parallel hf_receipt.php */}
-            <div className="hf-receipt-box" style={{ borderRadius: '20px', border: '1px solid #646464', padding: '8px 14px', marginBottom: '8px', background: '#ffffff' }}>
-                <table width="100%" border="0" cellSpacing="0" cellPadding="3" style={{ borderCollapse: 'collapse', fontSize: '13px', color: '#000000' }}>
+            <div className="hf-receipt-box" style={{ borderRadius: '14px', border: '1px solid #646464', padding: '4px 10px', marginBottom: '4px', background: '#ffffff' }}>
+                <table width="100%" border="0" cellSpacing="0" cellPadding="2" style={{ borderCollapse: 'collapse', fontSize: '11.5px', color: '#000000' }}>
                     <tbody>
                         <tr>
                             <td width="55%"><strong>Receipt No : </strong>{cleanReceiptNo}</td>
-                            <td width="45%" style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '13px' }}>{copyType}</td>
+                            <td width="45%" style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '11.5px' }}>{copyType}</td>
                         </tr>
                         <tr>
                             <td><strong>Date : </strong>{formattedDate}</td>
@@ -3962,61 +3962,61 @@ function HfReceiptVoucherCopy({ receipt, copyType = 'Member Copy', showLetterhea
             </div>
 
             {/* Contribution Details & Remarks Table */}
-            <table width="100%" border="0" cellSpacing="0" cellPadding="6" className="hf-grid-table" style={{ borderCollapse: 'collapse', width: '100%', marginTop: '6px', fontSize: '13px', color: '#000000' }}>
+            <table width="100%" border="0" cellSpacing="0" cellPadding="4" className="hf-grid-table" style={{ borderCollapse: 'collapse', width: '100%', marginTop: '3px', fontSize: '11.5px', color: '#000000' }}>
                 <thead>
                     <tr style={{ background: '#D1D1D1', borderTop: '1px solid #646464', borderBottom: '1px solid #646464' }}>
-                        <th width="30" style={{ textAlign: 'center', padding: '6px', color: '#000000', backgroundColor: '#D1D1D1' }}>#</th>
-                        <th width="230" style={{ textAlign: 'left', padding: '6px', color: '#000000', backgroundColor: '#D1D1D1' }}>Contribution Details</th>
-                        <th width="420" style={{ textAlign: 'left', padding: '6px', color: '#000000', backgroundColor: '#D1D1D1' }}>Remarks</th>
-                        <th width="120" style={{ textAlign: 'right', padding: '6px', color: '#000000', backgroundColor: '#D1D1D1' }}>Amount/Kind</th>
+                        <th width="30" style={{ textAlign: 'center', padding: '3px 4px', color: '#000000', backgroundColor: '#D1D1D1' }}>#</th>
+                        <th width="230" style={{ textAlign: 'left', padding: '3px 6px', color: '#000000', backgroundColor: '#D1D1D1' }}>Contribution Details</th>
+                        <th width="420" style={{ textAlign: 'left', padding: '3px 6px', color: '#000000', backgroundColor: '#D1D1D1' }}>Remarks</th>
+                        <th width="120" style={{ textAlign: 'right', padding: '3px 6px', color: '#000000', backgroundColor: '#D1D1D1' }}>Amount/Kind</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td style={{ textAlign: 'center', verticalAlign: 'top', padding: '8px 6px' }}>1.</td>
-                        <td style={{ textAlign: 'left', verticalAlign: 'top', padding: '8px 6px' }}>
+                        <td style={{ textAlign: 'center', verticalAlign: 'top', padding: '5px 4px' }}>1.</td>
+                        <td style={{ textAlign: 'left', verticalAlign: 'top', padding: '5px 6px' }}>
                             <div style={{ fontWeight: 'bold' }}>{crCode}</div>
-                            <div style={{ fontSize: '12px', color: '#222222' }}>{crName}</div>
+                            <div style={{ fontSize: '11px', color: '#222222' }}>{crName}</div>
                         </td>
-                        <td style={{ textAlign: 'left', verticalAlign: 'top', padding: '8px 6px' }}>
-                            <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#000000', marginBottom: '2px' }}>
+                        <td style={{ textAlign: 'left', verticalAlign: 'top', padding: '5px 6px' }}>
+                            <div style={{ fontWeight: 'bold', fontSize: '12px', color: '#000000', marginBottom: '1px' }}>
                                 {receipt.applicable_year || 2026} - {artName}
                             </div>
-                            <div style={{ fontSize: '12px', color: '#222222' }}>
+                            <div style={{ fontSize: '11px', color: '#222222' }}>
                                 <strong>Tag No:</strong> {tagNo} &nbsp;|&nbsp; <strong>Article No:</strong> {artNo} {category ? `| ${category}` : ''}
                             </div>
                         </td>
-                        <td style={{ textAlign: 'right', verticalAlign: 'top', padding: '8px 6px', fontWeight: 'bold' }}>
+                        <td style={{ textAlign: 'right', verticalAlign: 'top', padding: '5px 6px', fontWeight: 'bold' }}>
                             {amountVal}
                         </td>
                     </tr>
                     <tr style={{ borderBottom: '1px solid #000000' }}>
-                        <td colSpan="4" style={{ padding: '2px' }}></td>
+                        <td colSpan="4" style={{ padding: '1px' }}></td>
                     </tr>
                     <tr>
-                        <td colSpan="3" style={{ padding: '8px 6px', fontSize: '12px' }}>
+                        <td colSpan="3" style={{ padding: '4px 6px', fontSize: '11px' }}>
                             Bahraini Dinar <strong>{amountWords}</strong> Only
                         </td>
-                        <td style={{ textAlign: 'right', padding: '8px 6px', fontWeight: 'bold', fontSize: '14px' }}>
+                        <td style={{ textAlign: 'right', padding: '4px 6px', fontWeight: 'bold', fontSize: '12.5px' }}>
                             <strong>{amountVal}</strong>
                         </td>
                     </tr>
                     <tr>
-                        <td colSpan="3" style={{ padding: '12px 6px 4px 6px' }}>
+                        <td colSpan="3" style={{ padding: '6px 6px 2px 6px' }}>
                             <table width="100%" border="0" cellPadding="0" cellSpacing="0">
                                 <tbody>
                                     <tr>
-                                        <td width="100" style={{ fontSize: '11px', color: '#444444' }}>Page 1 of 1</td>
-                                        <td style={{ textAlign: 'center', fontStyle: 'italic', fontSize: '12px', color: '#000000' }}>
+                                        <td width="90" style={{ fontSize: '10.5px', color: '#444444' }}>Page 1 of 1</td>
+                                        <td style={{ textAlign: 'center', fontStyle: 'italic', fontSize: '11px', color: '#000000' }}>
                                             <i>NB : Outstanding Amount till date : BHD {memberOutstanding}</i>
                                         </td>
                                     </tr>
                                 </tbody>
                             </table>
                         </td>
-                        <td style={{ textAlign: 'right', padding: '12px 6px 4px 6px', verticalAlign: 'bottom' }}>
-                            <div style={{ borderTop: '1px solid #777777', width: '90px', marginLeft: 'auto', marginBottom: '2px' }}></div>
-                            <strong style={{ fontSize: '12px' }}>Trustee</strong>
+                        <td style={{ textAlign: 'right', padding: '6px 6px 2px 6px', verticalAlign: 'bottom' }}>
+                            <div style={{ borderTop: '1px solid #777777', width: '80px', marginLeft: 'auto', marginBottom: '2px' }}></div>
+                            <strong style={{ fontSize: '11px' }}>Trustee</strong>
                         </td>
                     </tr>
                 </tbody>
@@ -4078,7 +4078,7 @@ function ReceiptModal({ receiptNo, isOpen, onClose }) {
     <title>Receipt ${cleanReceiptBadge}</title>
     <link rel="stylesheet" href="/css/app.css">
     <style>
-        @page { size: A4 portrait; margin: 8mm 10mm; }
+        @page { size: A4 portrait; margin: 5mm 8mm; }
         html, body {
             margin: 0 !important;
             padding: 0 !important;
@@ -4090,24 +4090,26 @@ function ReceiptModal({ receiptNo, isOpen, onClose }) {
         }
         .hf-receipt-container {
             width: 100% !important;
-            max-width: 800px !important;
+            max-width: 780px !important;
             margin: 0 auto !important;
             background: #ffffff !important;
         }
         .hf-receipt-sheet {
             width: 100% !important;
-            max-width: 800px !important;
-            margin: 0 auto 14px auto !important;
+            max-width: 780px !important;
+            margin: 0 auto !important;
             padding: 0 !important;
             background: #ffffff !important;
             color: #000000 !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
+            font-size: 11.5px !important;
         }
         .hf-receipt-box {
-            border-radius: 20px !important;
+            border-radius: 14px !important;
             border: 1px solid #646464 !important;
-            padding: 8px 14px !important;
+            padding: 4px 10px !important;
+            margin-bottom: 4px !important;
             background: #ffffff !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
@@ -4123,15 +4125,31 @@ function ReceiptModal({ receiptNo, isOpen, onClose }) {
             print-color-adjust: exact !important;
         }
         .hf-receipt-divider {
-            page-break-before: always !important;
-            break-before: page !important;
-            height: 1px !important;
+            page-break-before: auto !important;
+            break-before: auto !important;
+            page-break-after: auto !important;
+            break-after: auto !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            display: block !important;
+            width: 100% !important;
+            height: 12px !important;
             border: none !important;
-            margin: 0 !important;
+            border-top: 1px dashed #777777 !important;
+            margin: 6px 0 !important;
             padding: 0 !important;
+            text-align: center !important;
+            position: relative !important;
         }
         .hf-receipt-divider span {
-            display: none !important;
+            display: inline-block !important;
+            position: relative !important;
+            top: -8px !important;
+            background: #ffffff !important;
+            padding: 0 8px !important;
+            font-size: 9.5px !important;
+            color: #555555 !important;
+            font-family: Arial, sans-serif !important;
         }
     </style>
 </head>
@@ -4221,7 +4239,7 @@ function ReceiptModal({ receiptNo, isOpen, onClose }) {
                             {showChurchCopy && (
                                 <>
                                     <div className="hf-receipt-divider">
-                                        <span>Church Copy Below</span>
+                                        <span>✂ - - - - - - - - - - - - - - - - - - Tear / Cut Along This Line (Church Copy Below) - - - - - - - - - - - - - - - - - - ✂</span>
                                     </div>
                                     <HfReceiptVoucherCopy 
                                         receipt={receipt} 

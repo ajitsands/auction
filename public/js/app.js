@@ -620,30 +620,6 @@ function LoginScreen({ onLoginSuccess }) {
                         {loading ? 'Authenticating...' : 'Sign In to Portal →'}
                     </button>
                 </form>
-
-                <div className="login-demo-box">
-                    <p><strong>System Connected Credentials (tbl_users):</strong></p>
-                    <div style={{ marginTop: '6px', fontSize: '12px', lineHeight: '1.6' }}>
-                        <div><strong>Admin:</strong> <code>admin</code> / <code>Syskode123#$#</code></div>
-                        <div><strong>HF Data Entry:</strong> <code>hf</code> / <code>Sreya8409</code></div>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '10px' }}>
-                        <button 
-                            type="button" 
-                            className="btn btn-secondary btn-sm" 
-                            onClick={() => { setUsername('admin'); setPassword('Syskode123#$#'); }}
-                        >
-                            Admin Login
-                        </button>
-                        <button 
-                            type="button" 
-                            className="btn btn-secondary btn-sm" 
-                            onClick={() => { setUsername('hf'); setPassword('Sreya8409'); }}
-                        >
-                            HF Login
-                        </button>
-                    </div>
-                </div>
             </div>
         </div>
     );

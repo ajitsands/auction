@@ -4815,28 +4815,6 @@ function ReportsView({ year, showToast }) {
             page-break-inside: avoid;
             break-inside: avoid;
         }
-        /* Signatures block */
-        .signatures-area {
-            margin-top: 24px;
-            padding-top: 10px;
-            display: flex;
-            justify-content: space-between;
-            page-break-inside: avoid;
-            break-inside: avoid;
-        }
-        .sig-col {
-            text-align: center;
-            width: 180px;
-        }
-        .sig-line {
-            border-top: 1px solid #444444;
-            margin-bottom: 4px;
-        }
-        .sig-label {
-            font-size: 9.5px;
-            font-weight: bold;
-            color: #333333;
-        }
     </style>
 </head>
 <body>
@@ -4927,22 +4905,6 @@ function ReportsView({ year, showToast }) {
             </tr>
         </tfoot>
     </table>
-
-    <!-- Signatures -->
-    <div class="signatures-area">
-        <div class="sig-col">
-            <div class="sig-line"></div>
-            <div class="sig-label">Prepared By (Cashier)</div>
-        </div>
-        <div class="sig-col">
-            <div class="sig-line"></div>
-            <div class="sig-label">Verified By (Auditor)</div>
-        </div>
-        <div class="sig-col">
-            <div class="sig-line"></div>
-            <div class="sig-label">Approved By (Hon. Trustee / Vicar)</div>
-        </div>
-    </div>
 </body>
 </html>`;
 

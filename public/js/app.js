@@ -3988,22 +3988,18 @@ function PromisesView({ year, showToast, onOpenReceipt }) {
 
     return (
         <div>
-            {/* Breadcrumbs Header */}
-            <div className="breadcrumbs-wrapper">
-                <div className="breadcrumbs-title">
-                    <i className="material-icons">account_balance_wallet</i>
-                    <h4>Auction Promises & Receivables ({year})</h4>
-                </div>
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                    <span>Cathedral Auction</span> &gt; <span style={{ color: 'var(--primary)', fontWeight: 600 }}>Member Credit & Receivables</span>
-                </div>
-            </div>
-
             <div className="card">
-                <div className="card-header">
-                    <div>
-                        <h3>Auction Promises & Receivables ({year})</h3>
-                        <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Track member credit purchases, pending balances, and record collections</p>
+                <div className="card-header" style={{ flexWrap: 'wrap', gap: '14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <i className="material-icons" style={{ fontSize: '28px', color: 'var(--primary)' }}>account_balance_wallet</i>
+                        <div>
+                            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--primary)' }}>
+                                Auction Promises & Receivables ({year})
+                            </h3>
+                            <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
+                                Track member credit purchases, pending balances, and record collections
+                            </p>
+                        </div>
                     </div>
                     <div style={{ display: 'flex', gap: '10px' }}>
                         <select className="form-control" style={{ width: '150px' }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>

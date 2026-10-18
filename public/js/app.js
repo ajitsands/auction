@@ -5094,8 +5094,9 @@ function App() {
     const [user, setUser] = useState(null);
     const [authLoading, setAuthLoading] = useState(true);
     const [currentTab, setCurrentTab] = useState('dashboard');
-    const [year, setYear] = useState(2026);
-    const [availableYears, setAvailableYears] = useState([2026, 2025, 2024]);
+    const currentCalYear = new Date().getFullYear();
+    const [year, setYear] = useState(currentCalYear);
+    const [availableYears, setAvailableYears] = useState([currentCalYear]);
     const [stats, setStats] = useState(null);
     const [toasts, setToasts] = useState([]);
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -5151,6 +5152,14 @@ function App() {
             ]);
             if (yRes.success && yRes.years && yRes.years.length) {
                 setAvailableYears(yRes.years);
+                if (targetYear === undefined) {
+                    setYear(prev => {
+                        if (yRes.years.includes(currentCalYear)) {
+                            return currentCalYear;
+                        }
+                        return yRes.years.includes(prev) ? prev : yRes.years[0];
+                    });
+                }
             }
             if (sRes.success) {
                 setStats(sRes.stats);

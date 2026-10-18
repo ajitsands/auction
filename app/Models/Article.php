@@ -72,18 +72,14 @@ class Article extends Model {
                 SELECT applicable_year as yr FROM hf_promises WHERE applicable_year > 2000
             ) t ORDER BY yr DESC
         ");
-        $dbYears = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
-
+        $years = array_values(array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN)));
         $currentYear = (int)date('Y');
-        $years = $dbYears;
-        // Ensure a range of relevant recent/upcoming festival years is always selectable
-        for ($y = $currentYear + 1; $y >= $currentYear - 3; $y--) {
-            if (!in_array($y, $years)) {
-                $years[] = $y;
-            }
+
+        if (empty($years)) {
+            return [$currentYear];
         }
-        rsort($years);
-        return array_values(array_unique($years));
+
+        return $years;
     }
 
     public function getCategories(): array {

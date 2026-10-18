@@ -1,0 +1,20 @@
+# Ignored archives and staging directories
+staging_parallel/
+staging_parallel.zip
+
+# Database dumps (exceeds GitHub 100MB limit)
+*.sql
+
+# Environment and sensitive configuration
+.env
+.env.*
+!.env.example
+
+# Logs and cache
+*.log
+
+# OS & Editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

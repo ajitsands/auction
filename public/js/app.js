@@ -3816,21 +3816,19 @@ function HfReceiptVoucherCopy({ receipt, copyType = 'Member Copy', showLetterhea
         : '—';
     const amountVal = Number(receipt.amount_paid || 0).toFixed(3);
     const amountWords = getCurrencyWords(receipt.amount_paid);
-    const balanceDue = Number(receipt.total_transaction_balance || 0).toFixed(3);
+    // Member Outstanding Balance logic from staging_parallel/accounts/view/hf_receipt.php
+    const memberOutstanding = Number(receipt.member_outstanding_balance ?? receipt.total_transaction_balance ?? 0).toFixed(3);
 
     const artName = receipt.article_name || 'Auction Article';
     const tagNo = receipt.tag_number || 'N/A';
     const artNo = receipt.article_number || 'N/A';
     const category = receipt.category || '';
-    const drCode = receipt.dr_code || '02123';
-    const drName = receipt.dr_name || 'Cash on Hand-Harvest Festival';
     const crCode = receipt.cr_code || '02206';
     const crName = receipt.cr_name || 'Church Building Fund - Harvest Festival';
-    const voucherRef = receipt.voucher_no 
-        ? `HRCPT #${receipt.voucher_no}` 
-        : (receipt.manual_receipt_no ? `#${receipt.manual_receipt_no}` : (receipt.receipt_no || ''));
-    const promiseRef = receipt.initial_promise_voucher ? ` | Promise MP #${receipt.initial_promise_voucher}` : '';
-    const auctionRef = receipt.auction_ref_no ? `Auction Ref: ${receipt.auction_ref_no}` : '';
+
+    // Only number needs to display in the receipt print (no HRCPT # or text)
+    const rawReceiptRef = receipt.voucher_no || receipt.manual_receipt_no || receipt.receipt_no || '';
+    const cleanReceiptNo = String(rawReceiptRef).replace(/[^0-9]/g, '') || String(rawReceiptRef).replace(/^HRCPT\s*[-#]?\s*/i, '').replace(/^#/, '').trim();
 
     return (
         <div className="hf-receipt-sheet" style={{ background: '#ffffff', color: '#000000', fontFamily: 'Arial, Consolas, "Courier New", monospace', fontSize: '13px' }}>
@@ -3842,9 +3840,6 @@ function HfReceiptVoucherCopy({ receipt, copyType = 'Member Copy', showLetterhea
                         style={{ height: '44px', maxWidth: '380px', objectFit: 'contain' }}
                         onError={(e) => { e.target.src = '/images/logo/login-page-logo.png'; }}
                     />
-                    <div style={{ fontSize: '11px', color: '#444444', textTransform: 'uppercase', letterSpacing: '0.6px', marginTop: '2px', fontWeight: 'bold' }}>
-                        Annual Harvest Festival & Article Auction • Official Payment Receipt
-                    </div>
                 </div>
             ) : (
                 <div style={{ height: '60px' }}></div>
@@ -3855,12 +3850,12 @@ function HfReceiptVoucherCopy({ receipt, copyType = 'Member Copy', showLetterhea
                 <table width="100%" border="0" cellSpacing="0" cellPadding="3" style={{ borderCollapse: 'collapse', fontSize: '13px', color: '#000000' }}>
                     <tbody>
                         <tr>
-                            <td width="55%"><strong>Receipt No : </strong>{voucherRef}</td>
+                            <td width="55%"><strong>Receipt No : </strong>{cleanReceiptNo}</td>
                             <td width="45%" style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '13px' }}>{copyType}</td>
                         </tr>
                         <tr>
                             <td><strong>Date : </strong>{formattedDate}</td>
-                            <td style={{ textAlign: 'right', color: '#444444', fontSize: '12px' }}>{auctionRef}</td>
+                            <td style={{ textAlign: 'right' }}>&nbsp;</td>
                         </tr>
                         <tr>
                             <td><strong>Received with thanks from : </strong><strong>{receipt.buyer_name}</strong></td>
@@ -3906,16 +3901,15 @@ function HfReceiptVoucherCopy({ receipt, copyType = 'Member Copy', showLetterhea
                             <div style={{ fontSize: '12px', color: '#222222' }}>{crName}</div>
                         </td>
                         <td style={{ textAlign: 'left', verticalAlign: 'top', padding: '8px 6px' }}>
-                            {/* In Remarks: Article details displayed along with ledger details */}
+                            {/* In Remarks: Article details displayed along with ONLY Cr head (no Dr head, no payment mode, no promise id) */}
                             <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#000000', marginBottom: '2px' }}>
                                 {receipt.applicable_year || 2026} - {artName}
                             </div>
                             <div style={{ fontSize: '12px', color: '#222222', marginBottom: '4px' }}>
                                 <strong>Tag No:</strong> {tagNo} &nbsp;|&nbsp; <strong>Article No:</strong> {artNo} {category ? `| ${category}` : ''}
                             </div>
-                            <div style={{ fontSize: '11px', color: '#333333', borderTop: '1px dotted #999999', paddingTop: '3px', marginTop: '3px', lineHeight: '1.4' }}>
-                                <div><strong>Ledger:</strong> Dr: {drCode} ({drName}) / Cr: {crCode} ({crName})</div>
-                                <div><strong>Payment:</strong> {receipt.payment_mode || 'Cash'} {receipt.reference_no ? `(Ref: ${receipt.reference_no})` : ''} {promiseRef}</div>
+                            <div style={{ fontSize: '12px', color: '#333333', borderTop: '1px dotted #999999', paddingTop: '3px', marginTop: '3px' }}>
+                                <strong>Cr Head:</strong> {crCode} {crName}
                             </div>
                         </td>
                         <td style={{ textAlign: 'right', verticalAlign: 'top', padding: '8px 6px', fontWeight: 'bold' }}>
@@ -3940,7 +3934,7 @@ function HfReceiptVoucherCopy({ receipt, copyType = 'Member Copy', showLetterhea
                                     <tr>
                                         <td width="100" style={{ fontSize: '11px', color: '#444444' }}>Page 1 of 1</td>
                                         <td style={{ textAlign: 'center', fontStyle: 'italic', fontSize: '12px', color: '#000000' }}>
-                                            <i>NB : Outstanding Amount till date : BHD {balanceDue}</i>
+                                            <i>NB : Outstanding Amount till date : BHD {memberOutstanding}</i>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -3981,6 +3975,10 @@ function ReceiptModal({ receiptNo, isOpen, onClose }) {
         window.print();
     };
 
+    const cleanReceiptBadge = receipt 
+        ? (String(receipt.voucher_no || receipt.manual_receipt_no || receipt.receipt_no || receiptNo).replace(/[^0-9]/g, '') || receipt.receipt_no || receiptNo)
+        : (String(receiptNo).replace(/[^0-9]/g, '') || receiptNo);
+
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-content" style={{ maxWidth: '880px', width: '95%', background: 'var(--bg-surface)' }} onClick={e => e.stopPropagation()}>
@@ -3989,7 +3987,7 @@ function ReceiptModal({ receiptNo, isOpen, onClose }) {
                         title="Harvest Festival Payment Receipt (Voucher Format)" 
                         icon="receipt_long" 
                         onClose={onClose} 
-                        badge={receipt?.voucher_no ? `HRCPT #${receipt.voucher_no}` : (receipt?.receipt_no || receiptNo)}
+                        badge={cleanReceiptBadge}
                     />
                     <div style={{ padding: '8px 24px', background: 'var(--bg-card-hover)', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', fontSize: '12px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '18px', flexWrap: 'wrap' }}>

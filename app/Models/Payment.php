@@ -344,7 +344,7 @@ class Payment extends Model {
                            0
                        ))
                    END as total_transaction_balance,
-                   t.buyer_name, t.buyer_code_c, 
+                   t.buyer_name, t.buyer_code_c, t.buyer_member_id,
                    COALESCE(NULLIF(t.buyer_phone, ''), m.bahrain_contact_no) as buyer_phone,
                    t.contrib_voucher_no as initial_contrib_voucher, t.promise_voucher_no as initial_promise_voucher,
                    t.acc_contribution_id as initial_acc_contrib_id, t.acc_promise_id as initial_acc_promise_id,
@@ -376,7 +376,13 @@ class Payment extends Model {
             'rno_tcid'   => $cleanNo
         ]);
         $row = $stmt->fetch();
-        if ($row) return $row;
+        if ($row) {
+            $row['member_outstanding_balance'] = $this->getMemberOutstandingBalance(
+                !empty($row['buyer_code_c']) ? (int)$row['buyer_code_c'] : null,
+                !empty($row['buyer_member_id']) ? (int)$row['buyer_member_id'] : null
+            );
+            return $row;
+        }
 
         // 2. Fallback directly to acc_contribution if no hf_payments row exists
         $stmtAcc = $this->db->prepare("
@@ -415,6 +421,7 @@ class Payment extends Model {
                 END as total_transaction_balance,
                 COALESCE(NULLIF(t.buyer_name, ''), c.member_name) as buyer_name,
                 COALESCE(t.buyer_code_c, c.member_ccode) as buyer_code_c,
+                COALESCE(t.buyer_member_id, c.member_id) as buyer_member_id,
                 COALESCE(NULLIF(t.buyer_phone, ''), m.bahrain_contact_no) as buyer_phone,
                 c.voucher_ref_no as initial_contrib_voucher,
                 t.promise_voucher_no as initial_promise_voucher,
@@ -442,6 +449,57 @@ class Payment extends Model {
             'rno_manual' => $cleanNo
         ]);
         $rowAcc = $stmtAcc->fetch();
-        return $rowAcc ?: null;
+        if ($rowAcc) {
+            $rowAcc['member_outstanding_balance'] = $this->getMemberOutstandingBalance(
+                !empty($rowAcc['buyer_code_c']) ? (int)$rowAcc['buyer_code_c'] : null,
+                !empty($rowAcc['member_id']) ? (int)$rowAcc['member_id'] : (!empty($rowAcc['buyer_member_id']) ? (int)$rowAcc['buyer_member_id'] : null)
+            );
+            return $rowAcc;
+        }
+        return null;
+    }
+
+    /**
+     * Compute member outstanding promise balance matching staging_parallel/accounts/view/hf_receipt.php:
+     * select COALESCE(sum(balance_amount),0) as promise_bal from acc_promises 
+     * where (cr_code in (select head_code from acc_parallel_sur_defi_heads) or dr_code in (select head_code from acc_parallel_sur_defi_heads )) 
+     *   and member_ccode = :mem_code and balance_amount > 0 and promise_status = 'Active' and promise_type = 'By Amount'
+     */
+    public function getMemberOutstandingBalance(?int $memberCodeC, ?int $memberId = null): float {
+        if (empty($memberCodeC) && empty($memberId)) return 0.0;
+        try {
+            $sql = "
+                SELECT COALESCE(SUM(balance_amount), 0) as promise_bal 
+                FROM acc_promises 
+                WHERE (cr_code IN (SELECT head_code FROM acc_parallel_sur_defi_heads) OR dr_code IN (SELECT head_code FROM acc_parallel_sur_defi_heads)) 
+                  AND (member_ccode = :mcode OR (member_id = :mid AND member_id > 0)) 
+                  AND balance_amount > 0 
+                  AND promise_status = 'Active' 
+                  AND promise_type = 'By Amount'
+            ";
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([
+                'mcode' => (int)($memberCodeC ?: 0),
+                'mid'   => (int)($memberId ?: 0)
+            ]);
+            return (float)($stmt->fetchColumn() ?: 0.0);
+        } catch (\Throwable $e) {
+            try {
+                $stmt = $this->db->prepare("
+                    SELECT COALESCE(SUM(balance_amount), 0) 
+                    FROM acc_promises 
+                    WHERE (member_ccode = :mcode OR (member_id = :mid AND member_id > 0)) 
+                      AND balance_amount > 0 
+                      AND promise_status = 'Active'
+                ");
+                $stmt->execute([
+                    'mcode' => (int)($memberCodeC ?: 0),
+                    'mid'   => (int)($memberId ?: 0)
+                ]);
+                return (float)($stmt->fetchColumn() ?: 0.0);
+            } catch (\Throwable $ex) {
+                return 0.0;
+            }
+        }
     }
 }

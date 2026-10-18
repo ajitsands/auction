@@ -1,0 +1,19 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Prevent directory listing
+    Options -Indexes
+
+    # Stop processing if request already points to public/
+    RewriteRule ^public/ - [L]
+
+    # Protect hidden files (.git, .env, etc.)
+    RewriteRule (^|/)\.(?!well-known) - [F]
+
+    # Protect internal application directories and sensitive files
+    RewriteRule ^app(/.*)?$ - [F,L]
+    RewriteRule \.(sql|bat|log|ini|sh)$ - [F,L]
+
+    # Rewrite all other requests to the public/ directory
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>

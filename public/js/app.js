@@ -1362,8 +1362,16 @@ function ArticlesView({ year, onOpenNewArticle, onEditArticle, onOpenImport, sho
                                         <button 
                                             type="button"
                                             className="btn btn-secondary btn-sm" 
-                                            style={{ marginRight: '6px' }} 
-                                            onClick={() => onEditArticle(a)}
+                                            style={{ marginRight: '6px', ...(!isAvailable ? { opacity: 0.4, cursor: 'not-allowed' } : {}) }} 
+                                            disabled={!isAvailable}
+                                            onClick={() => {
+                                                if (!isAvailable) {
+                                                    showToast('warning', `Only articles with status "Available" can be edited (Current: ${a.status}).`);
+                                                    return;
+                                                }
+                                                onEditArticle(a);
+                                            }}
+                                            title={isAvailable ? `Edit Article [${a.article_number}]` : `Cannot edit: Article status is "${a.status}" (only Available articles can be edited)`}
                                         >
                                             <i className="material-icons" style={{ fontSize: '15px' }}>edit</i> Edit
                                         </button>
@@ -5428,7 +5436,14 @@ function App() {
                         key={year}
                         year={year} 
                         onOpenNewArticle={() => { setEditingArticle(null); setArticleModalOpen(true); }}
-                        onEditArticle={(a) => { setEditingArticle(a); setArticleModalOpen(true); }}
+                        onEditArticle={(a) => { 
+                            if (a.status !== 'Available') {
+                                showToast('warning', `Only articles with status "Available" can be edited (Current: ${a.status}).`);
+                                return;
+                            }
+                            setEditingArticle(a); 
+                            setArticleModalOpen(true); 
+                        }}
                         onOpenImport={() => setImportModalOpen(true)}
                         showToast={showToast}
                     />

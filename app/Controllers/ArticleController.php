@@ -85,6 +85,13 @@ class ArticleController extends Controller {
             $this->jsonResponse(['success' => false, 'error' => 'Article not found'], 404);
         }
 
+        if (strcasecmp($existing['status'] ?? '', 'Available') !== 0) {
+            $this->jsonResponse([
+                'success' => false,
+                'error'   => "Only articles with status 'Available' can be edited. This article is currently marked as '{$existing['status']}'."
+            ], 400);
+        }
+
         $data = $this->getJsonInput();
         if (empty($data['article_name'])) {
             $this->jsonResponse(['success' => false, 'error' => 'Article Name is required.'], 400);

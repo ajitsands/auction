@@ -5141,14 +5141,15 @@ function App() {
         }
     };
 
-    const fetchYearsAndStats = async () => {
+    const fetchYearsAndStats = async (targetYear) => {
         if (!user) return;
+        const activeYear = targetYear !== undefined ? targetYear : year;
         try {
             const [yRes, sRes] = await Promise.all([
                 api.get('/api/articles/years'),
-                api.get(`/api/auctions/stats?year=${year}`)
+                api.get(`/api/auctions/stats?year=${activeYear}`)
             ]);
-            if (yRes.success && yRes.years.length) {
+            if (yRes.success && yRes.years && yRes.years.length) {
                 setAvailableYears(yRes.years);
             }
             if (sRes.success) {
@@ -5157,12 +5158,19 @@ function App() {
         } catch (err) {}
     };
 
+    const handleYearChange = (newYear) => {
+        const y = Number(newYear);
+        if (!y || y === year) return;
+        setYear(y);
+        fetchYearsAndStats(y);
+    };
+
     useEffect(() => {
         checkAuth();
     }, []);
 
     useEffect(() => {
-        fetchYearsAndStats();
+        fetchYearsAndStats(year);
     }, [user, year]);
 
     const isAdmin = String(user?.user_type || '').trim().toLowerCase() === 'administrator';
@@ -5297,7 +5305,7 @@ function App() {
                             <select 
                                 className="year-select"
                                 value={year} 
-                                onChange={e => setYear(Number(e.target.value))}
+                                onChange={e => handleYearChange(e.target.value)}
                             >
                                 {availableYears.map(y => (
                                     <option key={y} value={y}>{y}</option>
@@ -5338,6 +5346,19 @@ function App() {
 
                 {/* Mobile Menu Dropdown */}
                 <div className={`mobile-nav-drawer ${sidebarOpen ? 'open' : ''}`}>
+                    <div style={{ padding: '8px 14px', borderBottom: '1px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#ffffff', fontSize: '13px', fontWeight: 600 }}>Festival Year:</span>
+                        <select 
+                            className="form-control" 
+                            style={{ width: '120px', padding: '4px 8px', fontSize: '13px', background: 'rgba(255,255,255,0.9)', color: '#2c3e50', fontWeight: 700 }}
+                            value={year} 
+                            onChange={e => { handleYearChange(e.target.value); setSidebarOpen(false); }}
+                        >
+                            {availableYears.map(y => (
+                                <option key={y} value={y}>{y}</option>
+                            ))}
+                        </select>
+                    </div>
                     <div 
                         className={`top-nav-item ${currentTab === 'dashboard' ? 'active' : ''}`}
                         onClick={() => { setCurrentTab('dashboard'); setSidebarOpen(false); }}
@@ -5390,6 +5411,7 @@ function App() {
             <main className="main-content">
                 {currentTab === 'dashboard' && (
                     <DashboardView 
+                        key={year}
                         stats={stats} 
                         year={year} 
                         onNavigate={setCurrentTab}
@@ -5400,6 +5422,7 @@ function App() {
 
                 {currentTab === 'articles' && (
                     <ArticlesView 
+                        key={year}
                         year={year} 
                         onOpenNewArticle={() => { setEditingArticle(null); setArticleModalOpen(true); }}
                         onEditArticle={(a) => { setEditingArticle(a); setArticleModalOpen(true); }}
@@ -5410,6 +5433,7 @@ function App() {
 
                 {currentTab === 'auction' && (
                     <AuctionDeskView 
+                        key={year}
                         year={year} 
                         showToast={showToast}
                         onOpenReceipt={rno => setReceiptModalNo(rno)}
@@ -5418,6 +5442,7 @@ function App() {
 
                 {currentTab === 'promises' && (
                     <PromisesView 
+                        key={year}
                         year={year} 
                         showToast={showToast}
                         onOpenReceipt={rno => setReceiptModalNo(rno)}
@@ -5426,6 +5451,7 @@ function App() {
 
                 {currentTab === 'reports' && (
                     <ReportsView 
+                        key={year}
                         year={year} 
                         showToast={showToast}
                     />

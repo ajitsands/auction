@@ -64,15 +64,25 @@ class Article extends Model {
 
     public function getYears(): array {
         $stmt = $this->db->query("
-            SELECT DISTINCT applicable_year 
-            FROM hf_articles 
-            ORDER BY applicable_year DESC
+            SELECT DISTINCT yr FROM (
+                SELECT applicable_year as yr FROM hf_articles WHERE applicable_year > 2000
+                UNION
+                SELECT applicable_year as yr FROM hf_auction_transactions WHERE applicable_year > 2000
+                UNION
+                SELECT applicable_year as yr FROM hf_promises WHERE applicable_year > 2000
+            ) t ORDER BY yr DESC
         ");
-        $years = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        $dbYears = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+
         $currentYear = (int)date('Y');
-        if (!in_array($currentYear, $years)) {
-            array_unshift($years, $currentYear);
+        $years = $dbYears;
+        // Ensure a range of relevant recent/upcoming festival years is always selectable
+        for ($y = $currentYear + 1; $y >= $currentYear - 3; $y--) {
+            if (!in_array($y, $years)) {
+                $years[] = $y;
+            }
         }
+        rsort($years);
         return array_values(array_unique($years));
     }
 

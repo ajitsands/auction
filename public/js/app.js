@@ -3911,16 +3911,23 @@ function HfReceiptVoucherCopy({ receipt, copyType = 'Member Copy', showLetterhea
     return (
         <div className="hf-receipt-sheet" style={{ background: '#ffffff', color: '#000000', fontFamily: 'Arial, Consolas, "Courier New", monospace', fontSize: '11.5px', lineHeight: '1.25' }}>
             {showLetterhead ? (
-                <div style={{ textAlign: 'center', marginBottom: '4px', paddingTop: '2px' }}>
+                <div style={{ textAlign: 'center', marginBottom: '3px', paddingTop: '1px' }}>
                     <img 
                         src="/images/logo/red_full_logo.png" 
                         alt="St. Mary's Indian Orthodox Cathedral" 
                         style={{ height: '34px', maxWidth: '340px', objectFit: 'contain' }}
                         onError={(e) => { e.target.src = '/images/logo/login-page-logo.png'; }}
                     />
+                    <div style={{ fontSize: '13px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1.5px', marginTop: '1px', color: '#000000' }}>
+                        RECEIPT
+                    </div>
                 </div>
             ) : (
-                <div style={{ height: '36px' }}></div>
+                <div style={{ height: '40px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', marginBottom: '3px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1.5px', color: '#000000' }}>
+                        RECEIPT
+                    </div>
+                </div>
             )}
 
             {/* Top rounded box matching #rcorners2 in staging_parallel hf_receipt.php */}
@@ -4045,6 +4052,10 @@ function ReceiptModal({ receiptNo, isOpen, onClose }) {
         }
     }, [receiptNo]);
 
+    const cleanReceiptBadge = receipt 
+        ? (String(receipt.voucher_no || receipt.manual_receipt_no || receipt.receipt_no || receiptNo).replace(/[^0-9]/g, '') || receipt.receipt_no || receiptNo)
+        : (String(receiptNo).replace(/[^0-9]/g, '') || receiptNo);
+
     const handlePrint = () => {
         const printArea = document.getElementById('hf-printable-receipt-area');
         if (!printArea) {
@@ -4087,22 +4098,37 @@ function ReceiptModal({ receiptNo, isOpen, onClose }) {
             font-family: Arial, Consolas, "Courier New", monospace !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
+            height: 287mm !important;
+            overflow: hidden !important;
         }
         .hf-receipt-container {
             width: 100% !important;
             max-width: 780px !important;
             margin: 0 auto !important;
+            padding: 0 !important;
             background: #ffffff !important;
+            box-sizing: border-box !important;
         }
+        /* Half-A4: exactly 138mm height per copy for top & bottom halves */
         .hf-receipt-sheet {
             width: 100% !important;
             max-width: 780px !important;
+            height: 138mm !important;
+            max-height: 138mm !important;
+            min-height: 138mm !important;
+            box-sizing: border-box !important;
             margin: 0 auto !important;
-            padding: 0 !important;
+            padding: 2mm 4mm !important;
             background: #ffffff !important;
             color: #000000 !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
+            page-break-after: avoid !important;
+            break-after: avoid !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: flex-start !important;
+            overflow: hidden !important;
             font-size: 11.5px !important;
         }
         .hf-receipt-box {
@@ -4124,32 +4150,44 @@ function ReceiptModal({ receiptNo, isOpen, onClose }) {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
         }
+        /* Center tear/cut line sitting at exactly the 148.5mm midpoint of the A4 page */
         .hf-receipt-divider {
-            page-break-before: auto !important;
-            break-before: auto !important;
-            page-break-after: auto !important;
-            break-after: auto !important;
+            page-break-before: avoid !important;
+            break-before: avoid !important;
+            page-break-after: avoid !important;
+            break-after: avoid !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
-            display: block !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
             width: 100% !important;
-            height: 12px !important;
-            border: none !important;
-            border-top: 1px dashed #777777 !important;
-            margin: 6px 0 !important;
+            height: 10mm !important;
+            margin: 0 auto !important;
             padding: 0 !important;
             text-align: center !important;
             position: relative !important;
+            box-sizing: border-box !important;
+        }
+        .hf-receipt-divider::before {
+            content: '' !important;
+            position: absolute !important;
+            left: 0 !important;
+            right: 0 !important;
+            top: 50% !important;
+            border-top: 1px dashed #777777 !important;
+            z-index: 1 !important;
         }
         .hf-receipt-divider span {
             display: inline-block !important;
             position: relative !important;
-            top: -8px !important;
+            z-index: 2 !important;
             background: #ffffff !important;
-            padding: 0 8px !important;
+            padding: 0 10px !important;
             font-size: 9.5px !important;
             color: #555555 !important;
             font-family: Arial, sans-serif !important;
+            letter-spacing: 0.5px !important;
         }
     </style>
 </head>
@@ -4181,10 +4219,6 @@ function ReceiptModal({ receiptNo, isOpen, onClose }) {
         setTimeout(doPrint, 350);
         iframe.onload = doPrint;
     };
-
-    const cleanReceiptBadge = receipt 
-        ? (String(receipt.voucher_no || receipt.manual_receipt_no || receipt.receipt_no || receiptNo).replace(/[^0-9]/g, '') || receipt.receipt_no || receiptNo)
-        : (String(receiptNo).replace(/[^0-9]/g, '') || receiptNo);
 
     return (
         <div className="modal-overlay" onClick={onClose}>

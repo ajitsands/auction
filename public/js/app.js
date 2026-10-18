@@ -2496,7 +2496,7 @@ function AuctionDeskView({ year, showToast, onOpenReceipt }) {
             if (res.success) {
                 let successMsg = `Auction recorded! Ref: ${res.data.auction_ref_no}`;
                 if (res.data.acc_contribution_id) {
-                    successMsg += ` | Contrib ID: #${res.data.acc_contribution_id} (HRCPT #${res.data.contrib_voucher_no})`;
+                    successMsg += ` | Contrib ID: #${res.data.acc_contribution_id} (Receipt #${res.data.contrib_voucher_no})`;
                 }
                 if (res.data.acc_promise_id) {
                     successMsg += ` | Promise ID: #${res.data.acc_promise_id} (MP #${res.data.promise_voucher_no})`;
@@ -3138,7 +3138,7 @@ function AuctionDeskView({ year, showToast, onOpenReceipt }) {
                             sortable: false,
                             footer: () => null,
                             searchValue: (t) => {
-                                const cvs = (t.contributions || []).map(c => `HRCPT ${c.voucher_no || ''} ${c.contribution_amount || ''} ${c.receipt_no || ''}`).join(' ');
+                                const cvs = (t.contributions || []).map(c => `Receipt HRCPT ${c.voucher_no || ''} ${c.contribution_amount || ''} ${c.receipt_no || ''}`).join(' ');
                                 const pvs = (t.promises || []).map(p => `MP ${p.voucher_no || ''} ${p.promise_amount || ''}`).join(' ');
                                 return `${cvs} ${pvs} ${t.contrib_voucher_no || ''} ${t.promise_voucher_no || ''} ${t.manual_receipt_no || ''} ${t.receipt_book_no || ''}`;
                             },
@@ -3190,10 +3190,10 @@ function AuctionDeskView({ year, showToast, onOpenReceipt }) {
                                                     textAlign: 'left',
                                                     width: 'fit-content'
                                                 }}
-                                                title={`Click to view & print official receipt for Voucher #${c.voucher_no}`}
+                                                title={`Click to view & print official receipt #${c.voucher_no}`}
                                             >
                                                 <i className="material-icons" style={{ fontSize: '13px' }}>receipt</i>
-                                                <span>HRCPT #{c.voucher_no}</span>
+                                                <span>Receipt #{c.voucher_no}</span>
                                                 {Number(c.contribution_amount) > 0 && (
                                                     <span>• BHD {Number(c.contribution_amount).toFixed(3)}</span>
                                                 )}
@@ -3459,7 +3459,7 @@ function RecordPaymentModal({ transaction, isOpen, onClose, onSuccess, onOpenRec
             if (res.success) {
                 let msg = `Payment of BHD ${amountNum.toFixed(3)} recorded! Receipt: ${res.data.receipt_no}`;
                 if (res.data.acc_contribution_id) {
-                    msg += ` | Contrib ID: #${res.data.acc_contribution_id} (HRCPT #${res.data.contrib_voucher_no})`;
+                    msg += ` | Contrib ID: #${res.data.acc_contribution_id} (Receipt #${res.data.contrib_voucher_no})`;
                 }
                 showToast('success', msg);
                 onSuccess();

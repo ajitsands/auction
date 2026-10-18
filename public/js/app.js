@@ -4651,8 +4651,14 @@ function ReportsView({ year, showToast }) {
 
         const buyerRowsHtml = buyers.map((b, idx) => {
             const itemsStr = Array.isArray(b.items) && b.items.length > 0 
-                ? b.items.map(i => `${i.tag_number ? '[' + i.tag_number + '] ' : ''}${i.article_name || ''} (BHD ${Number(i.winning_bid_amount || 0).toFixed(3)})`).join('<br>')
-                : (b.items_purchased || 0) + ' Item(s)';
+                ? b.items.map(i => `
+                    <div style="margin-bottom: 3px; line-height: 1.35;">
+                        ${i.tag_number ? `<strong style="color: #111;">[${i.tag_number}]</strong> ` : ''}
+                        <span>${i.article_name || ''}</span>
+                        <span style="color: #555; white-space: nowrap; font-size: 9.5px;"> (BHD ${Number(i.winning_bid_amount || 0).toFixed(3)})</span>
+                    </div>
+                `).join('')
+                : `<span>${b.items_purchased || 0} Item(s)</span>`;
             
             const statusColor = b.overall_status === 'Paid' ? '#2e7d32' : b.overall_status === 'Partial' ? '#e65100' : '#c62828';
             const statusBg = b.overall_status === 'Paid' ? '#e8f5e9' : b.overall_status === 'Partial' ? '#fff3e0' : '#ffebee';
@@ -4660,18 +4666,18 @@ function ReportsView({ year, showToast }) {
             return `
                 <tr>
                     <td style="text-align: center; vertical-align: top;">${idx + 1}</td>
-                    <td style="font-weight: bold; vertical-align: top;">
+                    <td style="font-weight: bold; vertical-align: top; word-break: break-word;">
                         ${b.buyer_name}
-                        ${b.prayer_group_name && b.prayer_group_name !== 'NA' ? `<br><small style="color: #666; font-weight: normal;">${b.prayer_group_name}</small>` : ''}
+                        ${b.prayer_group_name && b.prayer_group_name !== 'NA' ? `<br><small style="color: #666; font-weight: normal; font-size: 9px;">${b.prayer_group_name}</small>` : ''}
                     </td>
                     <td style="text-align: center; vertical-align: top;">${b.buyer_code_c || 'N/A'}</td>
                     <td style="text-align: center; vertical-align: top;">${b.buyer_phone || '—'}</td>
-                    <td style="font-size: 10px; vertical-align: top; color: #222;">${itemsStr}</td>
-                    <td style="text-align: right; font-weight: bold; vertical-align: top;">BHD ${Number(b.total_purchased || 0).toFixed(3)}</td>
-                    <td style="text-align: right; color: #2e7d32; vertical-align: top;">BHD ${Number(b.total_paid || 0).toFixed(3)}</td>
-                    <td style="text-align: right; font-weight: bold; color: ${Number(b.total_balance) > 0 ? '#c62828' : '#222'}; vertical-align: top;">BHD ${Number(b.total_balance || 0).toFixed(3)}</td>
-                    <td style="text-align: center; vertical-align: top;">
-                        <span style="display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 9.5px; font-weight: bold; background: ${statusBg}; color: ${statusColor};">
+                    <td style="font-size: 10px; vertical-align: top; text-align: left;">${itemsStr}</td>
+                    <td style="text-align: right; font-weight: bold; vertical-align: top; white-space: nowrap;">BHD ${Number(b.total_purchased || 0).toFixed(3)}</td>
+                    <td style="text-align: right; color: #2e7d32; vertical-align: top; white-space: nowrap;">BHD ${Number(b.total_paid || 0).toFixed(3)}</td>
+                    <td style="text-align: right; font-weight: bold; color: ${Number(b.total_balance) > 0 ? '#c62828' : '#222'}; vertical-align: top; white-space: nowrap;">BHD ${Number(b.total_balance || 0).toFixed(3)}</td>
+                    <td style="text-align: center; vertical-align: top; white-space: nowrap;">
+                        <span style="display: inline-block; padding: 2px 5px; border-radius: 4px; font-size: 9px; font-weight: bold; background: ${statusBg}; color: ${statusColor};">
                             ${b.overall_status}
                         </span>
                     </td>
@@ -4775,6 +4781,10 @@ function ReportsView({ year, showToast }) {
             border-collapse: collapse;
             font-size: 10px;
             margin-bottom: 12px;
+            table-layout: fixed;
+        }
+        table.report-table th, table.report-table td {
+            box-sizing: border-box;
         }
         table.report-table th {
             background-color: #e2e8f0 !important;
@@ -4866,12 +4876,12 @@ function ReportsView({ year, showToast }) {
     <table class="report-table">
         <thead>
             <tr>
-                <th style="width: 30px; text-align: center;">#</th>
-                <th>Category</th>
-                <th style="width: 70px; text-align: center;">Articles</th>
-                <th style="width: 70px; text-align: center;">Sold</th>
-                <th style="width: 110px; text-align: right;">Est. Value</th>
-                <th style="width: 110px; text-align: right;">Total Auction Sales</th>
+                <th style="width: 5%; text-align: center;">#</th>
+                <th style="width: 35%; text-align: left;">Category</th>
+                <th style="width: 12%; text-align: center;">Articles</th>
+                <th style="width: 12%; text-align: center;">Sold</th>
+                <th style="width: 18%; text-align: right;">Est. Value</th>
+                <th style="width: 18%; text-align: right;">Total Auction Sales</th>
             </tr>
         </thead>
         <tbody>
@@ -4879,11 +4889,11 @@ function ReportsView({ year, showToast }) {
         </tbody>
         <tfoot>
             <tr>
-                <td colspan="2" style="text-align: right;">Total:</td>
-                <td style="text-align: center;">${catTotalArticles}</td>
-                <td style="text-align: center;">${catTotalSold}</td>
-                <td style="text-align: right;">BHD ${catTotalEst.toFixed(3)}</td>
-                <td style="text-align: right;">BHD ${catTotalBid.toFixed(3)}</td>
+                <td colspan="2" style="text-align: right; font-weight: bold;">Total:</td>
+                <td style="text-align: center; font-weight: bold;">${catTotalArticles}</td>
+                <td style="text-align: center; font-weight: bold;">${catTotalSold}</td>
+                <td style="text-align: right; font-weight: bold;">BHD ${catTotalEst.toFixed(3)}</td>
+                <td style="text-align: right; font-weight: bold;">BHD ${catTotalBid.toFixed(3)}</td>
             </tr>
         </tfoot>
     </table>
@@ -4893,15 +4903,15 @@ function ReportsView({ year, showToast }) {
     <table class="report-table">
         <thead>
             <tr>
-                <th style="width: 25px; text-align: center;">#</th>
-                <th style="width: 130px;">Buyer / Member Name</th>
-                <th style="width: 55px; text-align: center;">Roll No</th>
-                <th style="width: 70px; text-align: center;">Phone</th>
-                <th>Articles Purchased</th>
-                <th style="width: 80px; text-align: right;">Total Bid</th>
-                <th style="width: 80px; text-align: right;">Total Paid</th>
-                <th style="width: 80px; text-align: right;">Balance</th>
-                <th style="width: 60px; text-align: center;">Status</th>
+                <th style="width: 3%; text-align: center;">#</th>
+                <th style="width: 16%; text-align: left;">Buyer / Member Name</th>
+                <th style="width: 5%; text-align: center;">Roll No</th>
+                <th style="width: 8%; text-align: center;">Phone</th>
+                <th style="width: 38%; text-align: left;">Articles</th>
+                <th style="width: 8%; text-align: right; white-space: nowrap;">Total Bid</th>
+                <th style="width: 8%; text-align: right; white-space: nowrap;">Total Paid</th>
+                <th style="width: 8%; text-align: right; white-space: nowrap;">Balance</th>
+                <th style="width: 6%; text-align: center; white-space: nowrap;">Status</th>
             </tr>
         </thead>
         <tbody>
@@ -4909,10 +4919,10 @@ function ReportsView({ year, showToast }) {
         </tbody>
         <tfoot>
             <tr>
-                <td colspan="5" style="text-align: right;">Grand Totals (${buyers.length} Buyers):</td>
-                <td style="text-align: right;">BHD ${buyerTotalBid.toFixed(3)}</td>
-                <td style="text-align: right; color: #2e7d32;">BHD ${buyerTotalPaid.toFixed(3)}</td>
-                <td style="text-align: right; color: ${buyerTotalBalance > 0 ? '#c62828' : '#222'};">BHD ${buyerTotalBalance.toFixed(3)}</td>
+                <td colspan="5" style="text-align: right; font-weight: bold;">Grand Totals (${buyers.length} Buyers):</td>
+                <td style="text-align: right; white-space: nowrap; font-weight: bold;">BHD ${buyerTotalBid.toFixed(3)}</td>
+                <td style="text-align: right; color: #2e7d32; white-space: nowrap; font-weight: bold;">BHD ${buyerTotalPaid.toFixed(3)}</td>
+                <td style="text-align: right; color: ${buyerTotalBalance > 0 ? '#c62828' : '#222'}; white-space: nowrap; font-weight: bold;">BHD ${buyerTotalBalance.toFixed(3)}</td>
                 <td></td>
             </tr>
         </tfoot>

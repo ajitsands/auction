@@ -4,6 +4,7 @@ staging_parallel.zip
 
 # Database dumps (exceeds GitHub 100MB limit)
 *.sql
+!database_migration.sql
 
 # Environment and sensitive configuration
 .env

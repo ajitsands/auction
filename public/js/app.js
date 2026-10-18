@@ -3901,15 +3901,11 @@ function HfReceiptVoucherCopy({ receipt, copyType = 'Member Copy', showLetterhea
                             <div style={{ fontSize: '12px', color: '#222222' }}>{crName}</div>
                         </td>
                         <td style={{ textAlign: 'left', verticalAlign: 'top', padding: '8px 6px' }}>
-                            {/* In Remarks: Article details displayed along with ONLY Cr head (no Dr head, no payment mode, no promise id) */}
                             <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#000000', marginBottom: '2px' }}>
                                 {receipt.applicable_year || 2026} - {artName}
                             </div>
-                            <div style={{ fontSize: '12px', color: '#222222', marginBottom: '4px' }}>
+                            <div style={{ fontSize: '12px', color: '#222222' }}>
                                 <strong>Tag No:</strong> {tagNo} &nbsp;|&nbsp; <strong>Article No:</strong> {artNo} {category ? `| ${category}` : ''}
-                            </div>
-                            <div style={{ fontSize: '12px', color: '#333333', borderTop: '1px dotted #999999', paddingTop: '3px', marginTop: '3px' }}>
-                                <strong>Cr Head:</strong> {crCode} {crName}
                             </div>
                         </td>
                         <td style={{ textAlign: 'right', verticalAlign: 'top', padding: '8px 6px', fontWeight: 'bold' }}>

@@ -135,6 +135,53 @@ class Report extends Model {
             ORDER BY total_purchased DESC
         ");
         $stmt->execute(['year' => $year]);
-        return $stmt->fetchAll();
+        $buyers = $stmt->fetchAll();
+
+        // Fetch item details (tag, name, article number) for transactions of this year
+        $itemsStmt = $this->db->prepare("
+            SELECT 
+                t.transaction_id,
+                t.buyer_name,
+                t.buyer_code_c,
+                t.buyer_phone,
+                t.winning_bid_amount,
+                a.article_id,
+                a.article_number,
+                a.tag_number,
+                a.article_name,
+                a.category
+            FROM hf_auction_transactions t
+            JOIN hf_articles a ON t.article_id = a.article_id
+            WHERE t.applicable_year = :year
+            ORDER BY a.tag_number ASC, a.article_number ASC
+        ");
+        $itemsStmt->execute(['year' => $year]);
+        $allItems = $itemsStmt->fetchAll();
+
+        // Group items by buyer signature (name + code_c + phone)
+        $itemsByBuyer = [];
+        foreach ($allItems as $item) {
+            $key = trim($item['buyer_name']) . '|' . trim((string)($item['buyer_code_c'] ?? '')) . '|' . trim((string)($item['buyer_phone'] ?? ''));
+            if (!isset($itemsByBuyer[$key])) {
+                $itemsByBuyer[$key] = [];
+            }
+            $itemsByBuyer[$key][] = [
+                'article_id'         => (int)$item['article_id'],
+                'article_number'     => $item['article_number'],
+                'tag_number'         => $item['tag_number'],
+                'article_name'       => $item['article_name'],
+                'category'           => $item['category'],
+                'winning_bid_amount' => (float)$item['winning_bid_amount']
+            ];
+        }
+
+        // Attach items array to each buyer
+        foreach ($buyers as &$b) {
+            $key = trim($b['buyer_name']) . '|' . trim((string)($b['buyer_code_c'] ?? '')) . '|' . trim((string)($b['buyer_phone'] ?? ''));
+            $b['items'] = $itemsByBuyer[$key] ?? [];
+        }
+        unset($b);
+
+        return $buyers;
     }
 }

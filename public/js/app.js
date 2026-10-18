@@ -4234,7 +4234,10 @@ function ReportsView({ year, showToast }) {
             'Roll No': b.buyer_code_c || 'N/A',
             'CPR': b.cpr_no || 'N/A',
             'Phone': b.buyer_phone || 'N/A',
-            'Items Won': b.items_purchased,
+            'Items Count': b.items_purchased,
+            'Items Bought': Array.isArray(b.items) && b.items.length > 0 
+                ? b.items.map(i => `${i.tag_number ? '[' + i.tag_number + '] ' : ''}${i.article_number ? '(' + i.article_number + ') ' : ''}${i.article_name || ''}`).join('; ')
+                : (b.items_purchased || 0),
             'Total Bid (BHD)': b.total_purchased,
             'Total Paid (BHD)': b.total_paid,
             'Balance Due (BHD)': b.total_balance,
@@ -4419,7 +4422,62 @@ function ReportsView({ year, showToast }) {
                             accessor: 'items_purchased',
                             sortable: true,
                             sortValue: (b) => Number(b.items_purchased) || 0,
-                            render: (b) => <span className="badge badge-secondary">{b.items_purchased}</span>
+                            searchValue: (b) => {
+                                const itemsStr = Array.isArray(b.items) 
+                                    ? b.items.map(i => `${i.tag_number || ''} ${i.article_number || ''} ${i.article_name || ''}`).join(' ') 
+                                    : '';
+                                return `${b.items_purchased || ''} ${itemsStr}`;
+                            },
+                            style: { minWidth: '260px' },
+                            render: (b) => (
+                                <div>
+                                    <div style={{ marginBottom: (Array.isArray(b.items) && b.items.length > 0) ? '6px' : '0' }}>
+                                        <span className="badge badge-secondary" style={{ fontWeight: 700, fontSize: '11px', letterSpacing: '0.3px' }}>
+                                            {b.items_purchased} {b.items_purchased === 1 ? 'Item' : 'Items'}
+                                        </span>
+                                    </div>
+                                    {Array.isArray(b.items) && b.items.length > 0 && (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                            {b.items.map((it, idx) => (
+                                                <div 
+                                                    key={idx} 
+                                                    style={{ 
+                                                        fontSize: '12px', 
+                                                        lineHeight: '1.3',
+                                                        padding: '4px 8px',
+                                                        background: 'var(--bg-card, rgba(255, 255, 255, 0.04))',
+                                                        border: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
+                                                        borderRadius: '6px'
+                                                    }}
+                                                >
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '2px', flexWrap: 'wrap' }}>
+                                                        {it.tag_number && (
+                                                            <span className="tag-badge" style={{ fontSize: '10px', padding: '1px 5px', fontWeight: 700 }}>
+                                                                {it.tag_number}
+                                                            </span>
+                                                        )}
+                                                        {it.article_number && (
+                                                            <span style={{ 
+                                                                fontSize: '10px', 
+                                                                color: 'var(--text-muted)', 
+                                                                fontFamily: 'monospace', 
+                                                                background: 'rgba(255,255,255,0.06)', 
+                                                                padding: '1px 4px', 
+                                                                borderRadius: '3px' 
+                                                            }}>
+                                                                {it.article_number}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                                                        {it.article_name}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )
                         },
                         {
                             header: 'Total Purchases',

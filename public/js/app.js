@@ -2297,6 +2297,7 @@ function AuctionDeskView({ year, showToast, onOpenReceipt }) {
     const [memberSearch, setMemberSearch] = useState('');
     const [memberResults, setMemberResults] = useState([]);
     const [selectedMember, setSelectedMember] = useState(null);
+    const [memberBalanceLoading, setMemberBalanceLoading] = useState(false);
     const [notes, setNotes] = useState('');
 
     const selectedArticle = useMemo(() => {
@@ -2390,9 +2391,29 @@ function AuctionDeskView({ year, showToast, onOpenReceipt }) {
     }, [memberSearch]);
 
     const handleSelectMember = (m) => {
-        setSelectedMember(m);
+        setSelectedMember({ ...m, outstanding_balance: null });
         setMemberSearch('');
         setMemberResults([]);
+        setMemberBalanceLoading(true);
+
+        api.get(`/api/members/${m.primary_member_id}/outstanding`)
+            .then(res => {
+                if (res.success) {
+                    setSelectedMember(prev => {
+                        if (!prev || prev.primary_member_id !== m.primary_member_id) return prev;
+                        return {
+                            ...prev,
+                            outstanding_balance: Number(res.outstanding_balance || 0)
+                        };
+                    });
+                }
+            })
+            .catch(err => {
+                console.error("Failed to load member outstanding balance:", err);
+            })
+            .finally(() => {
+                setMemberBalanceLoading(false);
+            });
     };
 
     const handleSelectArticle = (art) => {
@@ -2513,6 +2534,7 @@ function AuctionDeskView({ year, showToast, onOpenReceipt }) {
                 setBidAmount('');
                 setPaidAmount('');
                 setSelectedMember(null);
+                setMemberBalanceLoading(false);
                 setMemberSearch('');
                 setNotes('');
                 setReceiptBookNo('');
@@ -2747,6 +2769,11 @@ function AuctionDeskView({ year, showToast, onOpenReceipt }) {
                                 <div style={{ fontSize: '11px', marginTop: '4px', color: 'var(--text-muted)' }}>
                                     Balance Due: <strong>BHD {currentBalance.toFixed(3)}</strong>
                                     {' '}(Winning Bid: BHD {(Number(bidAmount) || 0).toFixed(3)} posted as Promise)
+                                    {selectedMember && selectedMember.outstanding_balance !== null && selectedMember.outstanding_balance !== undefined && (
+                                        <span style={{ marginLeft: '8px', color: Number(selectedMember.outstanding_balance) > 0 ? 'var(--danger)' : 'var(--text-muted)', fontWeight: 600 }}>
+                                            • Member Existing Due: BHD {Number(selectedMember.outstanding_balance).toFixed(3)}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -2763,17 +2790,68 @@ function AuctionDeskView({ year, showToast, onOpenReceipt }) {
                             </div>
 
                             {selectedMember ? (
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '12px 16px', borderRadius: '8px' }}>
-                                    <div>
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    background: 'rgba(16, 185, 129, 0.08)',
+                                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                                    padding: '12px 16px',
+                                    borderRadius: '8px',
+                                    flexWrap: 'wrap',
+                                    gap: '14px'
+                                }}>
+                                    <div style={{ minWidth: '220px', flex: '1 1 auto' }}>
                                         <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '15px' }}>{selectedMember.primary_member_name}</div>
-                                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
                                             Roll No: <strong style={{ color: 'var(--primary)' }}>{selectedMember.code_c}</strong> &nbsp;|&nbsp;
-                                            CPR: {selectedMember.cpr_no} &nbsp;|&nbsp;
-                                            Phone: {selectedMember.bahrain_contact_no} &nbsp;|&nbsp;
-                                            {selectedMember.prayer_group_name}
+                                            CPR: {selectedMember.cpr_no || 'NA'} &nbsp;|&nbsp;
+                                            Phone: {selectedMember.bahrain_contact_no || 'NA'} &nbsp;|&nbsp;
+                                            {selectedMember.prayer_group_name || ''}
                                         </div>
                                     </div>
-                                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setSelectedMember(null)}>
+
+                                    {/* Populated Member Outstanding Balance */}
+                                    <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '10px',
+                                        background: Number(selectedMember.outstanding_balance || 0) > 0 ? 'rgba(239, 68, 68, 0.12)' : 'rgba(16, 185, 129, 0.12)',
+                                        border: `1px solid ${Number(selectedMember.outstanding_balance || 0) > 0 ? 'rgba(239, 68, 68, 0.4)' : 'rgba(16, 185, 129, 0.4)'}`,
+                                        padding: '7px 14px',
+                                        borderRadius: '8px',
+                                        minWidth: '180px'
+                                    }}>
+                                        <i className="material-icons" style={{ fontSize: '24px', color: Number(selectedMember.outstanding_balance || 0) > 0 ? 'var(--danger)' : 'var(--success)' }}>
+                                            account_balance_wallet
+                                        </i>
+                                        <div>
+                                            <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700, color: 'var(--text-muted)' }}>
+                                                Outstanding Balance
+                                            </div>
+                                            <div style={{ fontSize: '16px', fontWeight: 800, color: Number(selectedMember.outstanding_balance || 0) > 0 ? 'var(--danger)' : 'var(--success)' }}>
+                                                {memberBalanceLoading ? (
+                                                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                                        <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" style={{ width: '12px', height: '12px', marginRight: '6px', borderWidth: '2px', display: 'inline-block' }}></span>
+                                                        Fetching balance...
+                                                    </span>
+                                                ) : (
+                                                    `BHD ${Number(selectedMember.outstanding_balance || 0).toFixed(3)}`
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <button 
+                                        type="button" 
+                                        className="btn btn-secondary btn-sm" 
+                                        onClick={() => {
+                                            setSelectedMember(null);
+                                            setMemberBalanceLoading(false);
+                                        }}
+                                        style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                                    >
+                                        <i className="material-icons" style={{ fontSize: '15px' }}>swap_horiz</i>
                                         Change Member
                                     </button>
                                 </div>

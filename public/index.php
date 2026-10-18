@@ -91,6 +91,7 @@ $router->get('/api/promises', [PromiseController::class, 'index']);
 
 // Member Lookup
 $router->get('/api/members/search', [MemberController::class, 'search']);
+$router->get('/api/members/{id}/outstanding', [MemberController::class, 'outstanding']);
 
 // Reports Endpoints
 $router->get('/api/reports/summary', [ReportController::class, 'summary']);

@@ -4999,16 +4999,10 @@ function UsersView({ currentUser, showToast }) {
     return (
         <div>
             {/* Page Header */}
-            <div className="page-header">
-                <div>
-                    <h2>User Administration</h2>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
-                        System users and Harvest Festival data entry accounts connected to <code>tbl_users</code>
-                    </p>
-                </div>
-                <div className="breadcrumb">
-                    <span>Portal Settings</span> &gt; <span style={{ color: 'var(--primary)', fontWeight: 600 }}>System Users</span>
-                </div>
+            <div style={{ marginBottom: '20px' }}>
+                <h2 style={{ color: 'var(--primary)', fontWeight: 700, margin: 0, fontSize: '24px' }}>
+                    User Administration
+                </h2>
             </div>
 
             {/* Metrics Grid */}

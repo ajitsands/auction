@@ -4234,14 +4234,11 @@ function ReportsView({ year, showToast }) {
 
     return (
         <div>
-            {/* Breadcrumbs Header */}
+            {/* Header */}
             <div className="breadcrumbs-wrapper">
                 <div className="breadcrumbs-title">
                     <i className="material-icons">insert_chart</i>
                     <h4>Auction Sales & Financial Reports ({year})</h4>
-                </div>
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                    <span>Cathedral Auction</span> &gt; <span style={{ color: 'var(--primary)', fontWeight: 600 }}>Financial Ledger & Analysis</span>
                 </div>
             </div>
 

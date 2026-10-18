@@ -1768,35 +1768,152 @@ select.form-control option {
 
 /* Print Media Query */
 @media print {
-    body * {
-        visibility: hidden !important;
+    @page {
+        size: A4 portrait;
+        margin: 8mm 10mm;
     }
-    .hf-receipt-container, .hf-receipt-container *,
-    .receipt-wrapper, .receipt-wrapper * {
-        visibility: visible !important;
+
+    html, body {
+        width: 100% !important;
+        height: auto !important;
+        min-height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        overflow: visible !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
     }
-    .hf-receipt-container, .receipt-wrapper {
-        position: absolute !important;
-        left: 0 !important;
-        top: 0 !important;
+
+    /* Completely hide background application layout elements */
+    .top-navbar,
+    main,
+    footer.page-footer,
+    .no-print,
+    .modal-header,
+    .modal-footer,
+    .toast-container,
+    .toast,
+    .dt-toolbar,
+    .mobile-hamburger {
+        display: none !important;
+    }
+
+    #root,
+    .app-container {
+        display: block !important;
+        width: 100% !important;
+        height: auto !important;
+        min-height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: transparent !important;
+        overflow: visible !important;
+    }
+
+    .modal-overlay {
+        position: static !important;
+        display: block !important;
+        width: 100% !important;
+        height: auto !important;
+        min-height: auto !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        background: #ffffff !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        animation: none !important;
+        transform: none !important;
+        overflow: visible !important;
+        z-index: auto !important;
+    }
+
+    .modal-content {
+        position: static !important;
+        display: block !important;
         width: 100% !important;
         max-width: 100% !important;
+        height: auto !important;
+        max-height: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        background: #ffffff !important;
         box-shadow: none !important;
         border: none !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        background: transparent !important;
+        border-radius: 0 !important;
+        animation: none !important;
+        transform: none !important;
+        overflow: visible !important;
     }
-    .modal-overlay, .modal-content, .modal-body {
+
+    .modal-body {
         position: static !important;
+        display: block !important;
+        width: 100% !important;
         padding: 0 !important;
         margin: 0 !important;
-        background: transparent !important;
+        background: #ffffff !important;
+        overflow: visible !important;
+    }
+
+    .hf-receipt-container {
+        position: static !important;
+        display: block !important;
+        width: 100% !important;
+        max-width: 800px !important;
+        margin: 0 auto !important;
+        padding: 0 !important;
+        background: #ffffff !important;
         box-shadow: none !important;
         border: none !important;
         overflow: visible !important;
     }
-    .modal-footer, .no-print, .top-navbar, .page-footer {
+
+    .hf-receipt-sheet {
+        position: static !important;
+        display: block !important;
+        width: 100% !important;
+        max-width: 800px !important;
+        margin: 0 auto 14px auto !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+
+    .hf-receipt-box {
+        border-radius: 20px !important;
+        border: 1px solid #646464 !important;
+        background: #ffffff !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    .hf-grid-table {
+        border-collapse: collapse !important;
+        width: 100% !important;
+    }
+
+    .hf-grid-table th {
+        background-color: #D1D1D1 !important;
+        color: #000000 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    .hf-receipt-divider {
+        page-break-before: always !important;
+        break-before: page !important;
+        display: block !important;
+        height: 1px !important;
+        border: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .hf-receipt-divider span {
         display: none !important;
     }
 }

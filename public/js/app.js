@@ -3968,7 +3968,122 @@ function ReceiptModal({ receiptNo, isOpen, onClose }) {
     }, [receiptNo]);
 
     const handlePrint = () => {
-        window.print();
+        const printArea = document.getElementById('hf-printable-receipt-area');
+        if (!printArea) {
+            window.print();
+            return;
+        }
+
+        // Clean up any existing print iframe
+        const oldIframe = document.getElementById('hf-receipt-print-frame');
+        if (oldIframe) {
+            oldIframe.remove();
+        }
+
+        const iframe = document.createElement('iframe');
+        iframe.id = 'hf-receipt-print-frame';
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '10px';
+        iframe.style.height = '10px';
+        iframe.style.border = '0';
+        iframe.style.opacity = '0.01';
+        iframe.style.pointerEvents = 'none';
+        iframe.style.zIndex = '-999';
+        document.body.appendChild(iframe);
+
+        const printHtml = `<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Receipt ${cleanReceiptBadge}</title>
+    <link rel="stylesheet" href="/css/app.css">
+    <style>
+        @page { size: A4 portrait; margin: 8mm 10mm; }
+        html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+            color: #000000 !important;
+            font-family: Arial, Consolas, "Courier New", monospace !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        .hf-receipt-container {
+            width: 100% !important;
+            max-width: 800px !important;
+            margin: 0 auto !important;
+            background: #ffffff !important;
+        }
+        .hf-receipt-sheet {
+            width: 100% !important;
+            max-width: 800px !important;
+            margin: 0 auto 14px auto !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+            color: #000000 !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+        }
+        .hf-receipt-box {
+            border-radius: 20px !important;
+            border: 1px solid #646464 !important;
+            padding: 8px 14px !important;
+            background: #ffffff !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        .hf-grid-table {
+            border-collapse: collapse !important;
+            width: 100% !important;
+        }
+        .hf-grid-table th {
+            background-color: #D1D1D1 !important;
+            color: #000000 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        .hf-receipt-divider {
+            page-break-before: always !important;
+            break-before: page !important;
+            height: 1px !important;
+            border: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        .hf-receipt-divider span {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="hf-receipt-container">
+        ${printArea.innerHTML}
+    </div>
+</body>
+</html>`;
+
+        const doc = iframe.contentWindow.document;
+        doc.open();
+        doc.write(printHtml);
+        doc.close();
+
+        let printed = false;
+        const doPrint = () => {
+            if (printed) return;
+            printed = true;
+            try {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+            } catch (err) {
+                console.error("Iframe print error:", err);
+                window.print();
+            }
+        };
+
+        setTimeout(doPrint, 350);
+        iframe.onload = doPrint;
     };
 
     const cleanReceiptBadge = receipt 
@@ -4016,7 +4131,7 @@ function ReceiptModal({ receiptNo, isOpen, onClose }) {
                     ) : !receipt ? (
                         <div style={{ color: '#000', textAlign: 'center', padding: '30px' }}>Receipt details not found.</div>
                     ) : (
-                        <div className="hf-receipt-container">
+                        <div className="hf-receipt-container" id="hf-printable-receipt-area">
                             {/* Member Copy */}
                             <HfReceiptVoucherCopy 
                                 receipt={receipt} 

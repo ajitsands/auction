@@ -4251,26 +4251,25 @@ function ReportsView({ year, showToast }) {
 
     return (
         <div>
-            {/* Header */}
-            <div className="breadcrumbs-wrapper">
-                <div className="breadcrumbs-title">
-                    <i className="material-icons">insert_chart</i>
-                    <h4>Auction Sales & Financial Reports ({year})</h4>
-                </div>
-            </div>
-
             <div className="card" style={{ marginBottom: '28px' }}>
                 <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '18px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '18px', flexWrap: 'wrap' }}>
                         <img 
                             src="/images/logo/red_full_logo.png" 
                             alt="Auction Portal" 
-                            style={{ height: '52px', maxWidth: '360px', objectFit: 'contain' }} 
+                            style={{ height: '48px', maxWidth: '320px', objectFit: 'contain' }} 
                             onError={(e) => { e.target.src = '/images/logo/login-page-logo.png'; }}
                         />
-                        <div>
-                            <h3>Annual Harvest Festival Auction Summary ({year})</h3>
-                            <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Financial and volume breakdown across all auction categories</p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <i className="material-icons" style={{ fontSize: '28px', color: 'var(--primary)' }}>insert_chart</i>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--primary)' }}>
+                                    Auction Sales & Financial Reports ({year})
+                                </h3>
+                                <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
+                                    Annual Harvest Festival Auction Summary across all categories
+                                </p>
+                            </div>
                         </div>
                     </div>
                     <button className="btn btn-indigo btn-sm" onClick={() => window.print()}>
@@ -4372,10 +4371,17 @@ function ReportsView({ year, showToast }) {
 
             {/* Buyer Report */}
             <div className="card">
-                <div className="card-header">
-                    <div>
-                        <h3>Member & Buyer Settlement Ledger ({year})</h3>
-                        <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Buyer-wise purchase totals, payments, and open balances</p>
+                <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <i className="material-icons" style={{ fontSize: '28px', color: 'var(--primary)' }}>receipt_long</i>
+                        <div>
+                            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--primary)' }}>
+                                Member & Buyer Settlement Ledger ({year})
+                            </h3>
+                            <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
+                                Buyer-wise purchase totals, payments, and open balances
+                            </p>
+                        </div>
                     </div>
                     <button className="btn btn-excel btn-sm" onClick={exportBuyerReport}>
                         <i className="material-icons">file_download</i> Export Excel Ledger

@@ -4644,18 +4644,18 @@ function ReportsView({ year, showToast }) {
                 <td style="font-weight: bold;">${c.category}</td>
                 <td style="text-align: center;">${c.article_count || 0}</td>
                 <td style="text-align: center;">${c.sold_count || 0}</td>
-                <td style="text-align: right;">BHD ${Number(c.estimated_val || 0).toFixed(3)}</td>
-                <td style="text-align: right; font-weight: bold;">BHD ${Number(c.total_bid_val || 0).toFixed(3)}</td>
+                <td style="text-align: right; padding-right: 6px;">${Number(c.estimated_val || 0).toFixed(3)}</td>
+                <td style="text-align: right; font-weight: bold; padding-right: 6px;">${Number(c.total_bid_val || 0).toFixed(3)}</td>
             </tr>
         `).join('');
 
         const buyerRowsHtml = buyers.map((b, idx) => {
             const itemsStr = Array.isArray(b.items) && b.items.length > 0 
                 ? b.items.map(i => `
-                    <div style="margin-bottom: 3px; line-height: 1.35;">
+                    <div style="margin-bottom: 2px; line-height: 1.35;">
                         ${i.tag_number ? `<strong style="color: #111;">[${i.tag_number}]</strong> ` : ''}
                         <span>${i.article_name || ''}</span>
-                        <span style="color: #555; white-space: nowrap; font-size: 9.5px;"> (BHD ${Number(i.winning_bid_amount || 0).toFixed(3)})</span>
+                        <span style="color: #666; font-size: 9px; white-space: nowrap;"> (${Number(i.winning_bid_amount || 0).toFixed(3)})</span>
                     </div>
                 `).join('')
                 : `<span>${b.items_purchased || 0} Item(s)</span>`;
@@ -4673,11 +4673,11 @@ function ReportsView({ year, showToast }) {
                     <td style="text-align: center; vertical-align: top;">${b.buyer_code_c || 'N/A'}</td>
                     <td style="text-align: center; vertical-align: top;">${b.buyer_phone || '—'}</td>
                     <td style="font-size: 10px; vertical-align: top; text-align: left;">${itemsStr}</td>
-                    <td style="text-align: right; font-weight: bold; vertical-align: top; white-space: nowrap;">BHD ${Number(b.total_purchased || 0).toFixed(3)}</td>
-                    <td style="text-align: right; color: #2e7d32; vertical-align: top; white-space: nowrap;">BHD ${Number(b.total_paid || 0).toFixed(3)}</td>
-                    <td style="text-align: right; font-weight: bold; color: ${Number(b.total_balance) > 0 ? '#c62828' : '#222'}; vertical-align: top; white-space: nowrap;">BHD ${Number(b.total_balance || 0).toFixed(3)}</td>
+                    <td style="text-align: right; font-weight: bold; vertical-align: top; white-space: nowrap; padding-right: 8px;">${Number(b.total_purchased || 0).toFixed(3)}</td>
+                    <td style="text-align: right; color: #2e7d32; font-weight: 600; vertical-align: top; white-space: nowrap; padding-right: 8px;">${Number(b.total_paid || 0).toFixed(3)}</td>
+                    <td style="text-align: right; font-weight: bold; color: ${Number(b.total_balance) > 0 ? '#c62828' : '#222'}; vertical-align: top; white-space: nowrap; padding-right: 8px;">${Number(b.total_balance || 0).toFixed(3)}</td>
                     <td style="text-align: center; vertical-align: top; white-space: nowrap;">
-                        <span style="display: inline-block; padding: 2px 5px; border-radius: 4px; font-size: 9px; font-weight: bold; background: ${statusBg}; color: ${statusColor};">
+                        <span style="display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: bold; background: ${statusBg}; color: ${statusColor};">
                             ${b.overall_status}
                         </span>
                     </td>
@@ -4876,12 +4876,12 @@ function ReportsView({ year, showToast }) {
     <table class="report-table">
         <thead>
             <tr>
-                <th style="width: 5%; text-align: center;">#</th>
-                <th style="width: 35%; text-align: left;">Category</th>
-                <th style="width: 12%; text-align: center;">Articles</th>
-                <th style="width: 12%; text-align: center;">Sold</th>
-                <th style="width: 18%; text-align: right;">Est. Value</th>
-                <th style="width: 18%; text-align: right;">Total Auction Sales</th>
+                <th style="width: 5%; text-align: center; vertical-align: middle;">#</th>
+                <th style="width: 35%; text-align: left; vertical-align: middle;">Category</th>
+                <th style="width: 12%; text-align: center; vertical-align: middle;">Articles</th>
+                <th style="width: 12%; text-align: center; vertical-align: middle;">Sold</th>
+                <th style="width: 18%; text-align: right; vertical-align: middle; padding-right: 6px;">Est. Value (BHD)</th>
+                <th style="width: 18%; text-align: right; vertical-align: middle; padding-right: 6px;">Total Sales (BHD)</th>
             </tr>
         </thead>
         <tbody>
@@ -4892,8 +4892,8 @@ function ReportsView({ year, showToast }) {
                 <td colspan="2" style="text-align: right; font-weight: bold;">Total:</td>
                 <td style="text-align: center; font-weight: bold;">${catTotalArticles}</td>
                 <td style="text-align: center; font-weight: bold;">${catTotalSold}</td>
-                <td style="text-align: right; font-weight: bold;">BHD ${catTotalEst.toFixed(3)}</td>
-                <td style="text-align: right; font-weight: bold;">BHD ${catTotalBid.toFixed(3)}</td>
+                <td style="text-align: right; font-weight: bold; padding-right: 6px;">${catTotalEst.toFixed(3)}</td>
+                <td style="text-align: right; font-weight: bold; padding-right: 6px;">${catTotalBid.toFixed(3)}</td>
             </tr>
         </tfoot>
     </table>
@@ -4903,15 +4903,15 @@ function ReportsView({ year, showToast }) {
     <table class="report-table">
         <thead>
             <tr>
-                <th style="width: 3%; text-align: center;">#</th>
-                <th style="width: 16%; text-align: left;">Buyer / Member Name</th>
-                <th style="width: 5%; text-align: center;">Roll No</th>
-                <th style="width: 8%; text-align: center;">Phone</th>
-                <th style="width: 38%; text-align: left;">Articles</th>
-                <th style="width: 8%; text-align: right; white-space: nowrap;">Total Bid</th>
-                <th style="width: 8%; text-align: right; white-space: nowrap;">Total Paid</th>
-                <th style="width: 8%; text-align: right; white-space: nowrap;">Balance</th>
-                <th style="width: 6%; text-align: center; white-space: nowrap;">Status</th>
+                <th style="width: 3%; text-align: center; vertical-align: middle;">#</th>
+                <th style="width: 16%; text-align: left; vertical-align: middle;">Buyer / Member Name</th>
+                <th style="width: 5.5%; text-align: center; vertical-align: middle;">Roll No</th>
+                <th style="width: 8.5%; text-align: center; vertical-align: middle;">Phone</th>
+                <th style="width: 32%; text-align: left; vertical-align: middle;">Articles</th>
+                <th style="width: 10%; text-align: right; vertical-align: middle; padding-right: 8px;">Total Bid<br><span style="font-size: 8.5px; font-weight: normal; color: #444;">(BHD)</span></th>
+                <th style="width: 10%; text-align: right; vertical-align: middle; padding-right: 8px;">Total Paid<br><span style="font-size: 8.5px; font-weight: normal; color: #444;">(BHD)</span></th>
+                <th style="width: 9%; text-align: right; vertical-align: middle; padding-right: 8px;">Balance<br><span style="font-size: 8.5px; font-weight: normal; color: #444;">(BHD)</span></th>
+                <th style="width: 6%; text-align: center; vertical-align: middle;">Status</th>
             </tr>
         </thead>
         <tbody>
@@ -4920,9 +4920,9 @@ function ReportsView({ year, showToast }) {
         <tfoot>
             <tr>
                 <td colspan="5" style="text-align: right; font-weight: bold;">Grand Totals (${buyers.length} Buyers):</td>
-                <td style="text-align: right; white-space: nowrap; font-weight: bold;">BHD ${buyerTotalBid.toFixed(3)}</td>
-                <td style="text-align: right; color: #2e7d32; white-space: nowrap; font-weight: bold;">BHD ${buyerTotalPaid.toFixed(3)}</td>
-                <td style="text-align: right; color: ${buyerTotalBalance > 0 ? '#c62828' : '#222'}; white-space: nowrap; font-weight: bold;">BHD ${buyerTotalBalance.toFixed(3)}</td>
+                <td style="text-align: right; white-space: nowrap; font-weight: bold; padding-right: 8px;">${buyerTotalBid.toFixed(3)}</td>
+                <td style="text-align: right; color: #2e7d32; white-space: nowrap; font-weight: bold; padding-right: 8px;">${buyerTotalPaid.toFixed(3)}</td>
+                <td style="text-align: right; color: ${buyerTotalBalance > 0 ? '#c62828' : '#222'}; white-space: nowrap; font-weight: bold; padding-right: 8px;">${buyerTotalBalance.toFixed(3)}</td>
                 <td></td>
             </tr>
         </tfoot>

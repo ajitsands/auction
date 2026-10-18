@@ -42,6 +42,63 @@ function formatDateDMY(val) {
     return str;
 }
 
+// --- Number to Words Currency Formatter matching staging_parallel getCurrency ---
+function getCurrencyWords(number) {
+    if (number === null || number === undefined || isNaN(number)) return '';
+    const num = Number(number);
+    const intPart = Math.floor(Math.abs(num));
+    const decimalPart = Math.round((Math.abs(num) - intPart) * 1000);
+
+    const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+        'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+    function convertGroup(n) {
+        let str = '';
+        if (n >= 100) {
+            str += ones[Math.floor(n / 100)] + ' Hundred ';
+            n %= 100;
+        }
+        if (n >= 20) {
+            str += tens[Math.floor(n / 10)] + ' ';
+            n %= 10;
+        }
+        if (n > 0) {
+            str += ones[n] + ' ';
+        }
+        return str.trim();
+    }
+
+    let words = '';
+    let remainder = intPart;
+
+    if (remainder >= 10000000) {
+        const crore = Math.floor(remainder / 10000000);
+        words += convertGroup(crore) + ' Crore ';
+        remainder %= 10000000;
+    }
+    if (remainder >= 100000) {
+        const lakh = Math.floor(remainder / 100000);
+        words += convertGroup(lakh) + ' Lakh ';
+        remainder %= 100000;
+    }
+    if (remainder >= 1000) {
+        const thousand = Math.floor(remainder / 1000);
+        words += convertGroup(thousand) + ' Thousand ';
+        remainder %= 1000;
+    }
+    if (remainder > 0) {
+        words += convertGroup(remainder);
+    }
+    words = words.trim();
+    if (!words) words = 'Zero';
+
+    if (decimalPart > 0) {
+        return `${words} and ${decimalPart}/1000`;
+    }
+    return words;
+}
+
 // --- Entry Age & 24h Window Helper for Live Floor Pay Balance ---
 function getEntryAgeInfo(createdAt, auctionDate) {
     if (!createdAt && !auctionDate) {
@@ -3752,16 +3809,166 @@ function RecordPaymentModal({ transaction, isOpen, onClose, onSuccess, onOpenRec
     );
 }
 
-// --- Printable Receipt Modal ---
+// --- Printable Receipt Voucher Copy matching staging_parallel/accounts/view/hf_receipt.php ---
+function HfReceiptVoucherCopy({ receipt, copyType = 'Member Copy', showLetterhead = true }) {
+    const formattedDate = receipt.payment_date 
+        ? new Date(receipt.payment_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+        : '—';
+    const amountVal = Number(receipt.amount_paid || 0).toFixed(3);
+    const amountWords = getCurrencyWords(receipt.amount_paid);
+    const balanceDue = Number(receipt.total_transaction_balance || 0).toFixed(3);
+
+    const artName = receipt.article_name || 'Auction Article';
+    const tagNo = receipt.tag_number || 'N/A';
+    const artNo = receipt.article_number || 'N/A';
+    const category = receipt.category || '';
+    const drCode = receipt.dr_code || '02123';
+    const drName = receipt.dr_name || 'Cash on Hand-Harvest Festival';
+    const crCode = receipt.cr_code || '02206';
+    const crName = receipt.cr_name || 'Church Building Fund - Harvest Festival';
+    const voucherRef = receipt.voucher_no 
+        ? `HRCPT #${receipt.voucher_no}` 
+        : (receipt.manual_receipt_no ? `#${receipt.manual_receipt_no}` : (receipt.receipt_no || ''));
+    const promiseRef = receipt.initial_promise_voucher ? ` | Promise MP #${receipt.initial_promise_voucher}` : '';
+    const auctionRef = receipt.auction_ref_no ? `Auction Ref: ${receipt.auction_ref_no}` : '';
+
+    return (
+        <div className="hf-receipt-sheet" style={{ background: '#ffffff', color: '#000000', fontFamily: 'Arial, Consolas, "Courier New", monospace', fontSize: '13px' }}>
+            {showLetterhead ? (
+                <div style={{ textAlign: 'center', marginBottom: '12px', paddingTop: '4px' }}>
+                    <img 
+                        src="/images/logo/red_full_logo.png" 
+                        alt="St. Mary's Indian Orthodox Cathedral" 
+                        style={{ height: '44px', maxWidth: '380px', objectFit: 'contain' }}
+                        onError={(e) => { e.target.src = '/images/logo/login-page-logo.png'; }}
+                    />
+                    <div style={{ fontSize: '11px', color: '#444444', textTransform: 'uppercase', letterSpacing: '0.6px', marginTop: '2px', fontWeight: 'bold' }}>
+                        Annual Harvest Festival & Article Auction • Official Payment Receipt
+                    </div>
+                </div>
+            ) : (
+                <div style={{ height: '60px' }}></div>
+            )}
+
+            {/* Top rounded box matching #rcorners2 in staging_parallel hf_receipt.php */}
+            <div className="hf-receipt-box" style={{ borderRadius: '20px', border: '1px solid #646464', padding: '8px 14px', marginBottom: '8px', background: '#ffffff' }}>
+                <table width="100%" border="0" cellSpacing="0" cellPadding="3" style={{ borderCollapse: 'collapse', fontSize: '13px', color: '#000000' }}>
+                    <tbody>
+                        <tr>
+                            <td width="55%"><strong>Receipt No : </strong>{voucherRef}</td>
+                            <td width="45%" style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '13px' }}>{copyType}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Date : </strong>{formattedDate}</td>
+                            <td style={{ textAlign: 'right', color: '#444444', fontSize: '12px' }}>{auctionRef}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Received with thanks from : </strong><strong>{receipt.buyer_name}</strong></td>
+                            <td style={{ textAlign: 'left' }}><strong>Receipt Total : </strong>{amountVal}</td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <strong>Roll No : </strong>{receipt.buyer_code_c || 'NA'},&nbsp;
+                                <strong>Edavaka Reg No : </strong>{receipt.buyer_code_m || 'NA'}
+                            </td>
+                            <td style={{ textAlign: 'left' }}>
+                                <strong>Mobile : </strong>{receipt.buyer_phone || 'NA'}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <strong>PO Box : </strong>{receipt.buyer_pobox || 'NA'} ,&nbsp;
+                                <strong>Tele(O) : </strong>{receipt.buyer_tel || 'NA'}
+                            </td>
+                            <td style={{ textAlign: 'left' }}>
+                                <strong>Membership Status : </strong>{receipt.buyer_member_type || 'Permanent'}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Contribution Details & Remarks Table */}
+            <table width="100%" border="0" cellSpacing="0" cellPadding="6" className="hf-grid-table" style={{ borderCollapse: 'collapse', width: '100%', marginTop: '6px', fontSize: '13px', color: '#000000' }}>
+                <thead>
+                    <tr style={{ background: '#D1D1D1', borderTop: '1px solid #646464', borderBottom: '1px solid #646464' }}>
+                        <th width="30" style={{ textAlign: 'center', padding: '6px', color: '#000000', backgroundColor: '#D1D1D1' }}>#</th>
+                        <th width="230" style={{ textAlign: 'left', padding: '6px', color: '#000000', backgroundColor: '#D1D1D1' }}>Contribution Details</th>
+                        <th width="420" style={{ textAlign: 'left', padding: '6px', color: '#000000', backgroundColor: '#D1D1D1' }}>Remarks</th>
+                        <th width="120" style={{ textAlign: 'right', padding: '6px', color: '#000000', backgroundColor: '#D1D1D1' }}>Amount/Kind</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style={{ textAlign: 'center', verticalAlign: 'top', padding: '8px 6px' }}>1.</td>
+                        <td style={{ textAlign: 'left', verticalAlign: 'top', padding: '8px 6px' }}>
+                            <div style={{ fontWeight: 'bold' }}>{crCode}</div>
+                            <div style={{ fontSize: '12px', color: '#222222' }}>{crName}</div>
+                        </td>
+                        <td style={{ textAlign: 'left', verticalAlign: 'top', padding: '8px 6px' }}>
+                            {/* In Remarks: Article details displayed along with ledger details */}
+                            <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#000000', marginBottom: '2px' }}>
+                                {receipt.applicable_year || 2026} - {artName}
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#222222', marginBottom: '4px' }}>
+                                <strong>Tag No:</strong> {tagNo} &nbsp;|&nbsp; <strong>Article No:</strong> {artNo} {category ? `| ${category}` : ''}
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#333333', borderTop: '1px dotted #999999', paddingTop: '3px', marginTop: '3px', lineHeight: '1.4' }}>
+                                <div><strong>Ledger:</strong> Dr: {drCode} ({drName}) / Cr: {crCode} ({crName})</div>
+                                <div><strong>Payment:</strong> {receipt.payment_mode || 'Cash'} {receipt.reference_no ? `(Ref: ${receipt.reference_no})` : ''} {promiseRef}</div>
+                            </div>
+                        </td>
+                        <td style={{ textAlign: 'right', verticalAlign: 'top', padding: '8px 6px', fontWeight: 'bold' }}>
+                            {amountVal}
+                        </td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid #000000' }}>
+                        <td colSpan="4" style={{ padding: '2px' }}></td>
+                    </tr>
+                    <tr>
+                        <td colSpan="3" style={{ padding: '8px 6px', fontSize: '12px' }}>
+                            Bahraini Dinar <strong>{amountWords}</strong> Only
+                        </td>
+                        <td style={{ textAlign: 'right', padding: '8px 6px', fontWeight: 'bold', fontSize: '14px' }}>
+                            <strong>{amountVal}</strong>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colSpan="3" style={{ padding: '12px 6px 4px 6px' }}>
+                            <table width="100%" border="0" cellPadding="0" cellSpacing="0">
+                                <tbody>
+                                    <tr>
+                                        <td width="100" style={{ fontSize: '11px', color: '#444444' }}>Page 1 of 1</td>
+                                        <td style={{ textAlign: 'center', fontStyle: 'italic', fontSize: '12px', color: '#000000' }}>
+                                            <i>NB : Outstanding Amount till date : BHD {balanceDue}</i>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </td>
+                        <td style={{ textAlign: 'right', padding: '12px 6px 4px 6px', verticalAlign: 'bottom' }}>
+                            <div style={{ borderTop: '1px solid #777777', width: '90px', marginLeft: 'auto', marginBottom: '2px' }}></div>
+                            <strong style={{ fontSize: '12px' }}>Trustee</strong>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
+// --- Printable Receipt Modal matching staging_parallel/accounts/view/hf_receipt.php ---
 function ReceiptModal({ receiptNo, isOpen, onClose }) {
     if (!isOpen) return null;
     const [receipt, setReceipt] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [showLetterhead, setShowLetterhead] = useState(true);
+    const [showChurchCopy, setShowChurchCopy] = useState(true);
 
     useEffect(() => {
         if (receiptNo) {
             setLoading(true);
-            api.get(`/api/payments/receipt/${receiptNo}`)
+            api.get(`/api/payments/receipt/${encodeURIComponent(receiptNo)}`)
                 .then(res => {
                     if (res.success) setReceipt(res.receipt);
                 })
@@ -3776,147 +3983,73 @@ function ReceiptModal({ receiptNo, isOpen, onClose }) {
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content" style={{ maxWidth: '620px', background: 'var(--bg-surface)' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-content" style={{ maxWidth: '880px', width: '95%', background: 'var(--bg-surface)' }} onClick={e => e.stopPropagation()}>
                 <div className="no-print">
                     <ModalHeader 
-                        title="Official Auction Receipt Voucher" 
+                        title="Harvest Festival Payment Receipt (Voucher Format)" 
                         icon="receipt_long" 
                         onClose={onClose} 
-                        badge={receipt?.receipt_no || receiptNo}
+                        badge={receipt?.voucher_no ? `HRCPT #${receipt.voucher_no}` : (receipt?.receipt_no || receiptNo)}
                     />
+                    <div style={{ padding: '8px 24px', background: 'var(--bg-card-hover)', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', fontSize: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '18px', flexWrap: 'wrap' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', margin: 0 }}>
+                                <input 
+                                    type="checkbox" 
+                                    checked={showLetterhead} 
+                                    onChange={e => setShowLetterhead(e.target.checked)} 
+                                />
+                                <span>Show Cathedral Header (uncheck for church pre-printed stationery)</span>
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', margin: 0 }}>
+                                <input 
+                                    type="checkbox" 
+                                    checked={showChurchCopy} 
+                                    onChange={e => setShowChurchCopy(e.target.checked)} 
+                                />
+                                <span>Include Church Copy</span>
+                            </label>
+                        </div>
+                        <button type="button" className="btn btn-primary btn-sm" onClick={handlePrint} disabled={!receipt}>
+                            <i className="material-icons" style={{ fontSize: '15px' }}>print</i> Print Receipt
+                        </button>
+                    </div>
                 </div>
 
-                <div className="modal-body" style={{ background: '#f1f5f9', padding: '24px' }}>
+                <div className="modal-body" style={{ background: '#f1f5f9', padding: '20px' }}>
                     {loading ? (
                         <div style={{ textAlign: 'center', padding: '40px' }}><div className="spinner" style={{ margin: '0 auto' }}></div></div>
                     ) : !receipt ? (
-                        <div style={{ color: '#000', textAlign: 'center' }}>Receipt not found.</div>
+                        <div style={{ color: '#000', textAlign: 'center', padding: '30px' }}>Receipt details not found.</div>
                     ) : (
-                        <div className="receipt-wrapper">
-                            <div className="receipt-header">
-                                <img 
-                                    src="/images/logo/login-page-logo.png" 
-                                    alt="Auction Portal Logo" 
-                                    style={{ maxHeight: '68px', maxWidth: '440px', width: '100%', marginBottom: '12px', objectFit: 'contain' }} 
-                                />
-                                <h2>ST. MARY'S INDIAN ORTHODOX CATHEDRAL</h2>
-                                <p>Kingdom of Bahrain • Harvest Festival & Auction</p>
-                                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-                                    OFFICIAL PAYMENT RECEIPT
-                                </div>
-                            </div>
+                        <div className="hf-receipt-container">
+                            {/* Member Copy */}
+                            <HfReceiptVoucherCopy 
+                                receipt={receipt} 
+                                copyType="Member Copy" 
+                                showLetterhead={showLetterhead} 
+                            />
 
-                            <div className="receipt-grid">
-                                <div><span className="label">Receipt No:</span> <div className="val">{receipt.receipt_no}</div></div>
-                                <div><span className="label">Payment Date:</span> <div className="val">{formatDateDMY(receipt.payment_date)}</div></div>
-                                <div><span className="label">Auction Ref:</span> <div className="val">{receipt.auction_ref_no}</div></div>
-                                <div><span className="label">Payment Mode:</span> <div className="val">{receipt.payment_mode}</div></div>
-                            </div>
-
-                            <div className="receipt-item-box">
-                                <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>Buyer Information</div>
-                                <div style={{ fontWeight: 800, fontSize: '15px' }}>{receipt.buyer_name}</div>
-                                {receipt.buyer_code_c && <div>Member Roll No: <strong>{receipt.buyer_code_c}</strong></div>}
-                                {receipt.buyer_phone && <div>Contact: {receipt.buyer_phone}</div>}
-                                {receipt.buyer_cpr && <div>CPR: {receipt.buyer_cpr}</div>}
-                            </div>
-
-                            <div className="receipt-item-box">
-                                <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', marginBottom: '4px' }}>Auction Item Details</div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div>
-                                        <div style={{ fontWeight: 700 }}>{receipt.article_name}</div>
-                                        <div style={{ fontSize: '12px', color: '#64748b' }}>Tag: <strong>{receipt.tag_number}</strong> | Art No: <strong style={{ fontFamily: 'monospace' }}>{receipt.article_number}</strong></div>
+                            {/* Church Copy */}
+                            {showChurchCopy && (
+                                <>
+                                    <div className="hf-receipt-divider">
+                                        <span>Church Copy Below</span>
                                     </div>
-                                    <div style={{ textAlign: 'right' }}>
-                                        <span style={{ background: '#f59e0b', color: '#fff', padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 700 }}>
-                                            {receipt.applicable_year}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {(receipt.voucher_no || receipt.manual_receipt_no || receipt.dr_code || receipt.initial_promise_voucher) && (
-                                <div className="receipt-item-box" style={{ background: '#f8fafc', border: '1px dashed #cbd5e1' }}>
-                                    <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', marginBottom: '6px', fontWeight: 700 }}>
-                                        Cathedral Accounts Posting Reference
-                                    </div>
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px', fontSize: '12px' }}>
-                                        {(receipt.acc_contribution_id || receipt.initial_acc_contrib_id) && (
-                                            <div>
-                                                <span style={{ color: '#64748b' }}>Contribution ID:</span>{' '}
-                                                <strong style={{ color: '#0f766e' }}>#{receipt.acc_contribution_id || receipt.initial_acc_contrib_id}</strong>
-                                            </div>
-                                        )}
-                                        {receipt.voucher_no && (
-                                            <div>
-                                                <span style={{ color: '#64748b' }}>HRCPT Voucher:</span>{' '}
-                                                <strong style={{ color: '#0f766e' }}>#{receipt.voucher_no}</strong>
-                                            </div>
-                                        )}
-                                        {(receipt.receipt_book_no || receipt.manual_receipt_no) && (
-                                            <div>
-                                                <span style={{ color: '#64748b' }}>Receipt Book/No:</span>{' '}
-                                                <strong>{receipt.receipt_book_no ? `Bk ${receipt.receipt_book_no}` : ''} {receipt.manual_receipt_no ? `#${receipt.manual_receipt_no}` : ''}</strong>
-                                            </div>
-                                        )}
-                                        {receipt.dr_code && (
-                                            <div>
-                                                <span style={{ color: '#64748b' }}>Dr Head:</span>{' '}
-                                                <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{receipt.dr_code}</span> ({receipt.dr_name})
-                                            </div>
-                                        )}
-                                        {receipt.cr_code && (
-                                            <div>
-                                                <span style={{ color: '#64748b' }}>Cr Head:</span>{' '}
-                                                <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{receipt.cr_code}</span> ({receipt.cr_name})
-                                            </div>
-                                        )}
-                                        {receipt.initial_promise_voucher && (
-                                            <div>
-                                                <span style={{ color: '#64748b' }}>Linked Promise Ref:</span>{' '}
-                                                <strong style={{ color: '#b45309' }}>MP #{receipt.initial_promise_voucher}</strong>
-                                                {receipt.initial_acc_promise_id && (
-                                                    <span style={{ fontSize: '11px', color: '#b45309', marginLeft: '4px' }}>
-                                                        (ID: #{receipt.initial_acc_promise_id})
-                                                    </span>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
+                                    <HfReceiptVoucherCopy 
+                                        receipt={receipt} 
+                                        copyType="Church Copy" 
+                                        showLetterhead={showLetterhead} 
+                                    />
+                                </>
                             )}
-
-                            <div className="receipt-totals">
-                                <div className="receipt-row">
-                                    <span>Winning Bid Amount:</span>
-                                    <span>BHD {Number(receipt.winning_bid_amount).toFixed(3)}</span>
-                                </div>
-                                <div className="receipt-row bold">
-                                    <span>Amount Paid (This Voucher):</span>
-                                    <span>BHD {Number(receipt.amount_paid).toFixed(3)}</span>
-                                </div>
-                                <div className="receipt-row">
-                                    <span>Cumulative Total Paid:</span>
-                                    <span>BHD {Number(receipt.total_transaction_paid).toFixed(3)}</span>
-                                </div>
-                                <div className="receipt-row" style={{ color: Number(receipt.total_transaction_balance) > 0 ? '#ef4444' : '#10b981', fontWeight: 700 }}>
-                                    <span>Remaining Balance:</span>
-                                    <span>BHD {Number(receipt.total_transaction_balance).toFixed(3)}</span>
-                                </div>
-                            </div>
-
-                            <div className="receipt-footer">
-                                <p>Thank you for supporting the Cathedral Harvest Festival.</p>
-                                <p style={{ marginTop: '4px' }}>Cashier: {receipt.cashier_name || 'Accounts Desk'} • Authorized Signatory</p>
-                            </div>
                         </div>
                     )}
                 </div>
 
                 <div className="modal-footer no-print">
                     <button type="button" className="btn gradient-45deg-red-pink gradient-shadow white-text" onClick={onClose}>
-                        <i className="material-icons" style={{ fontSize: '16px' }}>close</i> Exit
+                        <i className="material-icons" style={{ fontSize: '16px' }}>close</i> Close
                     </button>
                     <button type="button" className="btn gradient-45deg-light-blue-cyan gradient-shadow white-text" onClick={handlePrint} disabled={!receipt}>
                         <i className="material-icons" style={{ fontSize: '16px' }}>print</i> Print Receipt

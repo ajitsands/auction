@@ -1706,23 +1706,95 @@ select.form-control option {
     text-decoration: underline;
 }
 
+/* --- HF Staging Parallel Receipt Styles --- */
+.hf-receipt-container {
+    background: #ffffff;
+    color: #000000;
+    font-family: Arial, Consolas, "Andale Mono", "Lucida Console", Monaco, "Courier New", monospace;
+    font-size: 13px;
+    line-height: 1.4;
+    padding: 16px 20px;
+    margin: 0 auto;
+    width: 100%;
+    max-width: 820px;
+    box-sizing: border-box;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    border-radius: var(--radius-md);
+}
+
+.hf-receipt-box {
+    border-radius: 20px;
+    border: 1px solid #646464;
+    padding: 8px 12px;
+    width: 100%;
+    box-sizing: border-box;
+    background: #ffffff;
+}
+
+.hf-grid-table th {
+    background-color: #D1D1D1 !important;
+    color: #000000 !important;
+    font-weight: bold;
+    padding: 6px 8px;
+    font-size: 13px;
+    text-align: left;
+}
+
+.hf-grid-table td {
+    padding: 6px 8px;
+    font-size: 13px;
+    color: #000000;
+}
+
+.hf-receipt-divider {
+    border-top: 1px dashed #777777;
+    margin: 24px auto;
+    width: 100%;
+    max-width: 800px;
+    text-align: center;
+    position: relative;
+}
+
+.hf-receipt-divider span {
+    background: #ffffff;
+    padding: 0 12px;
+    font-size: 11px;
+    color: #888888;
+    position: relative;
+    top: -9px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
 /* Print Media Query */
 @media print {
     body * {
-        visibility: hidden;
+        visibility: hidden !important;
     }
+    .hf-receipt-container, .hf-receipt-container *,
     .receipt-wrapper, .receipt-wrapper * {
-        visibility: visible;
+        visibility: visible !important;
     }
-    .receipt-wrapper {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
-        max-width: 100%;
-        box-shadow: none;
-        border: none;
-        padding: 0;
+    .hf-receipt-container, .receipt-wrapper {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-shadow: none !important;
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        background: transparent !important;
+    }
+    .modal-overlay, .modal-content, .modal-body {
+        position: static !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        border: none !important;
+        overflow: visible !important;
     }
     .modal-footer, .no-print, .top-navbar, .page-footer {
         display: none !important;

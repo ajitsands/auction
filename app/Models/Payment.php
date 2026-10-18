@@ -350,6 +350,8 @@ class Payment extends Model {
                    t.acc_contribution_id as initial_acc_contrib_id, t.acc_promise_id as initial_acc_promise_id,
                    a.article_number, a.tag_number, a.article_name, a.category, a.applicable_year,
                    m.cpr_no as buyer_cpr, m.prayer_group_name as buyer_prayer_group,
+                   m.code_m as buyer_code_m, m.company_pobox as buyer_pobox,
+                   m.company_tel as buyer_tel, m.member_type as buyer_member_type,
                    u.user_name as cashier_name
             FROM hf_payments p
             JOIN hf_auction_transactions t ON p.transaction_id = t.transaction_id
@@ -420,6 +422,8 @@ class Payment extends Model {
                 t.acc_promise_id as initial_acc_promise_id,
                 a.article_number, a.tag_number, a.article_name, a.category, a.applicable_year,
                 m.cpr_no as buyer_cpr, m.prayer_group_name as buyer_prayer_group,
+                m.code_m as buyer_code_m, m.company_pobox as buyer_pobox,
+                m.company_tel as buyer_tel, m.member_type as buyer_member_type,
                 'Cathedral Accounts' as cashier_name
             FROM acc_contribution c
             LEFT JOIN hf_auction_transactions t ON (c.article_id = t.article_id AND (t.buyer_member_id = c.member_id OR t.buyer_member_id IS NULL OR t.buyer_member_id = 0))

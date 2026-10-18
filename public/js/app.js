@@ -4021,12 +4021,22 @@ function PromisesView({ year, showToast, onOpenReceipt }) {
                             sortable: false,
                             headerStyle: { width: '60px', textAlign: 'center' },
                             style: { textAlign: 'center', width: '60px', fontWeight: 600, color: 'var(--text-muted)' },
+                            footer: () => (
+                                <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', fontWeight: 700 }}>
+                                    Total
+                                </span>
+                            ),
                             render: (p, index) => <span style={{ fontSize: '12px' }}>{index + 1}</span>
                         },
                         {
                             header: 'Promise ID',
                             accessor: 'hf_promise_id',
                             sortable: true,
+                            footer: (allRows) => (
+                                <span style={{ color: 'var(--text-primary)', fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                    {allRows.length} Promises
+                                </span>
+                            ),
                             render: (p) => (
                                 <div>
                                     <strong style={{ color: 'var(--text-primary)' }}>PRM-{p.hf_promise_id}</strong>
@@ -4048,6 +4058,7 @@ function PromisesView({ year, showToast, onOpenReceipt }) {
                             accessor: 'member_name',
                             sortable: true,
                             searchValue: (p) => `${p.member_name || ''} ${p.member_phone || ''}`,
+                            footer: () => null,
                             render: (p) => (
                                 <div>
                                     <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{p.member_name}</div>
@@ -4060,6 +4071,7 @@ function PromisesView({ year, showToast, onOpenReceipt }) {
                             accessor: 'member_code_c',
                             sortable: true,
                             searchValue: (p) => `${p.member_code_c || ''} ${p.member_cpr || ''}`,
+                            footer: () => null,
                             render: (p) => (
                                 <div>
                                     {p.member_code_c && <div>Roll No: <strong style={{ color: 'var(--primary)' }}>{p.member_code_c}</strong></div>}
@@ -4072,6 +4084,7 @@ function PromisesView({ year, showToast, onOpenReceipt }) {
                             accessor: 'article_name',
                             sortable: true,
                             searchValue: (p) => `${p.tag_number || ''} ${p.article_name || ''} ${p.article_number || ''}`,
+                            footer: () => null,
                             render: (p) => (
                                 <div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
@@ -4091,6 +4104,17 @@ function PromisesView({ year, showToast, onOpenReceipt }) {
                             accessor: 'total_promise_amount',
                             sortable: true,
                             sortValue: (p) => Number(p.total_promise_amount) || 0,
+                            footer: (allRows) => {
+                                const total = allRows.reduce((sum, p) => sum + (Number(p.total_promise_amount) || 0), 0);
+                                return (
+                                    <div className="dt-footer-amount-box">
+                                        <span className="dt-footer-amount-label">Bid Total</span>
+                                        <span className="dt-footer-amount-val" style={{ color: 'var(--primary)' }}>
+                                            BHD {total.toFixed(3)}
+                                        </span>
+                                    </div>
+                                );
+                            },
                             render: (p) => `BHD ${Number(p.total_promise_amount).toFixed(3)}`
                         },
                         {
@@ -4098,70 +4122,62 @@ function PromisesView({ year, showToast, onOpenReceipt }) {
                             accessor: 'paid_amount',
                             sortable: true,
                             sortValue: (p) => Number(p.paid_amount) || 0,
-                            render: (p) => <span style={{ color: 'var(--success)' }}>{Number(p.paid_amount).toFixed(3)}</span>
+                            footer: (allRows) => {
+                                const total = allRows.reduce((sum, p) => sum + (Number(p.paid_amount) || 0), 0);
+                                return (
+                                    <div className="dt-footer-amount-box">
+                                        <span className="dt-footer-amount-label">Paid Total</span>
+                                        <span className="dt-footer-amount-val" style={{ color: 'var(--success)' }}>
+                                            BHD {total.toFixed(3)}
+                                        </span>
+                                    </div>
+                                );
+                            },
+                            render: (p) => <span style={{ color: 'var(--success)', fontWeight: 600 }}>{Number(p.paid_amount).toFixed(3)}</span>
                         },
                         {
                             header: 'Outstanding Due',
                             accessor: 'balance_amount',
                             sortable: true,
                             sortValue: (p) => Number(p.balance_amount) || 0,
+                            footer: (allRows) => {
+                                const total = allRows.reduce((sum, p) => sum + (Number(p.balance_amount) || 0), 0);
+                                return (
+                                    <div className="dt-footer-amount-box">
+                                        <span className="dt-footer-amount-label">Due Total</span>
+                                        <span className="dt-footer-amount-val" style={{ color: total > 0.0001 ? 'var(--danger)' : 'var(--text-muted)' }}>
+                                            BHD {total.toFixed(3)}
+                                        </span>
+                                    </div>
+                                );
+                            },
                             render: (p) => <strong style={{ color: 'var(--danger)', fontSize: '14px' }}>BHD {Number(p.balance_amount).toFixed(3)}</strong>
                         },
                         {
                             header: 'Due Date',
                             accessor: 'due_date',
                             sortable: true,
+                            footer: () => null,
                             render: (p) => formatDateDMY(p.due_date)
                         },
                         {
                             header: 'Status',
                             accessor: 'promise_status',
                             sortable: true,
+                            footer: (allRows) => {
+                                const activeCount = allRows.filter(p => p.promise_status === 'Active').length;
+                                const fulfilledCount = allRows.length - activeCount;
+                                return (
+                                    <div style={{ fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                        <span style={{ color: 'var(--warning)', fontWeight: 700 }}>{activeCount} Active</span>
+                                        {fulfilledCount > 0 && <span style={{ color: 'var(--success)', fontWeight: 600 }}>{fulfilledCount} Fulfilled</span>}
+                                    </div>
+                                );
+                            },
                             render: (p) => (
                                 <span className={`badge badge-${p.promise_status === 'Fulfilled' ? 'success' : 'warning'}`}>
                                     {p.promise_status}
                                 </span>
-                            )
-                        },
-                        {
-                            header: 'Actions',
-                            id: 'actions',
-                            sortable: false,
-                            headerStyle: { textAlign: 'right' },
-                            style: { textAlign: 'right', whiteSpace: 'nowrap' },
-                            render: (p) => (
-                                p.promise_status === 'Active' ? (
-                                    <button 
-                                        type="button"
-                                        className="btn gradient-45deg-purple-deep-orange gradient-shadow white-text btn-sm"
-                                        style={{ fontSize: '12px', padding: '4px 10px', height: '32px' }}
-                                        onClick={() => setPaymentModalData({
-                                            transaction_id: p.transaction_id,
-                                            auction_ref_no: p.auction_ref_no,
-                                            buyer_name: p.member_name,
-                                            buyer_code_c: p.member_code_c,
-                                            buyer_phone: p.member_phone,
-                                            buyer_cpr: p.member_cpr,
-                                            tag_number: p.tag_number,
-                                            article_number: p.article_number,
-                                            article_name: p.article_name,
-                                            category: p.category,
-                                            winning_bid_amount: p.total_promise_amount,
-                                            total_promise_amount: p.total_promise_amount,
-                                            paid_amount: p.paid_amount,
-                                            balance_amount: p.balance_amount,
-                                            due_date: p.due_date,
-                                            promise_voucher_no: p.voucher_no,
-                                            acc_promise_id: p.acc_promise_id,
-                                            contrib_dr_code: p.dr_code || '02123',
-                                            contrib_cr_code: p.cr_code || '02206',
-                                            event_id: p.event_id,
-                                            event_name: p.event_name
-                                        })}
-                                    >
-                                        <i className="material-icons" style={{ fontSize: '15px' }}>payments</i> Collect
-                                    </button>
-                                ) : <span className="badge badge-success">Cleared</span>
                             )
                         }
                     ]}

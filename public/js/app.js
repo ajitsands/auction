@@ -596,14 +596,11 @@ function LoginScreen({ onLoginSuccess }) {
 function DashboardView({ stats, year, onNavigate, onOpenNewArticle, onOpenImport }) {
     return (
         <div>
-            {/* Breadcrumbs Header matching staging_parallel */}
+            {/* Header */}
             <div className="breadcrumbs-wrapper">
                 <div className="breadcrumbs-title">
                     <i className="material-icons">dashboard</i>
                     <h4>Festival Auction Dashboard ({year})</h4>
-                </div>
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                    <span>Cathedral Auction</span> &gt; <span style={{ color: 'var(--primary)', fontWeight: 600 }}>Festival Overview</span>
                 </div>
             </div>
 
@@ -677,9 +674,6 @@ function DashboardView({ stats, year, onNavigate, onOpenNewArticle, onOpenImport
                         </div>
                     </div>
                     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                        <button className="btn btn-primary" onClick={onOpenNewArticle}>
-                            <i className="material-icons">add_circle_outline</i> Add New Article
-                        </button>
                         <button className="btn btn-orange" onClick={onOpenImport}>
                             <i className="material-icons">cloud_upload</i> Import Excel / CSV
                         </button>

@@ -4593,6 +4593,371 @@ function ReportsView({ year, showToast }) {
         XLSX.writeFile(wb, `cathedral_auction_buyers_${year}.xlsx`);
     };
 
+    const handlePrintReport = () => {
+        if (!summary) {
+            showToast('info', 'Report data is still loading...');
+            return;
+        }
+
+        // Clean up any existing report print iframe
+        const oldIframe = document.getElementById('hf-sales-report-print-frame');
+        if (oldIframe) {
+            oldIframe.remove();
+        }
+
+        const iframe = document.createElement('iframe');
+        iframe.id = 'hf-sales-report-print-frame';
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '10px';
+        iframe.style.height = '10px';
+        iframe.style.border = '0';
+        iframe.style.opacity = '0.01';
+        iframe.style.pointerEvents = 'none';
+        iframe.style.zIndex = '-999';
+        document.body.appendChild(iframe);
+
+        const printDate = new Date().toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        // Totals for Category breakdown
+        const cats = summary.category_breakdown || [];
+        const catTotalArticles = cats.reduce((sum, c) => sum + (Number(c.article_count) || 0), 0);
+        const catTotalSold = cats.reduce((sum, c) => sum + (Number(c.sold_count) || 0), 0);
+        const catTotalEst = cats.reduce((sum, c) => sum + (Number(c.estimated_val) || 0), 0);
+        const catTotalBid = cats.reduce((sum, c) => sum + (Number(c.total_bid_val) || 0), 0);
+
+        // Totals for Buyer Ledger
+        const buyerTotalBid = buyers.reduce((sum, b) => sum + (Number(b.total_purchased) || 0), 0);
+        const buyerTotalPaid = buyers.reduce((sum, b) => sum + (Number(b.total_paid) || 0), 0);
+        const buyerTotalBalance = buyers.reduce((sum, b) => sum + (Number(b.total_balance) || 0), 0);
+
+        const categoryRowsHtml = cats.map((c, idx) => `
+            <tr>
+                <td style="text-align: center;">${idx + 1}</td>
+                <td style="font-weight: bold;">${c.category}</td>
+                <td style="text-align: center;">${c.article_count || 0}</td>
+                <td style="text-align: center;">${c.sold_count || 0}</td>
+                <td style="text-align: right;">BHD ${Number(c.estimated_val || 0).toFixed(3)}</td>
+                <td style="text-align: right; font-weight: bold;">BHD ${Number(c.total_bid_val || 0).toFixed(3)}</td>
+            </tr>
+        `).join('');
+
+        const buyerRowsHtml = buyers.map((b, idx) => {
+            const itemsStr = Array.isArray(b.items) && b.items.length > 0 
+                ? b.items.map(i => `${i.tag_number ? '[' + i.tag_number + '] ' : ''}${i.article_name || ''} (BHD ${Number(i.winning_bid_amount || 0).toFixed(3)})`).join('<br>')
+                : (b.items_purchased || 0) + ' Item(s)';
+            
+            const statusColor = b.overall_status === 'Paid' ? '#2e7d32' : b.overall_status === 'Partial' ? '#e65100' : '#c62828';
+            const statusBg = b.overall_status === 'Paid' ? '#e8f5e9' : b.overall_status === 'Partial' ? '#fff3e0' : '#ffebee';
+
+            return `
+                <tr>
+                    <td style="text-align: center; vertical-align: top;">${idx + 1}</td>
+                    <td style="font-weight: bold; vertical-align: top;">
+                        ${b.buyer_name}
+                        ${b.prayer_group_name && b.prayer_group_name !== 'NA' ? `<br><small style="color: #666; font-weight: normal;">${b.prayer_group_name}</small>` : ''}
+                    </td>
+                    <td style="text-align: center; vertical-align: top;">${b.buyer_code_c || 'N/A'}</td>
+                    <td style="text-align: center; vertical-align: top;">${b.buyer_phone || '—'}</td>
+                    <td style="font-size: 10px; vertical-align: top; color: #222;">${itemsStr}</td>
+                    <td style="text-align: right; font-weight: bold; vertical-align: top;">BHD ${Number(b.total_purchased || 0).toFixed(3)}</td>
+                    <td style="text-align: right; color: #2e7d32; vertical-align: top;">BHD ${Number(b.total_paid || 0).toFixed(3)}</td>
+                    <td style="text-align: right; font-weight: bold; color: ${Number(b.total_balance) > 0 ? '#c62828' : '#222'}; vertical-align: top;">BHD ${Number(b.total_balance || 0).toFixed(3)}</td>
+                    <td style="text-align: center; vertical-align: top;">
+                        <span style="display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 9.5px; font-weight: bold; background: ${statusBg}; color: ${statusColor};">
+                            ${b.overall_status}
+                        </span>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        const printHtml = `<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Auction Sales & Financial Report (${year})</title>
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 8mm 8mm;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: #ffffff;
+            color: #000000;
+            font-family: Arial, "Helvetica Neue", sans-serif;
+            font-size: 10.5px;
+            line-height: 1.3;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .report-header {
+            text-align: center;
+            border-bottom: 2px solid #000000;
+            padding-bottom: 6px;
+            margin-bottom: 10px;
+        }
+        .report-header img {
+            height: 38px;
+            max-width: 360px;
+            object-fit: contain;
+            margin-bottom: 4px;
+        }
+        .report-title {
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 2px 0;
+            color: #111111;
+        }
+        .report-subtitle {
+            font-size: 11px;
+            color: #444444;
+            margin: 2px 0 4px 0;
+        }
+        .report-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: #555555;
+            margin-top: 5px;
+            padding-top: 4px;
+            border-top: 1px dashed #cccccc;
+        }
+        /* KPI Cards Grid */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .kpi-card {
+            border: 1px solid #777777;
+            border-radius: 5px;
+            padding: 6px 8px;
+            background: #fafafa;
+            text-align: center;
+        }
+        .kpi-title {
+            font-size: 9px;
+            text-transform: uppercase;
+            font-weight: bold;
+            color: #555555;
+            margin-bottom: 2px;
+        }
+        .kpi-val {
+            font-size: 13.5px;
+            font-weight: bold;
+            color: #000000;
+        }
+        /* Tables */
+        h4.section-title {
+            font-size: 11.5px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin: 10px 0 4px 0;
+            padding-bottom: 2px;
+            border-bottom: 1.5px solid #444444;
+            color: #000000;
+        }
+        table.report-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10px;
+            margin-bottom: 12px;
+        }
+        table.report-table th {
+            background-color: #e2e8f0 !important;
+            color: #000000 !important;
+            font-weight: bold;
+            border: 1px solid #94a3b8;
+            padding: 4px 5px;
+            text-align: left;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        table.report-table td {
+            border: 1px solid #cbd5e1;
+            padding: 4px 5px;
+        }
+        table.report-table tr:nth-child(even) td {
+            background-color: #f8fafc;
+        }
+        table.report-table tfoot td {
+            background-color: #e2e8f0 !important;
+            font-weight: bold;
+            border: 1px solid #94a3b8;
+            padding: 4px 5px;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        tr {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        /* Signatures block */
+        .signatures-area {
+            margin-top: 24px;
+            padding-top: 10px;
+            display: flex;
+            justify-content: space-between;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        .sig-col {
+            text-align: center;
+            width: 180px;
+        }
+        .sig-line {
+            border-top: 1px solid #444444;
+            margin-bottom: 4px;
+        }
+        .sig-label {
+            font-size: 9.5px;
+            font-weight: bold;
+            color: #333333;
+        }
+    </style>
+</head>
+<body>
+    <div class="report-header">
+        <img src="/images/logo/red_full_logo.png" alt="St. Mary's Indian Orthodox Cathedral" onerror="this.src='/images/logo/login-page-logo.png'">
+        <div class="report-title">Harvest Festival & Article Auction — Official Sales & Financial Report</div>
+        <div class="report-subtitle">Annual Cathedral Auction Settlement & Revenue Summary</div>
+        <div class="report-meta">
+            <div><strong>Year:</strong> ${year}</div>
+            <div><strong>Total Registered Bidders:</strong> ${summary.total_bidders || 0}</div>
+            <div><strong>Report Generated:</strong> ${printDate}</div>
+        </div>
+    </div>
+
+    <!-- KPI Summary Cards -->
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-title">Total Auction Revenue</div>
+            <div class="kpi-val">BHD ${Number(summary.total_auction_revenue || 0).toFixed(3)}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-title">Cash Collections (Paid)</div>
+            <div class="kpi-val" style="color: #2e7d32;">BHD ${Number(summary.total_collected_amount || 0).toFixed(3)}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-title">Outstanding Receivables</div>
+            <div class="kpi-val" style="color: #c62828;">BHD ${Number(summary.total_receivable_promises || 0).toFixed(3)}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-title">Articles Clearance</div>
+            <div class="kpi-val">${summary.sold_articles || 0} / ${summary.total_articles || 0} Sold</div>
+        </div>
+    </div>
+
+    <!-- Category Breakdown Table -->
+    <h4 class="section-title">Category-Wise Performance Summary</h4>
+    <table class="report-table">
+        <thead>
+            <tr>
+                <th style="width: 30px; text-align: center;">#</th>
+                <th>Category</th>
+                <th style="width: 70px; text-align: center;">Articles</th>
+                <th style="width: 70px; text-align: center;">Sold</th>
+                <th style="width: 110px; text-align: right;">Est. Value</th>
+                <th style="width: 110px; text-align: right;">Total Auction Sales</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${categoryRowsHtml || '<tr><td colspan="6" style="text-align: center;">No categories available.</td></tr>'}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="2" style="text-align: right;">Total:</td>
+                <td style="text-align: center;">${catTotalArticles}</td>
+                <td style="text-align: center;">${catTotalSold}</td>
+                <td style="text-align: right;">BHD ${catTotalEst.toFixed(3)}</td>
+                <td style="text-align: right;">BHD ${catTotalBid.toFixed(3)}</td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <!-- Buyer Settlement Ledger -->
+    <h4 class="section-title">Member & Buyer Settlement Ledger</h4>
+    <table class="report-table">
+        <thead>
+            <tr>
+                <th style="width: 25px; text-align: center;">#</th>
+                <th style="width: 130px;">Buyer / Member Name</th>
+                <th style="width: 55px; text-align: center;">Roll No</th>
+                <th style="width: 70px; text-align: center;">Phone</th>
+                <th>Articles Purchased</th>
+                <th style="width: 80px; text-align: right;">Total Bid</th>
+                <th style="width: 80px; text-align: right;">Total Paid</th>
+                <th style="width: 80px; text-align: right;">Balance</th>
+                <th style="width: 60px; text-align: center;">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${buyerRowsHtml || '<tr><td colspan="9" style="text-align: center;">No buyer records found.</td></tr>'}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="5" style="text-align: right;">Grand Totals (${buyers.length} Buyers):</td>
+                <td style="text-align: right;">BHD ${buyerTotalBid.toFixed(3)}</td>
+                <td style="text-align: right; color: #2e7d32;">BHD ${buyerTotalPaid.toFixed(3)}</td>
+                <td style="text-align: right; color: ${buyerTotalBalance > 0 ? '#c62828' : '#222'};">BHD ${buyerTotalBalance.toFixed(3)}</td>
+                <td></td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <!-- Signatures -->
+    <div class="signatures-area">
+        <div class="sig-col">
+            <div class="sig-line"></div>
+            <div class="sig-label">Prepared By (Cashier)</div>
+        </div>
+        <div class="sig-col">
+            <div class="sig-line"></div>
+            <div class="sig-label">Verified By (Auditor)</div>
+        </div>
+        <div class="sig-col">
+            <div class="sig-line"></div>
+            <div class="sig-label">Approved By (Hon. Trustee / Vicar)</div>
+        </div>
+    </div>
+</body>
+</html>`;
+
+        const doc = iframe.contentWindow.document;
+        doc.open();
+        doc.write(printHtml);
+        doc.close();
+
+        let printed = false;
+        const doPrint = () => {
+            if (printed) return;
+            printed = true;
+            try {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+            } catch (err) {
+                console.error("Iframe print error:", err);
+                window.print();
+            }
+        };
+
+        setTimeout(doPrint, 350);
+        iframe.onload = doPrint;
+    };
+
     return (
         <div>
             <div className="card" style={{ marginBottom: '28px' }}>
@@ -4608,7 +4973,7 @@ function ReportsView({ year, showToast }) {
                             </p>
                         </div>
                     </div>
-                    <button className="btn btn-indigo btn-sm" onClick={() => window.print()}>
+                    <button className="btn btn-indigo btn-sm" onClick={handlePrintReport}>
                         <i className="material-icons">print</i> Print Report
                     </button>
                 </div>

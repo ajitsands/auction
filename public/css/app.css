@@ -1817,7 +1817,6 @@ select.form-control option {
 
     /* Completely hide background application layout elements */
     .top-navbar,
-    main,
     footer.page-footer,
     .no-print,
     .modal-header,
@@ -1825,6 +1824,7 @@ select.form-control option {
     .toast-container,
     .toast,
     .dt-toolbar,
+    .dt-pagination,
     .mobile-hamburger {
         display: none !important;
     }

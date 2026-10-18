@@ -1223,22 +1223,18 @@ function ArticlesView({ year, onOpenNewArticle, onEditArticle, onOpenImport, sho
 
     return (
         <div>
-            {/* Breadcrumbs Header */}
-            <div className="breadcrumbs-wrapper">
-                <div className="breadcrumbs-title">
-                    <i className="material-icons">inventory_2</i>
-                    <h4>Article Master Management ({year})</h4>
-                </div>
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                    <span>Cathedral Auction</span> &gt; <span style={{ color: 'var(--primary)', fontWeight: 600 }}>Articles Inventory</span>
-                </div>
-            </div>
-
             <div className="card">
                 <div className="card-header" style={{ flexWrap: 'wrap', gap: '14px' }}>
-                    <div>
-                        <h3>Article Master Records ({year})</h3>
-                        <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Create, edit, organize and assign unique tags to festival articles</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <i className="material-icons" style={{ fontSize: '28px', color: 'var(--primary)' }}>inventory_2</i>
+                        <div>
+                            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--primary)' }}>
+                                Article Master Management ({year})
+                            </h3>
+                            <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
+                                Create, edit, organize and assign unique tags to festival articles
+                            </p>
+                        </div>
                     </div>
                     <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                         {/* Hidden for now as requested:

@@ -5,6 +5,44 @@ if (typeof window !== 'undefined' && window.swal && typeof window.swal.setDefaul
     window.swal.setDefaults({ closeOnClickOutside: false });
 }
 
+// --- Currency Input Helpers ---
+// Determine whether a currency input value represents zero (e.g. '0.000', '0', 0, 0.00, etc.)
+function isZeroCurrencyValue(val) {
+    if (val === null || val === undefined) return false;
+    const str = String(val).trim();
+    if (str === '') return false;
+    return str === '0' || str === '0.000' || (!isNaN(Number(str)) && Number(str) === 0);
+}
+
+// Clear currency value on focus when current value is 0.000 or 0 so user can directly type new value
+function handleCurrencyFocus(value, setValue) {
+    if (isZeroCurrencyValue(value)) {
+        if (typeof setValue === 'function') {
+            setValue('');
+        }
+    }
+}
+
+// Global focusin listener for all currency inputs (inputs with step="0.001" or data-currency="true")
+if (typeof document !== 'undefined') {
+    document.addEventListener('focusin', function(e) {
+        const target = e.target;
+        if (target && target.tagName === 'INPUT') {
+            const isCurrency = target.getAttribute('step') === '0.001' || target.getAttribute('data-currency') === 'true';
+            if (isCurrency && isZeroCurrencyValue(target.value)) {
+                const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+                if (nativeSetter) {
+                    nativeSetter.call(target, '');
+                } else {
+                    target.value = '';
+                }
+                target.dispatchEvent(new Event('input', { bubbles: true }));
+                target.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
+    }, true);
+}
+
 // --- API Helper ---
 const api = {
     async request(url, options = {}) {
@@ -852,7 +890,9 @@ function CategoryManagementModal({ isOpen, onClose, categories, categoryDetails,
                                 buttons: false
                             });
                             showToast('success', `Category "${catName}" deleted.`);
-                            onCategoryDeleted(catId);
+                            if (typeof onCategoryDeleted === 'function') {
+                                await onCategoryDeleted(catId);
+                            }
                         }
                     } catch (err) {
                         window.swal("Error", err.message, "error");
@@ -865,7 +905,9 @@ function CategoryManagementModal({ isOpen, onClose, categories, categoryDetails,
                 const res = await api.delete(`/api/articles/categories/${catId}`);
                 if (res.success) {
                     showToast('success', `Category "${catName}" deleted.`);
-                    onCategoryDeleted(catId);
+                    if (typeof onCategoryDeleted === 'function') {
+                        await onCategoryDeleted(catId);
+                    }
                 }
             } catch (err) {
                 showToast('error', err.message);
@@ -1089,7 +1131,7 @@ function downloadExcelTemplate(targetYear = new Date().getFullYear(), catList = 
 }
 
 // --- Article Master Management View ---
-function ArticlesView({ year, onOpenNewArticle, onEditArticle, onOpenImport, showToast }) {
+function ArticlesView({ year, onOpenNewArticle, onEditArticle, onOpenImport, showToast, refreshTrigger, onDataChanged }) {
     const [articles, setArticles] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -1102,7 +1144,7 @@ function ArticlesView({ year, onOpenNewArticle, onEditArticle, onOpenImport, sho
     const fetchArticles = async () => {
         setLoading(true);
         try {
-            const url = `/api/articles?year=${year}&status=${statusFilter}&category=${categoryFilter}&search=${encodeURIComponent(search)}`;
+            const url = `/api/articles?year=${year}&status=${statusFilter}&category=${categoryFilter}&search=${encodeURIComponent(search)}&order=asc`;
             const res = await api.get(url);
             if (res.success) {
                 setArticles(res.articles);
@@ -1126,11 +1168,11 @@ function ArticlesView({ year, onOpenNewArticle, onEditArticle, onOpenImport, sho
 
     useEffect(() => {
         fetchCategories();
-    }, []);
+    }, [refreshTrigger]);
 
     useEffect(() => {
         fetchArticles();
-    }, [year, statusFilter, categoryFilter, search]);
+    }, [year, statusFilter, categoryFilter, search, refreshTrigger]);
 
     const handleDelete = (a) => {
         // Only articles with status 'Available' can be deleted
@@ -1183,6 +1225,9 @@ function ArticlesView({ year, onOpenNewArticle, onEditArticle, onOpenImport, sho
                             showToast('success', `Article [${a.article_number}] deleted successfully.`);
                             fetchArticles();
                             fetchCategories();
+                            if (typeof onDataChanged === 'function') {
+                                onDataChanged();
+                            }
                         }
                     } catch (err) {
                         window.swal("Error", err.message, "error");
@@ -1197,6 +1242,9 @@ function ArticlesView({ year, onOpenNewArticle, onEditArticle, onOpenImport, sho
                         showToast('success', `Article ${a.article_number} deleted successfully.`);
                         fetchArticles();
                         fetchCategories();
+                        if (typeof onDataChanged === 'function') {
+                            onDataChanged();
+                        }
                     }
                 })
                 .catch(err => showToast('error', err.message));
@@ -1240,12 +1288,20 @@ function ArticlesView({ year, onOpenNewArticle, onEditArticle, onOpenImport, sho
                             </p>
                         </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                        {/* Hidden for now as requested:
-                        <button className="btn btn-indigo btn-sm" onClick={() => downloadExcelTemplate(year, categories)} title="Download Excel template with Master Categories tab">
-                            <i className="material-icons">description</i> Template (.xlsx)
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <button 
+                            type="button" 
+                            className="btn btn-secondary btn-sm" 
+                            onClick={() => {
+                                fetchArticles();
+                                fetchCategories();
+                                if (typeof onDataChanged === 'function') onDataChanged();
+                            }} 
+                            title="Reload Articles Table"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        >
+                            <i className="material-icons" style={{ fontSize: '16px' }}>refresh</i> Reload Table
                         </button>
-                        */}
                         <button className="btn btn-purple btn-sm" onClick={() => setCategoryModalOpen(true)} title="Manage Categories">
                             <i className="material-icons">category</i> Categories ({categories.length})
                         </button>
@@ -1288,11 +1344,12 @@ function ArticlesView({ year, onOpenNewArticle, onEditArticle, onOpenImport, sho
                     columns={[
                         {
                             header: 'SL No',
-                            id: 'sl_no',
-                            searchable: false,
-                            sortable: false,
-                            headerStyle: { width: '60px', textAlign: 'center' },
-                            style: { textAlign: 'center', width: '60px', fontWeight: 600, color: 'var(--text-muted)' },
+                            accessor: 'article_id',
+                            id: 'article_id',
+                            sortable: true,
+                            sortValue: (a) => Number(a.article_id) || 0,
+                            headerStyle: { width: '70px', textAlign: 'center' },
+                            style: { textAlign: 'center', width: '70px', fontWeight: 600, color: 'var(--text-muted)' },
                             render: (a, index) => <span style={{ fontSize: '12px' }}>{index + 1}</span>
                         },
                         {
@@ -1402,8 +1459,10 @@ function ArticlesView({ year, onOpenNewArticle, onEditArticle, onOpenImport, sho
                     data={articles} 
                     loading={loading}
                     keyField="article_id" 
+                    defaultSortKey="article_id"
+                    defaultSortDir="asc"
                     initialPageSize={10} 
-                    searchPlaceholder="Search by SL No, Tag No, Tag Name, Article, Donor..." 
+                    searchPlaceholder="Search by SL No, Article No, Tag No, Tag Name, Donor..." 
                     emptyMessage={`No articles found for year ${year} matching the selected filters.`}
                 />
             </div>
@@ -1416,9 +1475,13 @@ function ArticlesView({ year, onOpenNewArticle, onEditArticle, onOpenImport, sho
                 onCategoryAdded={(res) => {
                     if (res.categories) setCategories(res.categories);
                     if (res.category_details) setCategoryDetails(res.category_details);
+                    fetchArticles();
+                    if (typeof onDataChanged === 'function') onDataChanged();
                 }}
-                onCategoryDeleted={() => {
-                    fetchCategories();
+                onCategoryDeleted={async () => {
+                    await fetchCategories();
+                    fetchArticles();
+                    if (typeof onDataChanged === 'function') onDataChanged();
                 }}
                 showToast={showToast}
             />
@@ -1454,6 +1517,23 @@ function ArticleModal({ article, year, isOpen, onClose, onSuccess, showToast }) 
     const [memberSearch, setMemberSearch] = useState('');
     const [memberList, setMemberList] = useState([]);
     const [submitting, setSubmitting] = useState(false);
+    const [isReserveCustomized, setIsReserveCustomized] = useState(!!article);
+
+    const handleEstimatedValueChange = (val) => {
+        setForm(f => ({
+            ...f,
+            estimated_value: val,
+            reserve_price: (!article && !isReserveCustomized) ? val : f.reserve_price
+        }));
+    };
+
+    const handleReservePriceChange = (val) => {
+        setIsReserveCustomized(true);
+        setForm(f => ({
+            ...f,
+            reserve_price: val
+        }));
+    };
 
     // Fetch next sequential unique article number for the selected year
     useEffect(() => {
@@ -1679,8 +1759,19 @@ function ArticleModal({ article, year, isOpen, onClose, onSuccess, showToast }) 
                                     type="number" 
                                     step="0.001" 
                                     className="form-control" 
+                                    placeholder="0.000"
+                                    data-currency="true"
                                     value={form.estimated_value}
-                                    onChange={e => setForm({...form, estimated_value: e.target.value})}
+                                    onFocus={() => {
+                                        handleCurrencyFocus(form.estimated_value, v => {
+                                            setForm(f => ({
+                                                ...f,
+                                                estimated_value: v,
+                                                reserve_price: (!article && !isReserveCustomized && isZeroCurrencyValue(f.reserve_price)) ? v : f.reserve_price
+                                            }));
+                                        });
+                                    }}
+                                    onChange={e => handleEstimatedValueChange(e.target.value)}
                                 />
                             </div>
                             <div className="form-group">
@@ -1689,8 +1780,11 @@ function ArticleModal({ article, year, isOpen, onClose, onSuccess, showToast }) 
                                     type="number" 
                                     step="0.001" 
                                     className="form-control" 
+                                    placeholder="0.000"
+                                    data-currency="true"
                                     value={form.reserve_price}
-                                    onChange={e => setForm({...form, reserve_price: e.target.value})}
+                                    onFocus={() => handleCurrencyFocus(form.reserve_price, v => setForm(f => ({ ...f, reserve_price: v })))}
+                                    onChange={e => handleReservePriceChange(e.target.value)}
                                 />
                             </div>
                         </div>
@@ -2240,7 +2334,7 @@ function SearchableHeadSelect({
 }
 
 // --- Live Auction Desk View ---
-function AuctionDeskView({ year, showToast, onOpenReceipt }) {
+function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDataChanged }) {
     const [transactions, setTransactions] = useState([]);
     const [availableArticles, setAvailableArticles] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -2359,7 +2453,7 @@ function AuctionDeskView({ year, showToast, onOpenReceipt }) {
 
     useEffect(() => {
         fetchAuctionData();
-    }, [year]);
+    }, [year, refreshTrigger]);
 
     useEffect(() => {
         if (memberSearch.trim().length > 1) {
@@ -2521,6 +2615,9 @@ function AuctionDeskView({ year, showToast, onOpenReceipt }) {
                 setReceiptBookNo('');
                 setReceiptNo('');
                 fetchAuctionData();
+                if (typeof onDataChanged === 'function') {
+                    onDataChanged();
+                }
 
                 // If receipt was generated, offer to open it
                 if (res.data.receipt_no) {
@@ -2729,8 +2826,10 @@ function AuctionDeskView({ year, showToast, onOpenReceipt }) {
                                     className="form-control" 
                                     style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--primary)' }}
                                     placeholder="0.000"
+                                    data-currency="true"
                                     required 
                                     value={bidAmount}
+                                    onFocus={() => handleCurrencyFocus(bidAmount, setBidAmount)}
                                     onChange={e => setBidAmount(e.target.value)}
                                 />
                             </div>
@@ -2744,7 +2843,9 @@ function AuctionDeskView({ year, showToast, onOpenReceipt }) {
                                     className="form-control" 
                                     style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--success)' }}
                                     placeholder="0.000"
+                                    data-currency="true"
                                     value={paidAmount}
+                                    onFocus={() => handleCurrencyFocus(paidAmount, setPaidAmount)}
                                     onChange={e => setPaidAmount(e.target.value)}
                                 />
                                 <div style={{ fontSize: '11px', marginTop: '4px', color: 'var(--text-muted)' }}>
@@ -3037,12 +3138,26 @@ function AuctionDeskView({ year, showToast, onOpenReceipt }) {
 
             {/* Auction Transactions Log DataTable */}
             <div className="card">
-                <div className="card-header">
+                <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
                     <div>
                         <h3>Recent Auction Transactions ({year})</h3>
                         <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Browse, search, sort, and record settlements on auction ledger sales</p>
                     </div>
-                    <span className="badge badge-info">{transactions.length} Total Sales</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <button 
+                            type="button" 
+                            className="btn btn-secondary btn-sm" 
+                            onClick={() => {
+                                fetchAuctionData();
+                                if (typeof onDataChanged === 'function') onDataChanged();
+                            }} 
+                            title="Reload Transactions Table"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        >
+                            <i className="material-icons" style={{ fontSize: '16px' }}>refresh</i> Reload Table
+                        </button>
+                        <span className="badge badge-info">{transactions.length} Total Sales</span>
+                    </div>
                 </div>
                 
                 <DataTable 
@@ -3419,6 +3534,9 @@ function AuctionDeskView({ year, showToast, onOpenReceipt }) {
                     onClose={() => setPaymentModalData(null)}
                     onSuccess={() => {
                         fetchAuctionData();
+                        if (typeof onDataChanged === 'function') {
+                            onDataChanged();
+                        }
                         showToast('success', 'Balance payment recorded!');
                     }}
                     onOpenReceipt={onOpenReceipt}
@@ -3713,8 +3831,11 @@ function RecordPaymentModal({ transaction, isOpen, onClose, onSuccess, onOpenRec
                                         paddingLeft: '14px',
                                         letterSpacing: '0.5px'
                                     }}
+                                    placeholder="0.000"
+                                    data-currency="true"
                                     required 
                                     value={amount}
+                                    onFocus={() => handleCurrencyFocus(amount, setAmount)}
                                     onChange={e => setAmount(e.target.value)}
                                 />
                             </div>
@@ -4281,7 +4402,7 @@ function ReceiptModal({ receiptNo, isOpen, onClose }) {
 }
 
 // --- Promises Management View ---
-function PromisesView({ year, showToast, onOpenReceipt }) {
+function PromisesView({ year, showToast, onOpenReceipt, refreshTrigger, onDataChanged }) {
     const [promises, setPromises] = useState([]);
     const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState('All');
@@ -4303,7 +4424,7 @@ function PromisesView({ year, showToast, onOpenReceipt }) {
 
     useEffect(() => {
         fetchPromises();
-    }, [year, statusFilter, search]);
+    }, [year, statusFilter, search, refreshTrigger]);
 
     useEffect(() => {
         api.get('/api/accounts/heads')
@@ -4328,7 +4449,19 @@ function PromisesView({ year, showToast, onOpenReceipt }) {
                             </p>
                         </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '10px' }}>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <button 
+                            type="button" 
+                            className="btn btn-secondary btn-sm" 
+                            onClick={() => {
+                                fetchPromises();
+                                if (typeof onDataChanged === 'function') onDataChanged();
+                            }} 
+                            title="Reload Promises Table"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        >
+                            <i className="material-icons" style={{ fontSize: '16px' }}>refresh</i> Reload Table
+                        </button>
                         <select className="form-control" style={{ width: '150px' }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
                             <option value="All">All Statuses</option>
                             <option value="Active">Active / Pending</option>
@@ -4522,6 +4655,9 @@ function PromisesView({ year, showToast, onOpenReceipt }) {
                     onClose={() => setPaymentModalData(null)}
                     onSuccess={() => {
                         fetchPromises();
+                        if (typeof onDataChanged === 'function') {
+                            onDataChanged();
+                        }
                         showToast('success', 'Promise payment recorded!');
                     }}
                     onOpenReceipt={onOpenReceipt}
@@ -4534,12 +4670,12 @@ function PromisesView({ year, showToast, onOpenReceipt }) {
 }
 
 // --- Reports & Analytics View ---
-function ReportsView({ year, showToast }) {
+function ReportsView({ year, showToast, refreshTrigger }) {
     const [summary, setSummary] = useState(null);
     const [buyers, setBuyers] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
+    const fetchReports = () => {
         setLoading(true);
         Promise.all([
             api.get(`/api/reports/summary?year=${year}`),
@@ -4550,7 +4686,11 @@ function ReportsView({ year, showToast }) {
         }).catch(err => {
             showToast('error', err.message);
         }).finally(() => setLoading(false));
-    }, [year]);
+    };
+
+    useEffect(() => {
+        fetchReports();
+    }, [year, refreshTrigger]);
 
     const exportBuyerReport = () => {
         if (!buyers.length) return;
@@ -5037,9 +5177,20 @@ function ReportsView({ year, showToast }) {
                             </p>
                         </div>
                     </div>
-                    <button className="btn btn-excel btn-sm" onClick={exportBuyerReport}>
-                        <i className="material-icons">file_download</i> Export Excel Ledger
-                    </button>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <button 
+                            type="button" 
+                            className="btn btn-secondary btn-sm" 
+                            onClick={fetchReports} 
+                            title="Reload Report Data"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        >
+                            <i className="material-icons" style={{ fontSize: '16px' }}>refresh</i> Reload
+                        </button>
+                        <button className="btn btn-excel btn-sm" onClick={exportBuyerReport}>
+                            <i className="material-icons">file_download</i> Export Excel Ledger
+                        </button>
+                    </div>
                 </div>
                 
                 <DataTable 
@@ -5856,6 +6007,14 @@ function App() {
     const [importModalOpen, setImportModalOpen] = useState(false);
     const [receiptModalNo, setReceiptModalNo] = useState(null);
 
+    // Global data revision trigger for live datatable updates across views
+    const [dataRevision, setDataRevision] = useState(0);
+
+    const refreshData = () => {
+        setDataRevision(prev => prev + 1);
+        fetchYearsAndStats();
+    };
+
     const showToast = (type, message) => {
         const id = Date.now() + Math.random();
         setToasts(prev => [...prev, { id, type, message }]);
@@ -6167,6 +6326,8 @@ function App() {
                     <ArticlesView 
                         key={year}
                         year={year} 
+                        refreshTrigger={dataRevision}
+                        onDataChanged={refreshData}
                         onOpenNewArticle={() => { setEditingArticle(null); setArticleModalOpen(true); }}
                         onEditArticle={(a) => { 
                             if (a.status !== 'Available') {
@@ -6185,6 +6346,8 @@ function App() {
                     <AuctionDeskView 
                         key={year}
                         year={year} 
+                        refreshTrigger={dataRevision}
+                        onDataChanged={refreshData}
                         showToast={showToast}
                         onOpenReceipt={rno => setReceiptModalNo(rno)}
                     />
@@ -6194,6 +6357,8 @@ function App() {
                     <PromisesView 
                         key={year}
                         year={year} 
+                        refreshTrigger={dataRevision}
+                        onDataChanged={refreshData}
                         showToast={showToast}
                         onOpenReceipt={rno => setReceiptModalNo(rno)}
                     />
@@ -6203,6 +6368,7 @@ function App() {
                     <ReportsView 
                         key={year}
                         year={year} 
+                        refreshTrigger={dataRevision}
                         showToast={showToast}
                     />
                 )}
@@ -6230,7 +6396,7 @@ function App() {
                 isOpen={articleModalOpen}
                 onClose={() => setArticleModalOpen(false)}
                 onSuccess={() => {
-                    fetchYearsAndStats();
+                    refreshData();
                 }}
                 showToast={showToast}
             />
@@ -6240,7 +6406,7 @@ function App() {
                 isOpen={importModalOpen}
                 onClose={() => setImportModalOpen(false)}
                 onSuccess={() => {
-                    fetchYearsAndStats();
+                    refreshData();
                 }}
                 showToast={showToast}
             />

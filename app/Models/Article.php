@@ -5,7 +5,7 @@ use App\Core\Model;
 use PDO;
 
 class Article extends Model {
-    public function getAll(int $year, ?string $status = null, ?string $search = null, ?string $category = null): array {
+    public function getAll(int $year, ?string $status = null, ?string $search = null, ?string $category = null, string $order = 'ASC'): array {
         $sql = "
             SELECT a.*, 
                    COALESCE(a.donor_code_c, m.code_c) as donor_code_c, 
@@ -39,7 +39,8 @@ class Article extends Model {
             $params['search4'] = $term;
         }
 
-        $sql .= " ORDER BY a.article_id DESC";
+        $dir = strtoupper(trim($order)) === 'DESC' ? 'DESC' : 'ASC';
+        $sql .= " ORDER BY a.article_id {$dir}";
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);

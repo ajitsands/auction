@@ -1,5 +1,10 @@
 const { useState, useEffect, useMemo, useRef } = React;
 
+// Ensure SweetAlert modals behave as strict modal dialogs (no close on clicking outside)
+if (typeof window !== 'undefined' && window.swal && typeof window.swal.setDefaults === 'function') {
+    window.swal.setDefaults({ closeOnClickOutside: false });
+}
+
 // --- API Helper ---
 const api = {
     async request(url, options = {}) {
@@ -929,8 +934,8 @@ function CategoryManagementModal({ isOpen, onClose, categories, categoryDetails,
     ];
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content" style={{ maxWidth: '680px' }} onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay">
+            <div className="modal-content" style={{ maxWidth: '680px' }}>
                 <ModalHeader 
                     title="Article Categories Management" 
                     icon="category" 
@@ -1552,8 +1557,8 @@ function ArticleModal({ article, year, isOpen, onClose, onSuccess, showToast }) 
     };
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content article-modal-content" onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay">
+            <div className="modal-content article-modal-content">
                 <ModalHeader 
                     title={article ? "Edit Article Record" : "Create Article Record"}
                     icon={article ? "edit" : "add_circle"}
@@ -1922,8 +1927,8 @@ function ExcelImportModal({ year, isOpen, onClose, onSuccess, showToast }) {
     ];
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content" style={{ maxWidth: '880px' }} onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay">
+            <div className="modal-content" style={{ maxWidth: '880px' }}>
                 <ModalHeader 
                     title="Excel / CSV Article Batch Import" 
                     icon="cloud_upload" 
@@ -3528,8 +3533,8 @@ function RecordPaymentModal({ transaction, isOpen, onClose, onSuccess, onOpenRec
     };
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content pay-balance-modal-content" onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay">
+            <div className="modal-content pay-balance-modal-content">
                 <ModalHeader 
                     title="Settle Auction Balance" 
                     icon="payments" 
@@ -4197,8 +4202,8 @@ function ReceiptModal({ receiptNo, isOpen, onClose }) {
     };
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content" style={{ maxWidth: '880px', width: '95%', background: 'var(--bg-surface)' }} onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay">
+            <div className="modal-content" style={{ maxWidth: '880px', width: '95%', background: 'var(--bg-surface)' }}>
                 <div className="no-print">
                     <ModalHeader 
                         title="Harvest Festival Payment Receipt (Voucher Format)" 
@@ -5276,11 +5281,10 @@ function UserModal({ isOpen, onClose, userToEdit, onSaved, showToast }) {
     };
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-overlay">
             <div 
                 className="modal-content" 
-                style={{ width: '95%', maxWidth: '640px', margin: 'auto', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }} 
-                onClick={e => e.stopPropagation()}
+                style={{ width: '95%', maxWidth: '640px', margin: 'auto', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}
             >
                 <ModalHeader 
                     title={isEdit ? `Edit User: @${userToEdit.username}` : "Add New User"} 
@@ -5464,11 +5468,10 @@ function ResetPasswordModal({ isOpen, onClose, user, onResetSuccess, showToast }
     };
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-overlay">
             <div 
                 className="modal-content" 
-                style={{ width: '95%', maxWidth: '520px', margin: 'auto', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }} 
-                onClick={e => e.stopPropagation()}
+                style={{ width: '95%', maxWidth: '520px', margin: 'auto', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}
             >
                 <ModalHeader 
                     title={`Reset Password: @${user.username}`} 

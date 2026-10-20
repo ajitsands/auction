@@ -2206,17 +2206,21 @@ function SearchableHeadSelect({
         ).slice(0, 60);
     }, [options, search]);
 
+    const cleanLabel = String(label || '').replace(/\s*\*+$/, '').trim();
+
     return (
         <div className="form-group" ref={containerRef} style={{ position: 'relative', margin: 0 }}>
-            <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                <span style={{ fontWeight: 600, fontSize: '13px' }}>
-                    {label} {required && <strong style={{ color: 'var(--danger)' }}>*</strong>}
-                </span>
-                {selectedHead && (
-                    <span style={{ fontSize: '11px', color: badgeColor, fontWeight: 700 }}>
-                        Code: {selectedHead.head_code}
-                    </span>
-                )}
+            <label className="form-label" style={{ 
+                display: 'block', 
+                marginBottom: '6px', 
+                whiteSpace: 'nowrap', 
+                overflow: 'hidden', 
+                textOverflow: 'ellipsis',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: 'var(--text-secondary)'
+            }} title={cleanLabel}>
+                {cleanLabel} {required && <strong style={{ color: 'var(--danger)' }}>*</strong>}
             </label>
 
             {selectedHead ? (
@@ -2505,7 +2509,7 @@ function DefaultLedgerSettingsModal({ isOpen, onClose, showToast, onSaved }) {
                                 </div>
                                 <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: '16px' }}>
                                     <SearchableHeadSelect
-                                        label="Default Debit Head (Receiving Cash/Bank) *"
+                                        label="Default Debit Head (Receiving Cash/Bank)"
                                         placeholder="Search debit head (e.g. 02123)..."
                                         options={accountsData.contribution_debit_heads}
                                         selectedHead={selectedContribDr}
@@ -2514,7 +2518,7 @@ function DefaultLedgerSettingsModal({ isOpen, onClose, showToast, onSaved }) {
                                         badgeColor="#3b82f6"
                                     />
                                     <SearchableHeadSelect
-                                        label="Default Credit Head (Harvest / Auction Income) *"
+                                        label="Default Credit Head (Harvest / Auction Income)"
                                         placeholder="Search credit head (e.g. 02206 or group 214)..."
                                         options={accountsData.contribution_credit_heads}
                                         selectedHead={selectedContribCr}
@@ -2542,7 +2546,7 @@ function DefaultLedgerSettingsModal({ isOpen, onClose, showToast, onSaved }) {
                                 </div>
                                 <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: '16px' }}>
                                     <SearchableHeadSelect
-                                        label="Default Debit Head (A/R Member Receivable) *"
+                                        label="Default Debit Head (A/R Member Receivable)"
                                         placeholder="Search debit head (e.g. 08583)..."
                                         options={accountsData.promise_debit_heads}
                                         selectedHead={selectedPromiseDr}
@@ -2551,7 +2555,7 @@ function DefaultLedgerSettingsModal({ isOpen, onClose, showToast, onSaved }) {
                                         badgeColor="#f59e0b"
                                     />
                                     <SearchableHeadSelect
-                                        label="Default Credit Head (Harvest Article Auction Income) *"
+                                        label="Default Credit Head (Harvest Article Auction Income)"
                                         placeholder="Search credit head (e.g. 07503)..."
                                         options={accountsData.promise_credit_heads}
                                         selectedHead={selectedPromiseCr}
@@ -3465,7 +3469,7 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
                                     {isAdmin ? (
                                         <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '16px' }}>
                                             <SearchableHeadSelect
-                                                label="Debit Head (Receiving Cash/Bank) *"
+                                                label="Debit Head (Receiving Cash/Bank)"
                                                 placeholder="Search contribution debit head (e.g. 02123)..."
                                                 options={accountsData.contribution_debit_heads}
                                                 selectedHead={selectedContribDr}
@@ -3474,7 +3478,7 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
                                                 badgeColor="#3b82f6"
                                             />
                                             <SearchableHeadSelect
-                                                label="Credit Head (Harvest / Auction Income) *"
+                                                label="Credit Head (Harvest / Auction Income)"
                                                 placeholder="Search contribution credit head (e.g. 02206)..."
                                                 options={accountsData.contribution_credit_heads}
                                                 selectedHead={selectedContribCr}
@@ -3565,7 +3569,7 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
                                 {isAdmin ? (
                                     <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '16px' }}>
                                         <SearchableHeadSelect
-                                            label="Debit Head (A/R Member Receivable) *"
+                                            label="Debit Head (A/R Member Receivable)"
                                             placeholder="Search promise debit head (e.g. 08583)..."
                                             options={accountsData.promise_debit_heads}
                                             selectedHead={selectedPromiseDr}
@@ -3574,7 +3578,7 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
                                             badgeColor="#f59e0b"
                                         />
                                         <SearchableHeadSelect
-                                            label="Credit Head (Harvest Article Auction Income) *"
+                                            label="Credit Head (Harvest Article Auction Income)"
                                             placeholder="Search promise credit head (e.g. 07503)..."
                                             options={accountsData.promise_credit_heads}
                                             selectedHead={selectedPromiseCr}
@@ -4403,9 +4407,9 @@ function RecordPaymentModal({ transaction, isOpen, onClose, onSuccess, onOpenRec
                                     </span>
                                 </div>
 
-                                <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
+                                <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '16px' }}>
                                     <SearchableHeadSelect
-                                        label="Debit Head (Receiving Cash/Bank) *"
+                                        label="Debit Head (Receiving Cash/Bank)"
                                         placeholder="Search receiving debit head (e.g. 02123)..."
                                         options={accountsData?.contribution_debit_heads || []}
                                         selectedHead={selectedDr}
@@ -4414,7 +4418,7 @@ function RecordPaymentModal({ transaction, isOpen, onClose, onSuccess, onOpenRec
                                         badgeColor="#3b82f6"
                                     />
                                     <SearchableHeadSelect
-                                        label="Credit Head (Harvest / Auction Income) *"
+                                        label="Credit Head (Harvest / Auction Income)"
                                         placeholder="Search income credit head (e.g. 02206 / 07503)..."
                                         options={accountsData?.contribution_credit_heads || []}
                                         selectedHead={selectedCr}

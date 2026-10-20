@@ -1054,7 +1054,8 @@ select.form-control option {
 /* ==========================================================================
    Modals - Staging Parallel Signature Look & Feel
    ========================================================================== */
-.modal-overlay {
+.modal-overlay,
+.modal-backdrop {
     position: fixed;
     top: 0;
     left: 0;

@@ -2442,20 +2442,18 @@ function DefaultLedgerSettingsModal({ isOpen, onClose, showToast, onSaved }) {
     if (!isOpen) return null;
 
     return (
-        <div className="modal-backdrop">
-            <div className="modal" style={{ maxWidth: '780px' }} onClick={e => e.stopPropagation()}>
-                <div className="modal-header" style={{ background: 'linear-gradient(90deg, rgba(59, 130, 246, 0.1), transparent)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <i className="material-icons" style={{ fontSize: '24px', color: 'var(--primary)' }}>settings_suggest</i>
-                        <div>
-                            <h3 style={{ margin: 0, fontSize: '18px' }}>Configure Default Live Auction Ledgers</h3>
-                            <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
-                                Set the default church accounting heads. Non-admin users will automatically post to these ledgers and cannot change them.
-                            </p>
-                        </div>
-                    </div>
-                    <button type="button" className="close-btn" onClick={onClose}>&times;</button>
-                </div>
+        <div className="modal-overlay" onClick={onClose}>
+            <div 
+                className="modal-content" 
+                style={{ width: '95%', maxWidth: '780px', margin: 'auto', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }} 
+                onClick={e => e.stopPropagation()}
+            >
+                <ModalHeader 
+                    title="Configure Default Live Auction Ledgers" 
+                    icon="account_balance" 
+                    onClose={onClose} 
+                    badge="Admin Configuration"
+                />
 
                 {loading ? (
                     <div style={{ padding: '40px', textAlign: 'center' }}>
@@ -2463,8 +2461,12 @@ function DefaultLedgerSettingsModal({ isOpen, onClose, showToast, onSaved }) {
                         <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Loading accounts and current defaults...</p>
                     </div>
                 ) : (
-                    <form onSubmit={handleSave}>
-                        <div className="modal-body" style={{ maxHeight: '72vh', overflowY: 'auto', padding: '20px 24px' }}>
+                    <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                        <div className="modal-body" style={{ overflowY: 'auto', padding: '20px 24px', flex: 1 }}>
+                            <div style={{ background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '8px', padding: '10px 14px', fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                                <i className="material-icons" style={{ color: 'var(--primary)', fontSize: '20px' }}>info</i>
+                                <span>Set default church accounting heads. Non-admin users will automatically post to these ledgers on the Live Auction Desk and cannot change them.</span>
+                            </div>
                             {/* Budget Event Head */}
                             <div className="form-group" style={{ marginBottom: '16px' }}>
                                 <label className="form-label" style={{ fontWeight: 700 }}>Default Budget Head / Event *</label>

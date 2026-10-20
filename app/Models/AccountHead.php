@@ -25,19 +25,28 @@ class AccountHead extends Model {
 
     /**
      * Get contribution credit heads as defined in acc_member_contribution_batch_hf.php
+     * including heads under group_id = 214 (Receivables & Harvest Festival heads)
      */
     public function getContributionCreditHeads(): array {
         $sql = "
-            SELECT head_id, head_code, REPLACE(head_name, '\\'', '') as head_name 
+            SELECT DISTINCT head_id, head_code, REPLACE(head_name, '\\'', '') as head_name 
             FROM acc_heads 
             WHERE head_type = 'L' 
               AND entry_status = 'Yes' 
-              AND main_group IN ('I', 'L') 
               AND head_status = 'Active' 
-              AND head_code NOT IN ('07101', 'AccCo') 
-              AND group_id NOT IN (241, 233, 259) 
-              AND main_ledger_code NOT IN ('07773', '07774', '07618') 
-              AND head_code IN (SELECT head_code FROM acc_parallel_sur_defi_heads)
+              AND (
+                  (
+                      main_group IN ('I', 'L') 
+                      AND head_code NOT IN ('07101', 'AccCo') 
+                      AND group_id NOT IN (241, 233, 259) 
+                      AND main_ledger_code NOT IN ('07773', '07774', '07618') 
+                      AND head_code IN (SELECT head_code FROM acc_parallel_sur_defi_heads)
+                  )
+                  OR 
+                  (
+                      group_id = 214
+                  )
+              )
             ORDER BY head_name ASC
         ";
         return $this->db->query($sql)->fetchAll();

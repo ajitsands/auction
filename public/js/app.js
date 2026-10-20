@@ -2224,24 +2224,25 @@ function SearchableHeadSelect({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    background: 'rgba(255, 255, 255, 0.05)',
+                    background: 'var(--bg-card, rgba(255, 255, 255, 0.05))',
                     border: `1.5px solid ${badgeColor}`,
                     borderRadius: '8px',
                     padding: '8px 12px',
-                    gap: '8px'
+                    gap: '10px',
+                    minHeight: '44px'
                 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-                        <span className="badge" style={{ background: badgeColor, color: '#fff', fontSize: '11px', padding: '3px 8px', whiteSpace: 'nowrap', fontWeight: 700 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1, paddingRight: '4px' }}>
+                        <span className="badge" style={{ background: badgeColor, color: '#fff', fontSize: '12px', padding: '3px 8px', whiteSpace: 'nowrap', fontWeight: 700, flexShrink: 0 }}>
                             {selectedHead.head_code}
                         </span>
-                        <span style={{ fontWeight: 600, fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)', wordBreak: 'break-word', lineHeight: '1.35' }} title={`${selectedHead.head_code} - ${selectedHead.head_name}`}>
                             {selectedHead.head_name}
                         </span>
                     </div>
                     <button
                         type="button"
                         className="btn btn-secondary btn-sm"
-                        style={{ padding: '3px 8px', fontSize: '11px', height: '26px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        style={{ padding: '3px 10px', fontSize: '11px', height: '28px', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}
                         onClick={() => { onSelect(null); setSearch(''); }}
                         title="Click to search and pick another head"
                     >
@@ -2292,7 +2293,7 @@ function SearchableHeadSelect({
                             left: 0,
                             right: 0,
                             zIndex: 250,
-                            maxHeight: '220px',
+                            maxHeight: '260px',
                             overflowY: 'auto'
                         }}>
                             {filteredOptions.length === 0 ? (
@@ -2311,15 +2312,15 @@ function SearchableHeadSelect({
                                             setSearch('');
                                         }}
                                     >
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-                                            <span className="badge" style={{ background: badgeColor, color: '#fff', fontSize: '11px', padding: '2px 7px', fontWeight: 700 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                                            <span className="badge" style={{ background: badgeColor, color: '#fff', fontSize: '11px', padding: '2px 7px', fontWeight: 700, flexShrink: 0 }}>
                                                 {opt.head_code}
                                             </span>
-                                            <span style={{ fontSize: '13px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            <span style={{ fontSize: '13px', fontWeight: 500, wordBreak: 'break-word', lineHeight: '1.3' }}>
                                                 {opt.head_name}
                                             </span>
                                         </div>
-                                        <span style={{ fontSize: '11px', color: badgeColor, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                                        <span style={{ fontSize: '11px', color: badgeColor, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
                                             Select &rarr;
                                         </span>
                                     </div>
@@ -2445,7 +2446,7 @@ function DefaultLedgerSettingsModal({ isOpen, onClose, showToast, onSaved }) {
         <div className="modal-overlay" onClick={onClose}>
             <div 
                 className="modal-content" 
-                style={{ width: '95%', maxWidth: '780px', margin: 'auto', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }} 
+                style={{ width: '96%', maxWidth: '1080px', margin: 'auto', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }} 
                 onClick={e => e.stopPropagation()}
             >
                 <ModalHeader 
@@ -2462,7 +2463,7 @@ function DefaultLedgerSettingsModal({ isOpen, onClose, showToast, onSaved }) {
                     </div>
                 ) : (
                     <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                        <div className="modal-body" style={{ overflowY: 'auto', padding: '20px 24px', flex: 1 }}>
+                        <div className="modal-body" style={{ overflowY: 'auto', padding: '20px 26px', flex: 1 }}>
                             <div style={{ background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '8px', padding: '10px 14px', fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
                                 <i className="material-icons" style={{ color: 'var(--primary)', fontSize: '20px' }}>info</i>
                                 <span>Set default church accounting heads. Non-admin users will automatically post to these ledgers on the Live Auction Desk and cannot change them.</span>
@@ -2493,16 +2494,16 @@ function DefaultLedgerSettingsModal({ isOpen, onClose, showToast, onSaved }) {
                                 border: '1px solid rgba(16, 185, 129, 0.3)',
                                 borderLeft: '4px solid #10b981',
                                 borderRadius: '8px',
-                                padding: '14px',
+                                padding: '16px',
                                 marginBottom: '16px'
                             }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
-                                    <span className="badge badge-success" style={{ fontSize: '12px', padding: '3px 8px' }}>
+                                    <span className="badge badge-success" style={{ fontSize: '12px', padding: '4px 10px' }}>
                                         <i className="material-icons" style={{ fontSize: '14px', verticalAlign: 'middle', marginRight: '4px' }}>receipt</i>
                                         Default Contribution Posting Heads (Receipt)
                                     </span>
                                 </div>
-                                <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
+                                <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: '16px' }}>
                                     <SearchableHeadSelect
                                         label="Default Debit Head (Receiving Cash/Bank) *"
                                         placeholder="Search debit head (e.g. 02123)..."
@@ -2514,7 +2515,7 @@ function DefaultLedgerSettingsModal({ isOpen, onClose, showToast, onSaved }) {
                                     />
                                     <SearchableHeadSelect
                                         label="Default Credit Head (Harvest / Auction Income) *"
-                                        placeholder="Search credit head (e.g. 02206)..."
+                                        placeholder="Search credit head (e.g. 02206 or group 214)..."
                                         options={accountsData.contribution_credit_heads}
                                         selectedHead={selectedContribCr}
                                         onSelect={setSelectedContribCr}
@@ -2530,16 +2531,16 @@ function DefaultLedgerSettingsModal({ isOpen, onClose, showToast, onSaved }) {
                                 border: '1px solid rgba(245, 158, 11, 0.3)',
                                 borderLeft: '4px solid #f59e0b',
                                 borderRadius: '8px',
-                                padding: '14px',
-                                marginBottom: '10px'
+                                padding: '16px',
+                                marginBottom: '12px'
                             }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
-                                    <span className="badge badge-warning" style={{ fontSize: '12px', padding: '3px 8px' }}>
+                                    <span className="badge badge-warning" style={{ fontSize: '12px', padding: '4px 10px' }}>
                                         <i className="material-icons" style={{ fontSize: '14px', verticalAlign: 'middle', marginRight: '4px' }}>history_edu</i>
                                         Default Promise Posting Heads (Member Receivable)
                                     </span>
                                 </div>
-                                <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
+                                <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: '16px' }}>
                                     <SearchableHeadSelect
                                         label="Default Debit Head (A/R Member Receivable) *"
                                         placeholder="Search debit head (e.g. 08583)..."
@@ -3462,7 +3463,7 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
                                     </div>
 
                                     {isAdmin ? (
-                                        <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
+                                        <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '16px' }}>
                                             <SearchableHeadSelect
                                                 label="Debit Head (Receiving Cash/Bank) *"
                                                 placeholder="Search contribution debit head (e.g. 02123)..."
@@ -3562,7 +3563,7 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
                                 </div>
 
                                 {isAdmin ? (
-                                    <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
+                                    <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '16px' }}>
                                         <SearchableHeadSelect
                                             label="Debit Head (A/R Member Receivable) *"
                                             placeholder="Search promise debit head (e.g. 08583)..."

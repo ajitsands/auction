@@ -163,8 +163,8 @@ CREATE TABLE IF NOT EXISTS `hf_users` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ------------------------------------------------------------------------------
--- 7. Alter Base Church Tables (`acc_contribution` & `acc_promises`)
--- Links accounting receipts and promises back to Harvest Festival article items
+-- 7. Alter Base Church Tables (`acc_contribution`, `acc_promises` & `acc_ledger_entries`)
+-- Links accounting receipts, promises, and ledger entries back to Harvest Festival article items
 -- (If article_id is already present, these lines can be safely skipped)
 -- ------------------------------------------------------------------------------
 ALTER TABLE `acc_contribution` ADD COLUMN `article_id` int(11) DEFAULT 0;
@@ -172,6 +172,9 @@ ALTER TABLE `acc_contribution` ADD INDEX `idx_article_id` (`article_id`);
 
 ALTER TABLE `acc_promises` ADD COLUMN `article_id` int(11) DEFAULT 0;
 ALTER TABLE `acc_promises` ADD INDEX `idx_article_id` (`article_id`);
+
+ALTER TABLE `acc_ledger_entries` ADD COLUMN `article_id` int(11) DEFAULT 0;
+ALTER TABLE `acc_ledger_entries` ADD INDEX `idx_article_id` (`article_id`);
 
 -- ------------------------------------------------------------------------------
 -- 8. Seed Default Categories

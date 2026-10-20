@@ -2652,7 +2652,7 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
 
                 <div className="card-body" style={{ padding: '16px 20px' }}>
                     <form onSubmit={handleRecordAuction}>
-                        <div className="form-row" style={{ gridTemplateColumns: 'minmax(280px, 2fr) minmax(130px, 1fr) minmax(140px, 1fr)', gap: '12px', alignItems: 'flex-start', marginBottom: '6px' }}>
+                        <div className="form-row auction-desk-form-row" style={{ gridTemplateColumns: 'minmax(280px, 2fr) minmax(130px, 1fr) minmax(140px, 1fr)', gap: '12px', alignItems: 'flex-start', marginBottom: '6px' }}>
                             {/* Article Searchable Selection */}
                             <div className="form-group" style={{ margin: 0 }}>
                                 <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -5985,6 +5985,18 @@ function App() {
     const [stats, setStats] = useState(null);
     const [toasts, setToasts] = useState([]);
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [reportsDropdownOpen, setReportsDropdownOpen] = useState(false);
+    const reportsDropdownRef = useRef(null);
+
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (reportsDropdownRef.current && !reportsDropdownRef.current.contains(e.target)) {
+                setReportsDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     // Theme state: default to 'light' (white color mode across application), user can toggle
     const [theme, setTheme] = useState(() => {
@@ -6168,36 +6180,67 @@ function App() {
                             )}
                         </div>
 
-                        <div 
-                            className={`top-nav-item ${currentTab === 'promises' ? 'active' : ''}`}
-                            onClick={() => setCurrentTab('promises')}
-                        >
-                            <i className="material-icons">account_balance_wallet</i>
-                            <span>Promises & Dues</span>
-                            {stats?.active_promises_count > 0 && (
-                                <span className="nav-badge" style={{ background: 'rgba(255, 82, 82, 0.4)', color: '#ffffff' }}>
-                                    {stats.active_promises_count}
-                                </span>
+                        {/* Sub Menu: More Dropdown (Promises & Dues, Sales Reports, User Management) */}
+                        <div className="top-nav-dropdown-container" ref={reportsDropdownRef}>
+                            <div 
+                                className={`top-nav-item top-nav-dropdown-trigger ${['promises', 'reports', 'users'].includes(currentTab) ? 'active' : ''}`}
+                                onClick={() => setReportsDropdownOpen(prev => !prev)}
+                                title="More: Promises & Dues, Reports, User Management"
+                            >
+                                <i className="material-icons">more_horiz</i>
+                                <span>More</span>
+                                {stats?.active_promises_count > 0 && (
+                                    <span className="nav-badge" style={{ background: 'rgba(255, 82, 82, 0.45)', color: '#ffffff' }}>
+                                        {stats.active_promises_count}
+                                    </span>
+                                )}
+                                <i className="material-icons dropdown-caret">{reportsDropdownOpen ? 'expand_less' : 'expand_more'}</i>
+                            </div>
+
+                            {reportsDropdownOpen && (
+                                <div className="top-nav-dropdown-menu">
+                                    <div 
+                                        className={`top-nav-dropdown-item ${currentTab === 'promises' ? 'active' : ''}`}
+                                        onClick={() => {
+                                            setCurrentTab('promises');
+                                            setReportsDropdownOpen(false);
+                                        }}
+                                    >
+                                        <i className="material-icons">account_balance_wallet</i>
+                                        <span style={{ flex: 1 }}>Promises & Dues</span>
+                                        {stats?.active_promises_count > 0 && (
+                                            <span className="nav-badge" style={{ background: 'rgba(255, 82, 82, 0.25)', color: 'var(--danger)', fontWeight: 700 }}>
+                                                {stats.active_promises_count}
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    <div 
+                                        className={`top-nav-dropdown-item ${currentTab === 'reports' ? 'active' : ''}`}
+                                        onClick={() => {
+                                            setCurrentTab('reports');
+                                            setReportsDropdownOpen(false);
+                                        }}
+                                    >
+                                        <i className="material-icons">insert_chart</i>
+                                        <span>Sales Reports</span>
+                                    </div>
+
+                                    {isAdmin && (
+                                        <div 
+                                            className={`top-nav-dropdown-item ${currentTab === 'users' ? 'active' : ''}`}
+                                            onClick={() => {
+                                                setCurrentTab('users');
+                                                setReportsDropdownOpen(false);
+                                            }}
+                                        >
+                                            <i className="material-icons">manage_accounts</i>
+                                            <span>User Management</span>
+                                        </div>
+                                    )}
+                                </div>
                             )}
                         </div>
-
-                        <div 
-                            className={`top-nav-item ${currentTab === 'reports' ? 'active' : ''}`}
-                            onClick={() => setCurrentTab('reports')}
-                        >
-                            <i className="material-icons">insert_chart</i>
-                            <span>Sales Reports</span>
-                        </div>
-
-                        {isAdmin && (
-                            <div 
-                                className={`top-nav-item ${currentTab === 'users' ? 'active' : ''}`}
-                                onClick={() => setCurrentTab('users')}
-                            >
-                                <i className="material-icons">manage_accounts</i>
-                                <span>Users</span>
-                            </div>
-                        )}
                     </nav>
 
                     {/* Top Actions: Year + Theme Switcher + Profile */}
@@ -6281,6 +6324,10 @@ function App() {
                     >
                         <i className="material-icons">gavel</i>
                         <span>Live Auction Desk ({stats?.available_articles || 0})</span>
+                    </div>
+
+                    <div className="mobile-nav-section-title">
+                        <span>More Modules & Reports</span>
                     </div>
                     <div 
                         className={`top-nav-item ${currentTab === 'promises' ? 'active' : ''}`}

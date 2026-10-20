@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/css/app.css">
+    <link rel="stylesheet" href="/css/app.css?v=<?= time() ?>">
     <link rel="stylesheet" href="/css/vendor/sweetalert.css">
 </head>
 <body>
@@ -28,6 +28,6 @@
     <script src="/js/vendor/sweetalert.min.js"></script>
 
     <!-- React Application Component Scripts -->
-    <script type="text/babel" src="/js/app.js"></script>
+    <script type="text/babel" src="/js/app.js?v=<?= time() ?>"></script>
 </body>
 </html>

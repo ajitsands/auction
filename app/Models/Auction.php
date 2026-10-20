@@ -551,40 +551,52 @@ class Auction extends Model {
                 $lastPaymentDate = ($paidAmount > 0) ? $auctionDate : null;
 
                 // Update acc_promises: winning amount as promise_amount, balance as (winning - paid), last payment date, article link
+                $hasPromiseArt = $this->hasColumn('acc_promises', 'article_id');
+                $pArtClause = $hasPromiseArt ? "article_id = :art_id," : "";
+
                 $updP = $this->db->prepare("
                     UPDATE acc_promises 
                     SET promise_amount    = :promise_amount,
                         balance_amount    = :balance_amount,
                         last_payment_date = :last_payment_date,
                         promise_status    = :promise_status,
-                        article_id        = :art_id,
+                        {$pArtClause}
                         item_description  = :art_details,
                         narration         = :narration
                     WHERE promise_id = :pid
                 ");
-                $updP->execute([
+                $pParams = [
                     'promise_amount'    => $bidAmount,
                     'balance_amount'    => $balanceAmount,
                     'last_payment_date' => $lastPaymentDate,
                     'promise_status'    => $promiseStatus,
-                    'art_id'            => $articleId,
                     'art_details'       => $articleDetails,
                     'narration'         => $pNarration,
                     'pid'               => $accPromiseId
-                ]);
+                ];
+                if ($hasPromiseArt) {
+                    $pParams['art_id'] = $articleId;
+                }
+                $updP->execute($pParams);
 
                 // Connect article_id and narration in acc_ledger_entries for MP entry
+                $hasLedgerArt = $this->hasColumn('acc_ledger_entries', 'article_id');
+                $leArtClause = $hasLedgerArt ? "article_id = :art_id," : "";
+
                 $updLEP = $this->db->prepare("
                     UPDATE acc_ledger_entries 
-                    SET article_id = :art_id,
+                    SET {$leArtClause}
                         narration = :narration
                     WHERE promise_id = :pid AND entry_type = 'MP'
                 ");
-                $updLEP->execute([
-                    'art_id'    => $articleId,
+                $leParams = [
                     'narration' => $pNarration,
                     'pid'       => $accPromiseId
-                ]);
+                ];
+                if ($hasLedgerArt) {
+                    $leParams['art_id'] = $articleId;
+                }
+                $updLEP->execute($leParams);
             } else {
                 throw new \Exception("Promise posting failed: " . ($pRes['msg'] ?? 'Unknown error'));
             }
@@ -642,9 +654,12 @@ class Auction extends Model {
                     $contribVoucherNo = (int)$cRes['vnos_ids']; // Generated Voucher Number (HRCPT)
 
                     // Connect article_id, promise_id, details, and receipt numbers directly in acc_contribution
+                    $hasContribArt = $this->hasColumn('acc_contribution', 'article_id');
+                    $cArtClause = $hasContribArt ? "article_id = :art_id," : "";
+
                     $updC = $this->db->prepare("
                         UPDATE acc_contribution 
-                        SET article_id = :art_id,
+                        SET {$cArtClause}
                             promise_id = :promise_id,
                             item_description = :art_details,
                             narration = :narration,
@@ -652,30 +667,37 @@ class Auction extends Model {
                             manual_receipt_no = :rno
                         WHERE contribution_id = :cid
                     ");
-                    $updC->execute([
-                        'art_id'      => $articleId,
+                    $cParams = [
                         'promise_id'  => $accPromiseId,
                         'art_details' => $articleDetails,
                         'narration'   => $cNarration,
                         'bno'         => $receiptBookNo,
                         'rno'         => $effectiveReceiptNo,
                         'cid'         => $accContribId
-                    ]);
+                    ];
+                    if ($hasContribArt) {
+                        $cParams['art_id'] = $articleId;
+                    }
+                    $updC->execute($cParams);
 
                     // Connect article_id, promise_id, and narration directly in acc_ledger_entries
+                    $leContribArtClause = $hasLedgerArt ? "article_id = :art_id," : "";
                     $updLE = $this->db->prepare("
                         UPDATE acc_ledger_entries 
-                        SET article_id = :art_id,
+                        SET {$leContribArtClause}
                             promise_id = :promise_id,
                             narration = :narration
                         WHERE contribution_id = :cid AND entry_type = 'HRCPT'
                     ");
-                    $updLE->execute([
-                        'art_id'     => $articleId,
+                    $leContribParams = [
                         'promise_id' => $accPromiseId,
                         'narration'  => $cNarration,
                         'cid'        => $accContribId
-                    ]);
+                    ];
+                    if ($hasLedgerArt) {
+                        $leContribParams['art_id'] = $articleId;
+                    }
+                    $updLE->execute($leContribParams);
                 } else {
                     throw new \Exception("Contribution posting failed: " . ($cRes['msg'] ?? 'Unknown error'));
                 }

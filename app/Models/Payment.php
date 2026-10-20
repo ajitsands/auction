@@ -151,9 +151,12 @@ class Payment extends Model {
                     $contribVoucherNo = (int)$cRes['vnos_ids']; // Generated Voucher Number (HRCPT)
 
                     // Connect article_id, promise_id, details, and receipt numbers directly in acc_contribution
+                    $hasContribArt = $this->hasColumn('acc_contribution', 'article_id');
+                    $cArtClause = $hasContribArt ? "article_id = :art_id," : "";
+
                     $updC = $this->db->prepare("
                         UPDATE acc_contribution 
-                        SET article_id = :art_id,
+                        SET {$cArtClause}
                             promise_id = :promise_id,
                             item_description = :art_details,
                             narration = :narration,
@@ -161,30 +164,39 @@ class Payment extends Model {
                             manual_receipt_no = :rno
                         WHERE contribution_id = :cid
                     ");
-                    $updC->execute([
-                        'art_id'      => (int)$trans['article_id'],
+                    $cParams = [
                         'promise_id'  => $targetAccPromiseId,
                         'art_details' => $articleDetails,
                         'narration'   => $cNarration,
                         'bno'         => $receiptBookNo,
                         'rno'         => $effectiveReceiptNo,
                         'cid'         => $accContribId
-                    ]);
+                    ];
+                    if ($hasContribArt) {
+                        $cParams['art_id'] = (int)$trans['article_id'];
+                    }
+                    $updC->execute($cParams);
 
                     // Connect article_id, promise_id, and narration directly in acc_ledger_entries
+                    $hasLedgerArt = $this->hasColumn('acc_ledger_entries', 'article_id');
+                    $leArtClause = $hasLedgerArt ? "article_id = :art_id," : "";
+
                     $updLE = $this->db->prepare("
                         UPDATE acc_ledger_entries 
-                        SET article_id = :art_id,
+                        SET {$leArtClause}
                             promise_id = :promise_id,
                             narration = :narration
                         WHERE contribution_id = :cid AND entry_type = 'HRCPT'
                     ");
-                    $updLE->execute([
-                        'art_id'     => (int)$trans['article_id'],
+                    $leParams = [
                         'promise_id' => $targetAccPromiseId,
                         'narration'  => $cNarration,
                         'cid'        => $accContribId
-                    ]);
+                    ];
+                    if ($hasLedgerArt) {
+                        $leParams['art_id'] = (int)$trans['article_id'];
+                    }
+                    $updLE->execute($leParams);
                 } else {
                     throw new \Exception("Contribution batch posting failed: " . ($cRes['msg'] ?? 'Unknown error'));
                 }

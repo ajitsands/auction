@@ -2333,13 +2333,269 @@ function SearchableHeadSelect({
     );
 }
 
+// --- Modal: Default Live Auction Ledger Heads Configuration (Admin Only) ---
+function DefaultLedgerSettingsModal({ isOpen, onClose, showToast, onSaved }) {
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [accountsData, setAccountsData] = useState({
+        contribution_debit_heads: [],
+        contribution_credit_heads: [],
+        promise_debit_heads: [],
+        promise_credit_heads: [],
+        events: []
+    });
+
+    const [selectedEventId, setSelectedEventId] = useState('');
+    const [selectedContribDr, setSelectedContribDr] = useState(null);
+    const [selectedContribCr, setSelectedContribCr] = useState(null);
+    const [selectedPromiseDr, setSelectedPromiseDr] = useState(null);
+    const [selectedPromiseCr, setSelectedPromiseCr] = useState(null);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        setLoading(true);
+        api.get('/api/accounts/heads')
+            .then(res => {
+                if (res && res.success) {
+                    setAccountsData(res);
+                    const defs = res.default_heads || {};
+
+                    // Event
+                    let defEvt = null;
+                    if (defs.event_id) {
+                        defEvt = res.events.find(e => String(e.event_id) === String(defs.event_id));
+                    }
+                    if (!defEvt) {
+                        defEvt = res.events.find(e => e.default_status === 'Yes') || res.events[0];
+                    }
+                    if (defEvt) {
+                        setSelectedEventId(defEvt.event_id);
+                    }
+
+                    // Contrib Dr
+                    const drCode = defs.contrib_dr_code || '02123';
+                    const cDr = res.contribution_debit_heads.find(h => h.head_code === drCode) || res.contribution_debit_heads[0] || null;
+                    setSelectedContribDr(cDr);
+
+                    // Contrib Cr
+                    const crCode = defs.contrib_cr_code || '02206';
+                    const cCr = res.contribution_credit_heads.find(h => h.head_code === crCode) || res.contribution_credit_heads[0] || null;
+                    setSelectedContribCr(cCr);
+
+                    // Promise Dr
+                    const pDrCode = defs.promise_dr_code || '08583';
+                    const pDr = res.promise_debit_heads.find(h => h.head_code === pDrCode) || res.promise_debit_heads[0] || null;
+                    setSelectedPromiseDr(pDr);
+
+                    // Promise Cr
+                    const pCrCode = defs.promise_cr_code || '07503';
+                    const pCr = res.promise_credit_heads.find(h => h.head_code === pCrCode) || res.promise_credit_heads[0] || null;
+                    setSelectedPromiseCr(pCr);
+                }
+            })
+            .catch(err => {
+                showToast('error', 'Failed to load ledger heads: ' + err.message);
+            })
+            .finally(() => setLoading(false));
+    }, [isOpen]);
+
+    const handleSave = async (e) => {
+        e.preventDefault();
+        if (!selectedContribDr || !selectedContribCr || !selectedPromiseDr || !selectedPromiseCr) {
+            showToast('error', 'Please select all required default heads.');
+            return;
+        }
+
+        const currentEvent = accountsData.events.find(ev => String(ev.event_id) === String(selectedEventId));
+        setSaving(true);
+        try {
+            const payload = {
+                event_id: currentEvent ? currentEvent.event_id : null,
+                event_name: currentEvent ? currentEvent.event_name : null,
+                contrib_dr_code: selectedContribDr.head_code,
+                contrib_dr_name: selectedContribDr.head_name,
+                contrib_cr_code: selectedContribCr.head_code,
+                contrib_cr_name: selectedContribCr.head_name,
+                promise_dr_code: selectedPromiseDr.head_code,
+                promise_dr_name: selectedPromiseDr.head_name,
+                promise_cr_code: selectedPromiseCr.head_code,
+                promise_cr_name: selectedPromiseCr.head_name,
+            };
+
+            const res = await api.post('/api/accounts/default-heads', payload);
+            if (res.success) {
+                showToast('success', 'Default posting ledgers saved! Non-admin users will now automatically use these accounts.');
+                if (typeof onSaved === 'function') {
+                    onSaved(res.default_heads);
+                }
+                onClose();
+            } else {
+                showToast('error', res.error || 'Failed to save default heads.');
+            }
+        } catch (err) {
+            showToast('error', err.message);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="modal-backdrop">
+            <div className="modal" style={{ maxWidth: '780px' }} onClick={e => e.stopPropagation()}>
+                <div className="modal-header" style={{ background: 'linear-gradient(90deg, rgba(59, 130, 246, 0.1), transparent)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <i className="material-icons" style={{ fontSize: '24px', color: 'var(--primary)' }}>settings_suggest</i>
+                        <div>
+                            <h3 style={{ margin: 0, fontSize: '18px' }}>Configure Default Live Auction Ledgers</h3>
+                            <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+                                Set the default church accounting heads. Non-admin users will automatically post to these ledgers and cannot change them.
+                            </p>
+                        </div>
+                    </div>
+                    <button type="button" className="close-btn" onClick={onClose}>&times;</button>
+                </div>
+
+                {loading ? (
+                    <div style={{ padding: '40px', textAlign: 'center' }}>
+                        <div className="spinner" style={{ margin: '0 auto 12px auto' }}></div>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Loading accounts and current defaults...</p>
+                    </div>
+                ) : (
+                    <form onSubmit={handleSave}>
+                        <div className="modal-body" style={{ maxHeight: '72vh', overflowY: 'auto', padding: '20px 24px' }}>
+                            {/* Budget Event Head */}
+                            <div className="form-group" style={{ marginBottom: '16px' }}>
+                                <label className="form-label" style={{ fontWeight: 700 }}>Default Budget Head / Event *</label>
+                                <select 
+                                    className="form-control"
+                                    value={selectedEventId}
+                                    onChange={e => setSelectedEventId(e.target.value)}
+                                    required
+                                >
+                                    {accountsData.events.map(ev => (
+                                        <option key={ev.event_id} value={ev.event_id}>
+                                            {ev.event_name} {ev.default_status === 'Yes' ? '(Default)' : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                    Accounting event under which auction contributions & promises will be logged.
+                                </div>
+                            </div>
+
+                            {/* Contribution Posting Defaults */}
+                            <div style={{
+                                background: 'rgba(16, 185, 129, 0.04)',
+                                border: '1px solid rgba(16, 185, 129, 0.3)',
+                                borderLeft: '4px solid #10b981',
+                                borderRadius: '8px',
+                                padding: '14px',
+                                marginBottom: '16px'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
+                                    <span className="badge badge-success" style={{ fontSize: '12px', padding: '3px 8px' }}>
+                                        <i className="material-icons" style={{ fontSize: '14px', verticalAlign: 'middle', marginRight: '4px' }}>receipt</i>
+                                        Default Contribution Posting Heads (Receipt)
+                                    </span>
+                                </div>
+                                <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
+                                    <SearchableHeadSelect
+                                        label="Default Debit Head (Receiving Cash/Bank) *"
+                                        placeholder="Search debit head (e.g. 02123)..."
+                                        options={accountsData.contribution_debit_heads}
+                                        selectedHead={selectedContribDr}
+                                        onSelect={setSelectedContribDr}
+                                        required={true}
+                                        badgeColor="#3b82f6"
+                                    />
+                                    <SearchableHeadSelect
+                                        label="Default Credit Head (Harvest / Auction Income) *"
+                                        placeholder="Search credit head (e.g. 02206)..."
+                                        options={accountsData.contribution_credit_heads}
+                                        selectedHead={selectedContribCr}
+                                        onSelect={setSelectedContribCr}
+                                        required={true}
+                                        badgeColor="#10b981"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Promise Posting Defaults */}
+                            <div style={{
+                                background: 'rgba(245, 158, 11, 0.04)',
+                                border: '1px solid rgba(245, 158, 11, 0.3)',
+                                borderLeft: '4px solid #f59e0b',
+                                borderRadius: '8px',
+                                padding: '14px',
+                                marginBottom: '10px'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
+                                    <span className="badge badge-warning" style={{ fontSize: '12px', padding: '3px 8px' }}>
+                                        <i className="material-icons" style={{ fontSize: '14px', verticalAlign: 'middle', marginRight: '4px' }}>history_edu</i>
+                                        Default Promise Posting Heads (Member Receivable)
+                                    </span>
+                                </div>
+                                <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
+                                    <SearchableHeadSelect
+                                        label="Default Debit Head (A/R Member Receivable) *"
+                                        placeholder="Search debit head (e.g. 08583)..."
+                                        options={accountsData.promise_debit_heads}
+                                        selectedHead={selectedPromiseDr}
+                                        onSelect={setSelectedPromiseDr}
+                                        required={true}
+                                        badgeColor="#f59e0b"
+                                    />
+                                    <SearchableHeadSelect
+                                        label="Default Credit Head (Harvest Article Auction Income) *"
+                                        placeholder="Search credit head (e.g. 07503)..."
+                                        options={accountsData.promise_credit_heads}
+                                        selectedHead={selectedPromiseCr}
+                                        onSelect={setSelectedPromiseCr}
+                                        required={true}
+                                        badgeColor="#8b5cf6"
+                                    />
+                                </div>
+                            </div>
+
+                            <div style={{ background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '6px', padding: '10px 14px', fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
+                                <i className="material-icons" style={{ color: 'var(--primary)', fontSize: '18px' }}>info</i>
+                                <span>When non-admin users submit an auction sale on the Live Auction Desk, the transaction will automatically be linked and posted to these exact heads.</span>
+                            </div>
+                        </div>
+
+                        <div className="modal-footer" style={{ padding: '14px 24px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>Cancel</button>
+                            <button type="submit" className="btn btn-primary" disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                {saving ? (
+                                    <>
+                                        <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" style={{ width: '14px', height: '14px' }}></span>
+                                        Saving Defaults...
+                                    </>
+                                ) : (
+                                    <>
+                                        <i className="material-icons" style={{ fontSize: '16px' }}>check</i>
+                                        Save Default Ledgers
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </form>
+                )}
+            </div>
+        </div>
+    );
+}
+
 // --- Live Auction Desk View ---
-function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDataChanged }) {
+function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDataChanged, isAdmin }) {
     const [transactions, setTransactions] = useState([]);
     const [availableArticles, setAvailableArticles] = useState([]);
     const [loading, setLoading] = useState(true);
     const [recording, setRecording] = useState(false);
     const [paymentModalData, setPaymentModalData] = useState(null);
+    const [ledgerSettingsOpen, setLedgerSettingsOpen] = useState(false);
 
     // Accounting heads data
     const [accountsData, setAccountsData] = useState({
@@ -2413,41 +2669,89 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
             if (artRes.success) setAvailableArticles(artRes.articles);
             if (accRes && accRes.success) {
                 setAccountsData(accRes);
-                
+                const defs = accRes.default_heads || {};
+
                 // Initialize default Event
-                const defEvt = accRes.events.find(e => e.default_status === 'Yes') || accRes.events[0];
+                let defEvt = null;
+                if (defs.event_id) {
+                    defEvt = accRes.events.find(e => String(e.event_id) === String(defs.event_id));
+                }
+                if (!defEvt) {
+                    defEvt = accRes.events.find(e => e.default_status === 'Yes') || accRes.events[0];
+                }
                 if (defEvt && !selectedEventId) {
                     setSelectedEventId(defEvt.event_id);
                 }
 
-                // Default Contribution Debit Head: Cash on Hand-Harvest Festival (02123)
+                // Default Contribution Debit Head
+                const defContribDrCode = defs.contrib_dr_code || '02123';
                 setSelectedContribDr(prev => {
                     if (prev) return prev;
-                    return accRes.contribution_debit_heads.find(h => h.head_code === '02123') || accRes.contribution_debit_heads[0] || null;
+                    return accRes.contribution_debit_heads.find(h => h.head_code === defContribDrCode) || accRes.contribution_debit_heads[0] || null;
                 });
 
-                // Default Contribution Credit Head: Church Building Fund or Harvest Festival head
+                // Default Contribution Credit Head
+                const defContribCrCode = defs.contrib_cr_code || '02206';
                 setSelectedContribCr(prev => {
                     if (prev) return prev;
-                    return accRes.contribution_credit_heads.find(h => h.head_code === '02206') || accRes.contribution_credit_heads[0] || null;
+                    return accRes.contribution_credit_heads.find(h => h.head_code === defContribCrCode) || accRes.contribution_credit_heads[0] || null;
                 });
 
-                // Default Promise Debit Head: Harvest Festival Auction Receivable (08583 or similar)
+                // Default Promise Debit Head
+                const defPromiseDrCode = defs.promise_dr_code || '08583';
                 setSelectedPromiseDr(prev => {
                     if (prev) return prev;
-                    return accRes.promise_debit_heads.find(h => h.head_code === '08583' || (h.head_name && h.head_name.includes('Harvest Festival') && h.head_name.includes('Auction'))) || accRes.promise_debit_heads[0] || null;
+                    return accRes.promise_debit_heads.find(h => h.head_code === defPromiseDrCode) || accRes.promise_debit_heads[0] || null;
                 });
 
-                // Default Promise Credit Head: Harvest Festival - Article Auction (07503)
+                // Default Promise Credit Head
+                const defPromiseCrCode = defs.promise_cr_code || '07503';
                 setSelectedPromiseCr(prev => {
                     if (prev) return prev;
-                    return accRes.promise_credit_heads.find(h => h.head_code === '07503') || accRes.promise_credit_heads[0] || null;
+                    return accRes.promise_credit_heads.find(h => h.head_code === defPromiseCrCode) || accRes.promise_credit_heads[0] || null;
                 });
             }
         } catch (err) {
             showToast('error', err.message);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const [savingCurrentDefaults, setSavingCurrentDefaults] = useState(false);
+
+    const handleSaveCurrentAsDefault = async () => {
+        if (!isAdmin) return;
+        if (!selectedContribDr || !selectedContribCr || !selectedPromiseDr || !selectedPromiseCr) {
+            showToast('error', 'Please ensure all contribution and promise heads are selected.');
+            return;
+        }
+        setSavingCurrentDefaults(true);
+        try {
+            const currentEvt = accountsData.events.find(e => String(e.event_id) === String(selectedEventId));
+            const payload = {
+                event_id: currentEvt ? currentEvt.event_id : null,
+                event_name: currentEvt ? currentEvt.event_name : null,
+                contrib_dr_code: selectedContribDr.head_code,
+                contrib_dr_name: selectedContribDr.head_name,
+                contrib_cr_code: selectedContribCr.head_code,
+                contrib_cr_name: selectedContribCr.head_name,
+                promise_dr_code: selectedPromiseDr.head_code,
+                promise_dr_name: selectedPromiseDr.head_name,
+                promise_cr_code: selectedPromiseCr.head_code,
+                promise_cr_name: selectedPromiseCr.head_name,
+            };
+            const res = await api.post('/api/accounts/default-heads', payload);
+            if (res.success) {
+                showToast('success', 'Current heads successfully saved as default ledgers for all users!');
+                fetchAuctionData();
+            } else {
+                showToast('error', res.error || 'Failed to save default heads.');
+            }
+        } catch (err) {
+            showToast('error', err.message);
+        } finally {
+            setSavingCurrentDefaults(false);
         }
     };
 
@@ -2493,9 +2797,8 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
 
     const handleSelectArticle = (art) => {
         setSelectedArticleId(art.article_id);
-        const bid = art.reserve_price > 0 ? art.reserve_price : art.estimated_value;
-        setBidAmount(bid);
-        setPaidAmount(bid);
+        setBidAmount('');
+        setPaidAmount('');
         setArticleSearch('');
         setArticleDropdownOpen(false);
     };
@@ -2526,10 +2829,23 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
             return;
         }
 
-        const paid = Number(paidAmount || 0);
-        const balance = Math.max(0, bid - paid);
+        const minReserve = selectedArticle ? Number(selectedArticle.reserve_price || 0) : 0;
+        if (minReserve > 0 && bid < minReserve) {
+            showToast('error', `Winning bid (BHD ${bid.toFixed(3)}) cannot be less than the Reserve Price of BHD ${minReserve.toFixed(3)}.`);
+            return;
+        }
 
-        // Validation for contribution posting heads when amount is paid
+        const paid = Number(paidAmount || 0);
+        if (paid < 0) {
+            showToast('error', 'Amount paid now cannot be negative.');
+            return;
+        }
+        if (paid > bid) {
+            showToast('error', `Amount paid now (BHD ${paid.toFixed(3)}) cannot exceed the winning bid amount (BHD ${bid.toFixed(3)}).`);
+            return;
+        }
+
+        // Validation for contribution posting heads ONLY when amount is paid (> 0)
         if (paid > 0) {
             if (!selectedContribDr) {
                 showToast('error', 'Please select a Debit Head for the Contribution Entry.');
@@ -2559,7 +2875,7 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
                 article_id: Number(selectedArticleId),
                 applicable_year: Number(year),
                 winning_bid_amount: bid,
-                paid_amount: paid,
+                paid_amount: paid > 0 ? paid : 0,
                 buyer_name: selectedMember.primary_member_name,
                 buyer_member_id: selectedMember.primary_member_id,
                 buyer_code_c: selectedMember.code_c,
@@ -2571,15 +2887,15 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
                 event_id: currentEvent ? currentEvent.event_id : null,
                 event_name: currentEvent ? currentEvent.event_name : null,
 
-                // Optional Manual Receipt Details
-                receipt_book_no: receiptBookNo.trim() || '0',
-                receipt_no: receiptNo.trim() || '0',
+                // Optional Manual Receipt Details (only if paid > 0)
+                receipt_book_no: paid > 0 ? (receiptBookNo.trim() || '0') : '0',
+                receipt_no: paid > 0 ? (receiptNo.trim() || '0') : '0',
 
-                // Contribution Posting Heads (Receipt)
-                contrib_dr_code: selectedContribDr ? selectedContribDr.head_code : null,
-                contrib_dr_name: selectedContribDr ? selectedContribDr.head_name : null,
-                contrib_cr_code: selectedContribCr ? selectedContribCr.head_code : null,
-                contrib_cr_name: selectedContribCr ? selectedContribCr.head_name : null,
+                // Contribution Posting Heads (Receipt) - only if paid > 0
+                contrib_dr_code: (paid > 0 && selectedContribDr) ? selectedContribDr.head_code : null,
+                contrib_dr_name: (paid > 0 && selectedContribDr) ? selectedContribDr.head_name : null,
+                contrib_cr_code: (paid > 0 && selectedContribCr) ? selectedContribCr.head_code : null,
+                contrib_cr_name: (paid > 0 && selectedContribCr) ? selectedContribCr.head_name : null,
 
                 // Promise Posting Heads (Receivable)
                 promise_dr_code: selectedPromiseDr ? selectedPromiseDr.head_code : null,
@@ -2634,6 +2950,9 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
     const currentBalance = Math.max(0, (Number(bidAmount) || 0) - (Number(paidAmount) || 0));
     const isPayingNow = Number(paidAmount || 0) > 0;
     const hasPromiseBalance = currentBalance > 0;
+    const reservePrice = Number(selectedArticle?.reserve_price || 0);
+    const isBelowReserve = Boolean(selectedArticle && reservePrice > 0 && bidAmount !== '' && Number(bidAmount) < reservePrice);
+    const isPaidExceedingBid = Boolean(bidAmount !== '' && paidAmount !== '' && Number(paidAmount) > Number(bidAmount));
 
     return (
         <div>
@@ -2819,12 +3138,26 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
 
                             {/* Winning Bid */}
                             <div className="form-group" style={{ margin: 0 }}>
-                                <label className="form-label">Winning Bid (BHD) *</label>
+                                <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span>Winning Bid (BHD) *</span>
+                                    {selectedArticle && reservePrice > 0 && (
+                                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                            Reserve: <strong style={{ color: 'var(--primary)' }}>BHD {reservePrice.toFixed(3)}</strong>
+                                        </span>
+                                    )}
+                                </label>
                                 <input 
                                     type="number" 
                                     step="0.001" 
+                                    min={selectedArticle && reservePrice > 0 ? reservePrice : 0.001}
                                     className="form-control" 
-                                    style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--primary)' }}
+                                    style={{ 
+                                        fontSize: '18px', 
+                                        fontWeight: 'bold', 
+                                        color: isBelowReserve ? 'var(--danger)' : 'var(--primary)',
+                                        borderColor: isBelowReserve ? 'var(--danger)' : undefined,
+                                        boxShadow: isBelowReserve ? '0 0 0 1px var(--danger)' : undefined
+                                    }}
                                     placeholder="0.000"
                                     data-currency="true"
                                     required 
@@ -2832,22 +3165,49 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
                                     onFocus={() => handleCurrencyFocus(bidAmount, setBidAmount)}
                                     onChange={e => setBidAmount(e.target.value)}
                                 />
+                                {isBelowReserve && (
+                                    <div style={{ color: 'var(--danger)', fontSize: '11px', marginTop: '4px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <i className="material-icons" style={{ fontSize: '14px' }}>error_outline</i>
+                                        Cannot be lower than Reserve Price (BHD {reservePrice.toFixed(3)})
+                                    </div>
+                                )}
                             </div>
 
                             {/* Paid Now */}
                             <div className="form-group" style={{ margin: 0 }}>
-                                <label className="form-label">Amount Paid Now (BHD)</label>
+                                <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span>Amount Paid Now (BHD)</span>
+                                    {isPayingNow ? (
+                                        <span className="badge badge-success" style={{ fontSize: '10px', padding: '2px 6px' }}>Posting Receipt</span>
+                                    ) : (
+                                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Leave 0 for Promise</span>
+                                    )}
+                                </label>
                                 <input 
                                     type="number" 
                                     step="0.001" 
+                                    min="0"
+                                    max={bidAmount !== '' ? Number(bidAmount) : undefined}
                                     className="form-control" 
-                                    style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--success)' }}
+                                    style={{ 
+                                        fontSize: '18px', 
+                                        fontWeight: 'bold', 
+                                        color: isPaidExceedingBid ? 'var(--danger)' : (isPayingNow ? 'var(--success)' : 'var(--text-secondary)'),
+                                        borderColor: isPaidExceedingBid ? 'var(--danger)' : undefined,
+                                        boxShadow: isPaidExceedingBid ? '0 0 0 1px var(--danger)' : undefined
+                                    }}
                                     placeholder="0.000"
                                     data-currency="true"
                                     value={paidAmount}
                                     onFocus={() => handleCurrencyFocus(paidAmount, setPaidAmount)}
                                     onChange={e => setPaidAmount(e.target.value)}
                                 />
+                                {isPaidExceedingBid && (
+                                    <div style={{ color: 'var(--danger)', fontSize: '11px', marginTop: '4px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <i className="material-icons" style={{ fontSize: '14px' }}>error_outline</i>
+                                        Amount paid cannot exceed winning bid (BHD {(Number(bidAmount) || 0).toFixed(3)})
+                                    </div>
+                                )}
                                 <div style={{ fontSize: '11px', marginTop: '4px', color: 'var(--text-muted)' }}>
                                     Balance Due: <strong>BHD {currentBalance.toFixed(3)}</strong>
                                     {' '}(Winning Bid: BHD {(Number(bidAmount) || 0).toFixed(3)} posted as Promise)
@@ -2993,71 +3353,160 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <i className="material-icons" style={{ color: 'var(--primary)', fontSize: '22px' }}>account_balance</i>
                                     <div>
-                                        <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700 }}>Accounts Ledger Posting Heads</h4>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                            <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700 }}>Accounts Ledger Posting Heads</h4>
+                                            {isAdmin ? (
+                                                <span className="badge badge-primary" style={{ fontSize: '10px', padding: '2px 6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                    <i className="material-icons" style={{ fontSize: '12px' }}>admin_panel_settings</i>
+                                                    Admin Access • Editable
+                                                </span>
+                                            ) : (
+                                                <span className="badge badge-secondary" style={{ fontSize: '10px', padding: '2px 6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                    <i className="material-icons" style={{ fontSize: '12px' }}>lock</i>
+                                                    Preset by Administrator
+                                                </span>
+                                            )}
+                                        </div>
                                         <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                                            Select heads for automated General Ledger posting of Contribution & Promise records
+                                            {isAdmin 
+                                                ? (isPayingNow 
+                                                    ? 'Posting heads for automated Contribution (Receipt) & Promise (Receivable) entries to church accounts' 
+                                                    : 'Posting heads for automated Promise (Receivable) entry to church accounts (No floor payment)')
+                                                : 'Default posting heads configured by Administrator. Transactions are automatically posted to these accounts.'}
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Budget Head / Event */}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '240px' }}>
-                                    <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Budget Head:</label>
-                                    <select
-                                        className="form-control"
-                                        style={{ height: '34px', fontSize: '12px', padding: '4px 8px' }}
-                                        value={selectedEventId}
-                                        onChange={e => setSelectedEventId(e.target.value)}
-                                    >
-                                        {accountsData.events.map(ev => (
-                                            <option key={ev.event_id} value={ev.event_id}>
-                                                {ev.event_name} {ev.default_status === 'Yes' ? '(Default)' : ''}
-                                            </option>
-                                        ))}
-                                    </select>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                    {isAdmin && (
+                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                            <button
+                                                type="button"
+                                                className="btn btn-secondary btn-sm"
+                                                onClick={() => setLedgerSettingsOpen(true)}
+                                                style={{ fontSize: '11px', padding: '4px 9px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                                title="Open settings modal to view and configure default ledgers"
+                                            >
+                                                <i className="material-icons" style={{ fontSize: '15px' }}>settings</i>
+                                                Configure Defaults
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="btn btn-primary btn-sm"
+                                                onClick={handleSaveCurrentAsDefault}
+                                                disabled={savingCurrentDefaults}
+                                                style={{ fontSize: '11px', padding: '4px 9px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                                title="Save the currently selected heads below as the system default for all other users"
+                                            >
+                                                <i className="material-icons" style={{ fontSize: '15px' }}>done_all</i>
+                                                {savingCurrentDefaults ? 'Saving...' : 'Set Current as Default'}
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* Budget Head / Event */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '220px' }}>
+                                        <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Budget Head:</label>
+                                        {isAdmin ? (
+                                            <select
+                                                className="form-control"
+                                                style={{ height: '34px', fontSize: '12px', padding: '4px 8px' }}
+                                                value={selectedEventId}
+                                                onChange={e => setSelectedEventId(e.target.value)}
+                                            >
+                                                {accountsData.events.map(ev => (
+                                                    <option key={ev.event_id} value={ev.event_id}>
+                                                        {ev.event_name} {ev.default_status === 'Yes' ? '(Default)' : ''}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)', background: 'rgba(0,0,0,0.04)', padding: '5px 10px', borderRadius: '6px', border: '1px solid var(--border-color)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                                <i className="material-icons" style={{ fontSize: '14px', color: 'var(--text-muted)' }}>event</i>
+                                                {accountsData.events.find(e => String(e.event_id) === String(selectedEventId))?.event_name || 'Default Budget Event'}
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* Section 1: Contribution Posting Heads (Receipt) */}
-                            <div className={`accounting-section-box ${isPayingNow ? 'active-posting' : ''}`} style={{
-                                opacity: isPayingNow ? 1 : 0.85,
-                                background: isPayingNow ? 'rgba(16, 185, 129, 0.03)' : 'transparent',
-                                borderLeft: isPayingNow ? '4px solid #10b981' : '1px solid var(--border-color)'
-                            }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '6px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <span className="badge badge-success" style={{ fontSize: '11px', padding: '3px 8px' }}>
-                                            <i className="material-icons" style={{ fontSize: '13px', verticalAlign: 'middle', marginRight: '4px' }}>receipt</i>
-                                            Contribution Entry (Receipt Posting)
+                            {/* Section 1: Contribution Posting Heads (Receipt) - ONLY DISPLAYED IF isPayingNow (paid amount > 0) */}
+                            {isPayingNow && (
+                                <div className="accounting-section-box active-posting" style={{
+                                    opacity: 1,
+                                    background: 'rgba(16, 185, 129, 0.04)',
+                                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                                    borderLeft: '4px solid #10b981',
+                                    borderRadius: '8px',
+                                    padding: '12px 14px',
+                                    marginBottom: '12px'
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '6px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <span className="badge badge-success" style={{ fontSize: '11px', padding: '3px 8px' }}>
+                                                <i className="material-icons" style={{ fontSize: '13px', verticalAlign: 'middle', marginRight: '4px' }}>receipt</i>
+                                                Contribution Entry (Receipt Posting)
+                                            </span>
+                                            {!isAdmin && (
+                                                <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                    <i className="material-icons" style={{ fontSize: '13px' }}>lock</i>
+                                                    Fixed Default
+                                                </span>
+                                            )}
+                                        </div>
+                                        <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--success)' }}>
+                                            Posting Amount: BHD {Number(paidAmount).toFixed(3)}
                                         </span>
                                     </div>
-                                    <span style={{ fontSize: '12px', fontWeight: 700, color: isPayingNow ? 'var(--success)' : 'var(--text-muted)' }}>
-                                        {isPayingNow ? `Posting Amount: BHD ${Number(paidAmount).toFixed(3)}` : 'No Immediate Floor Payment (BHD 0.000)'}
-                                    </span>
-                                </div>
 
-                                <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
-                                    <SearchableHeadSelect
-                                        label="Debit Head (Receiving Cash/Bank)"
-                                        placeholder="Search contribution debit head (e.g. 02123)..."
-                                        options={accountsData.contribution_debit_heads}
-                                        selectedHead={selectedContribDr}
-                                        onSelect={setSelectedContribDr}
-                                        required={isPayingNow}
-                                        badgeColor="#3b82f6"
-                                    />
-                                    <SearchableHeadSelect
-                                        label="Credit Head (Harvest / Auction Income)"
-                                        placeholder="Search contribution credit head (e.g. 02206)..."
-                                        options={accountsData.contribution_credit_heads}
-                                        selectedHead={selectedContribCr}
-                                        onSelect={setSelectedContribCr}
-                                        required={isPayingNow}
-                                        badgeColor="#10b981"
-                                    />
-                                </div>
+                                    {isAdmin ? (
+                                        <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
+                                            <SearchableHeadSelect
+                                                label="Debit Head (Receiving Cash/Bank) *"
+                                                placeholder="Search contribution debit head (e.g. 02123)..."
+                                                options={accountsData.contribution_debit_heads}
+                                                selectedHead={selectedContribDr}
+                                                onSelect={setSelectedContribDr}
+                                                required={true}
+                                                badgeColor="#3b82f6"
+                                            />
+                                            <SearchableHeadSelect
+                                                label="Credit Head (Harvest / Auction Income) *"
+                                                placeholder="Search contribution credit head (e.g. 02206)..."
+                                                options={accountsData.contribution_credit_heads}
+                                                selectedHead={selectedContribCr}
+                                                onSelect={setSelectedContribCr}
+                                                required={true}
+                                                badgeColor="#10b981"
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
+                                            <div style={{ background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.25)', padding: '10px 14px', borderRadius: '8px' }}>
+                                                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                                    Debit Head (Receiving Cash/Bank)
+                                                </div>
+                                                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
+                                                    <span className="badge badge-primary" style={{ marginRight: '6px', fontSize: '11px' }}>
+                                                        {selectedContribDr ? selectedContribDr.head_code : '02123'}
+                                                    </span>
+                                                    {selectedContribDr ? selectedContribDr.head_name : 'Cash on Hand-Harvest Festival'}
+                                                </div>
+                                            </div>
+                                            <div style={{ background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.25)', padding: '10px 14px', borderRadius: '8px' }}>
+                                                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                                    Credit Head (Harvest / Auction Income)
+                                                </div>
+                                                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
+                                                    <span className="badge badge-success" style={{ marginRight: '6px', fontSize: '11px' }}>
+                                                        {selectedContribCr ? selectedContribCr.head_code : '02206'}
+                                                    </span>
+                                                    {selectedContribCr ? selectedContribCr.head_name : 'Church Building Fund - Harvest Festival'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
 
-                                {isPayingNow && (
                                     <div className="form-row" style={{ gridTemplateColumns: '1fr 1fr', gap: '14px', marginTop: '10px' }}>
                                         <div className="form-group" style={{ margin: 0 }}>
                                             <label className="form-label" style={{ fontSize: '11px', fontWeight: 600 }}>Manual Receipt Book No (Optional)</label>
@@ -3082,8 +3531,8 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
                                             />
                                         </div>
                                     </div>
-                                )}
-                            </div>
+                                </div>
+                            )}
 
                             {/* Section 2: Promise Posting Heads (Receivable) */}
                             <div className="accounting-section-box active-promise" style={{
@@ -3098,32 +3547,65 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
                                             <i className="material-icons" style={{ fontSize: '13px', verticalAlign: 'middle', marginRight: '4px' }}>history_edu</i>
                                             Promise Posting (Member Receivable Entry)
                                         </span>
+                                        {!isAdmin && (
+                                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                <i className="material-icons" style={{ fontSize: '13px' }}>lock</i>
+                                                Fixed Default
+                                            </span>
+                                        )}
                                     </div>
                                     <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--warning)' }}>
                                         Promise Amount: BHD {(Number(bidAmount) || 0).toFixed(3)} | Balance Due: BHD {currentBalance.toFixed(3)}
                                     </span>
                                 </div>
 
-                                <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
-                                    <SearchableHeadSelect
-                                        label="Debit Head (A/R Member Receivable) *"
-                                        placeholder="Search promise debit head (e.g. 08583)..."
-                                        options={accountsData.promise_debit_heads}
-                                        selectedHead={selectedPromiseDr}
-                                        onSelect={setSelectedPromiseDr}
-                                        required={true}
-                                        badgeColor="#f59e0b"
-                                    />
-                                    <SearchableHeadSelect
-                                        label="Credit Head (Harvest Article Auction Income) *"
-                                        placeholder="Search promise credit head (e.g. 07503)..."
-                                        options={accountsData.promise_credit_heads}
-                                        selectedHead={selectedPromiseCr}
-                                        onSelect={setSelectedPromiseCr}
-                                        required={true}
-                                        badgeColor="#8b5cf6"
-                                    />
-                                </div>
+                                {isAdmin ? (
+                                    <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
+                                        <SearchableHeadSelect
+                                            label="Debit Head (A/R Member Receivable) *"
+                                            placeholder="Search promise debit head (e.g. 08583)..."
+                                            options={accountsData.promise_debit_heads}
+                                            selectedHead={selectedPromiseDr}
+                                            onSelect={setSelectedPromiseDr}
+                                            required={true}
+                                            badgeColor="#f59e0b"
+                                        />
+                                        <SearchableHeadSelect
+                                            label="Credit Head (Harvest Article Auction Income) *"
+                                            placeholder="Search promise credit head (e.g. 07503)..."
+                                            options={accountsData.promise_credit_heads}
+                                            selectedHead={selectedPromiseCr}
+                                            onSelect={setSelectedPromiseCr}
+                                            required={true}
+                                            badgeColor="#8b5cf6"
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
+                                        <div style={{ background: 'rgba(245, 158, 11, 0.05)', border: '1px solid rgba(245, 158, 11, 0.25)', padding: '10px 14px', borderRadius: '8px' }}>
+                                            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                                Debit Head (A/R Member Receivable)
+                                            </div>
+                                            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
+                                                <span className="badge badge-warning" style={{ marginRight: '6px', fontSize: '11px' }}>
+                                                    {selectedPromiseDr ? selectedPromiseDr.head_code : '08583'}
+                                                </span>
+                                                {selectedPromiseDr ? selectedPromiseDr.head_name : 'Harvest Festival Auction Receivable'}
+                                            </div>
+                                        </div>
+                                        <div style={{ background: 'rgba(139, 92, 246, 0.05)', border: '1px solid rgba(139, 92, 246, 0.25)', padding: '10px 14px', borderRadius: '8px' }}>
+                                            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                                Credit Head (Harvest Article Auction Income)
+                                            </div>
+                                            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
+                                                <span className="badge" style={{ marginRight: '6px', fontSize: '11px', background: '#8b5cf6', color: '#fff' }}>
+                                                    {selectedPromiseCr ? selectedPromiseCr.head_code : '07503'}
+                                                </span>
+                                                {selectedPromiseCr ? selectedPromiseCr.head_name : 'Harvest Festival - Article Auction'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -3542,6 +4024,16 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
                     onOpenReceipt={onOpenReceipt}
                     showToast={showToast}
                     accountsData={accountsData}
+                />
+            )}
+
+            {/* Default Ledger Settings Modal for Admins */}
+            {ledgerSettingsOpen && (
+                <DefaultLedgerSettingsModal 
+                    isOpen={ledgerSettingsOpen}
+                    onClose={() => setLedgerSettingsOpen(false)}
+                    showToast={showToast}
+                    onSaved={() => fetchAuctionData()}
                 />
             )}
         </div>
@@ -5716,6 +6208,7 @@ function UsersView({ currentUser, showToast }) {
     const [loading, setLoading] = useState(true);
     const [roleFilter, setRoleFilter] = useState('All');
     const [statusFilter, setStatusFilter] = useState('All');
+    const [ledgerModalOpen, setLedgerModalOpen] = useState(false);
 
     const fetchUsers = async () => {
         setLoading(true);
@@ -5920,10 +6413,22 @@ function UsersView({ currentUser, showToast }) {
 
             {/* Main Card */}
             <div className="card">
-                <div className="card-header" style={{ flexWrap: 'wrap', gap: '14px' }}>
+                <div className="card-header" style={{ flexWrap: 'wrap', gap: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                         <h3>Portal User Accounts (tbl_users)</h3>
                         <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Authorized Administrator and Harvest Festival data entry accounts from tbl_users</p>
+                    </div>
+                    <div>
+                        <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={() => setLedgerModalOpen(true)}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}
+                            title="Configure default church accounts ledgers for all auction users"
+                        >
+                            <i className="material-icons" style={{ fontSize: '18px' }}>account_balance</i>
+                            Default Auction Ledgers
+                        </button>
                     </div>
                 </div>
 
@@ -5970,6 +6475,15 @@ function UsersView({ currentUser, showToast }) {
                     />
                 </div>
             </div>
+
+            {/* Default Ledger Settings Modal for Admins */}
+            {ledgerModalOpen && (
+                <DefaultLedgerSettingsModal 
+                    isOpen={ledgerModalOpen}
+                    onClose={() => setLedgerModalOpen(false)}
+                    showToast={showToast}
+                />
+            )}
         </div>
     );
 }
@@ -6018,6 +6532,7 @@ function App() {
     const [editingArticle, setEditingArticle] = useState(null);
     const [importModalOpen, setImportModalOpen] = useState(false);
     const [receiptModalNo, setReceiptModalNo] = useState(null);
+    const [globalLedgerModalOpen, setGlobalLedgerModalOpen] = useState(false);
 
     // Global data revision trigger for live datatable updates across views
     const [dataRevision, setDataRevision] = useState(0);
@@ -6227,16 +6742,28 @@ function App() {
                                     </div>
 
                                     {isAdmin && (
-                                        <div 
-                                            className={`top-nav-dropdown-item ${currentTab === 'users' ? 'active' : ''}`}
-                                            onClick={() => {
-                                                setCurrentTab('users');
-                                                setReportsDropdownOpen(false);
-                                            }}
-                                        >
-                                            <i className="material-icons">manage_accounts</i>
-                                            <span>User Management</span>
-                                        </div>
+                                        <>
+                                            <div 
+                                                className={`top-nav-dropdown-item ${currentTab === 'users' ? 'active' : ''}`}
+                                                onClick={() => {
+                                                    setCurrentTab('users');
+                                                    setReportsDropdownOpen(false);
+                                                }}
+                                            >
+                                                <i className="material-icons">manage_accounts</i>
+                                                <span>User Management</span>
+                                            </div>
+                                            <div 
+                                                className="top-nav-dropdown-item"
+                                                onClick={() => {
+                                                    setGlobalLedgerModalOpen(true);
+                                                    setReportsDropdownOpen(false);
+                                                }}
+                                            >
+                                                <i className="material-icons">account_balance</i>
+                                                <span>Default Auction Ledgers</span>
+                                            </div>
+                                        </>
                                     )}
                                 </div>
                             )}
@@ -6345,13 +6872,22 @@ function App() {
                     </div>
 
                     {isAdmin && (
-                        <div 
-                            className={`top-nav-item ${currentTab === 'users' ? 'active' : ''}`}
-                            onClick={() => { setCurrentTab('users'); setSidebarOpen(false); }}
-                        >
-                            <i className="material-icons">manage_accounts</i>
-                            <span>User Management</span>
-                        </div>
+                        <>
+                            <div 
+                                className={`top-nav-item ${currentTab === 'users' ? 'active' : ''}`}
+                                onClick={() => { setCurrentTab('users'); setSidebarOpen(false); }}
+                            >
+                                <i className="material-icons">manage_accounts</i>
+                                <span>User Management</span>
+                            </div>
+                            <div 
+                                className="top-nav-item"
+                                onClick={() => { setGlobalLedgerModalOpen(true); setSidebarOpen(false); }}
+                            >
+                                <i className="material-icons">account_balance</i>
+                                <span>Default Auction Ledgers</span>
+                            </div>
+                        </>
                     )}
                 </div>
             </header>
@@ -6397,6 +6933,7 @@ function App() {
                         onDataChanged={refreshData}
                         showToast={showToast}
                         onOpenReceipt={rno => setReceiptModalNo(rno)}
+                        isAdmin={isAdmin}
                     />
                 )}
 
@@ -6463,6 +7000,16 @@ function App() {
                 isOpen={!!receiptModalNo}
                 onClose={() => setReceiptModalNo(null)}
             />
+
+            {/* Global Default Auction Ledgers Modal (accessible from More dropdown) */}
+            {isAdmin && globalLedgerModalOpen && (
+                <DefaultLedgerSettingsModal 
+                    isOpen={globalLedgerModalOpen}
+                    onClose={() => setGlobalLedgerModalOpen(false)}
+                    showToast={showToast}
+                    onSaved={() => refreshData()}
+                />
+            )}
         </div>
     );
 }

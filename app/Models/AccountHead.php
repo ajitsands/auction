@@ -95,6 +95,66 @@ class AccountHead extends Model {
     }
 
     /**
+     * Get default auction posting heads configured by Administrator
+     */
+    public function getDefaultHeads(): array {
+        $this->ensureSettingsTable();
+        try {
+            $stmt = $this->db->prepare("SELECT setting_value FROM hf_settings WHERE setting_key = 'auction_default_heads'");
+            $stmt->execute();
+            $val = $stmt->fetchColumn();
+            if ($val) {
+                $decoded = json_decode($val, true);
+                if (is_array($decoded)) {
+                    return $decoded;
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        // Fallback standard default heads if none configured yet
+        return [
+            'event_id'         => null,
+            'event_name'       => null,
+            'contrib_dr_code'  => '02123',
+            'contrib_dr_name'  => 'Cash on Hand-Harvest Festival',
+            'contrib_cr_code'  => '02206',
+            'contrib_cr_name'  => 'Church Building Fund - Harvest Festival',
+            'promise_dr_code'  => '08583',
+            'promise_dr_name'  => 'Harvest Festival Auction Receivable',
+            'promise_cr_code'  => '07503',
+            'promise_cr_name'  => 'Harvest Festival - Article Auction'
+        ];
+    }
+
+    /**
+     * Save default auction posting heads (Administrator only)
+     */
+    public function saveDefaultHeads(array $settings): bool {
+        $this->ensureSettingsTable();
+        $payload = [
+            'event_id'         => !empty($settings['event_id']) ? (int)$settings['event_id'] : null,
+            'event_name'       => !empty($settings['event_name']) ? trim($settings['event_name']) : null,
+            'contrib_dr_code'  => !empty($settings['contrib_dr_code']) ? trim($settings['contrib_dr_code']) : '02123',
+            'contrib_dr_name'  => !empty($settings['contrib_dr_name']) ? trim($settings['contrib_dr_name']) : 'Cash on Hand-Harvest Festival',
+            'contrib_cr_code'  => !empty($settings['contrib_cr_code']) ? trim($settings['contrib_cr_code']) : '02206',
+            'contrib_cr_name'  => !empty($settings['contrib_cr_name']) ? trim($settings['contrib_cr_name']) : 'Church Building Fund - Harvest Festival',
+            'promise_dr_code'  => !empty($settings['promise_dr_code']) ? trim($settings['promise_dr_code']) : '08583',
+            'promise_dr_name'  => !empty($settings['promise_dr_name']) ? trim($settings['promise_dr_name']) : 'Harvest Festival Auction Receivable',
+            'promise_cr_code'  => !empty($settings['promise_cr_code']) ? trim($settings['promise_cr_code']) : '07503',
+            'promise_cr_name'  => !empty($settings['promise_cr_name']) ? trim($settings['promise_cr_name']) : 'Harvest Festival - Article Auction',
+            'updated_at'       => date('Y-m-d H:i:s')
+        ];
+
+        $json = json_encode($payload);
+        $stmt = $this->db->prepare("
+            INSERT INTO hf_settings (setting_key, setting_value, updated_at)
+            VALUES ('auction_default_heads', :val, NOW())
+            ON DUPLICATE KEY UPDATE setting_value = :val2, updated_at = NOW()
+        ");
+        return $stmt->execute(['val' => $json, 'val2' => $json]);
+    }
+
+    /**
      * Get all heads and active events for client-side caching & selection
      */
     public function getAllHeadsAndEvents(): array {
@@ -104,6 +164,7 @@ class AccountHead extends Model {
             'promise_debit_heads'       => $this->getPromiseDebitHeads(),
             'promise_credit_heads'      => $this->getPromiseCreditHeads(),
             'events'                    => $this->getActiveEvents(),
+            'default_heads'             => $this->getDefaultHeads(),
         ];
     }
 }

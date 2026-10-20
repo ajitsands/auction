@@ -190,8 +190,19 @@ INSERT INTO `hf_categories` (`category_name`) VALUES
 ('Plants & Flowers')
 ON DUPLICATE KEY UPDATE `category_name` = VALUES(`category_name`);
 
+-- ------------------------------------------------------------------------------
+-- 9. Table: `hf_settings` (Application & Default Ledger Settings)
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `hf_settings` (
+  `setting_key` varchar(100) NOT NULL,
+  `setting_value` longtext DEFAULT NULL,
+  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`setting_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ==============================================================================
 -- End of Migration Script
 -- ==============================================================================
+

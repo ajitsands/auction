@@ -79,5 +79,22 @@ abstract class Model {
         $this->ensureColumn('acc_promises', 'article_id', 'int(11) DEFAULT 0');
         $this->ensureColumn('acc_contribution', 'article_id', 'int(11) DEFAULT 0');
         $this->ensureColumn('acc_ledger_entries', 'article_id', 'int(11) DEFAULT 0');
+        $this->ensureSettingsTable();
+    }
+
+    /**
+     * Ensure hf_settings table exists
+     */
+    public function ensureSettingsTable(): void {
+        try {
+            $this->db->exec("
+                CREATE TABLE IF NOT EXISTS `hf_settings` (
+                    `setting_key` varchar(100) NOT NULL,
+                    `setting_value` longtext DEFAULT NULL,
+                    `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    PRIMARY KEY (`setting_key`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ");
+        } catch (\Throwable $e) {}
     }
 }

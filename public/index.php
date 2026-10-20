@@ -54,6 +54,8 @@ $router->get('/api/accounts/heads', [AccountController::class, 'heads']);
 $router->get('/api/accounts/heads/contribution', [AccountController::class, 'contributionHeads']);
 $router->get('/api/accounts/heads/promise', [AccountController::class, 'promiseHeads']);
 $router->get('/api/accounts/events', [AccountController::class, 'events']);
+$router->get('/api/accounts/default-heads', [AccountController::class, 'getDefaultHeads']);
+$router->post('/api/accounts/default-heads', [AccountController::class, 'saveDefaultHeads']);
 
 // Auth Endpoints
 $router->post('/api/auth/login', [AuthController::class, 'login']);

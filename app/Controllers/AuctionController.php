@@ -34,6 +34,34 @@ class AuctionController extends Controller {
             $this->jsonResponse(['success' => false, 'error' => 'Article, Winning Bid Amount, and Buyer Name are required.'], 400);
         }
 
+        // Non-administrators must use administrator-configured default posting heads
+        $isAdmin = ($user['user_type'] ?? '') === 'Administrator';
+        if (!$isAdmin) {
+            $accountModel = new \App\Models\AccountHead();
+            $defaults = $accountModel->getDefaultHeads();
+
+            if (!empty($defaults['event_id'])) {
+                $data['event_id'] = $defaults['event_id'];
+                $data['event_name'] = $defaults['event_name'];
+            }
+            if (!empty($defaults['contrib_dr_code'])) {
+                $data['contrib_dr_code'] = $defaults['contrib_dr_code'];
+                $data['contrib_dr_name'] = $defaults['contrib_dr_name'];
+            }
+            if (!empty($defaults['contrib_cr_code'])) {
+                $data['contrib_cr_code'] = $defaults['contrib_cr_code'];
+                $data['contrib_cr_name'] = $defaults['contrib_cr_name'];
+            }
+            if (!empty($defaults['promise_dr_code'])) {
+                $data['promise_dr_code'] = $defaults['promise_dr_code'];
+                $data['promise_dr_name'] = $defaults['promise_dr_name'];
+            }
+            if (!empty($defaults['promise_cr_code'])) {
+                $data['promise_cr_code'] = $defaults['promise_cr_code'];
+                $data['promise_cr_name'] = $defaults['promise_cr_name'];
+            }
+        }
+
         try {
             $result = $this->auctionModel->recordAuction($data, $user['user_id']);
             $this->jsonResponse([

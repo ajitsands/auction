@@ -451,6 +451,16 @@ class Auction extends Model {
             $paidAmount = (float)($data['paid_amount'] ?? 0);
             $balanceAmount = max(0, $bidAmount - $paidAmount);
 
+            // Validate against article reserve price
+            $reservePrice = !empty($art['reserve_price']) ? (float)$art['reserve_price'] : 0.0;
+            if ($reservePrice > 0.0001 && $bidAmount < ($reservePrice - 0.0001)) {
+                throw new \Exception(sprintf(
+                    "Winning bid amount (BHD %.3f) cannot be less than the article's reserve price of BHD %.3f.",
+                    $bidAmount,
+                    $reservePrice
+                ));
+            }
+
             // Fetch member code_m if buyer_member_id given
             $memberCodeM = 0;
             if (!empty($data['buyer_member_id'])) {

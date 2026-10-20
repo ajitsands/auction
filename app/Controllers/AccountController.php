@@ -42,4 +42,27 @@ class AccountController extends Controller {
             'events'  => $this->accountModel->getActiveEvents(),
         ]);
     }
+
+    public function getDefaultHeads(): void {
+        $this->requireAuth();
+        $this->jsonResponse([
+            'success'       => true,
+            'default_heads' => $this->accountModel->getDefaultHeads(),
+        ]);
+    }
+
+    public function saveDefaultHeads(): void {
+        $user = $this->requireAuth();
+        if (($user['user_type'] ?? '') !== 'Administrator') {
+            $this->jsonResponse(['success' => false, 'error' => 'Access denied. Administrator privileges are required to configure default posting heads.'], 403);
+        }
+
+        $input = $this->getJsonInput();
+        $saved = $this->accountModel->saveDefaultHeads($input);
+        $this->jsonResponse([
+            'success'       => $saved,
+            'message'       => 'Default Live Auction posting heads saved successfully!',
+            'default_heads' => $this->accountModel->getDefaultHeads(),
+        ]);
+    }
 }

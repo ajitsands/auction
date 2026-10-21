@@ -82,6 +82,13 @@ class Auction extends Model {
                 t.notes,
                 t.created_by,
                 t.created_at,
+                NOW() as current_time_bahrain,
+                GREATEST(0, TIMESTAMPDIFF(SECOND, COALESCE(t.created_at, CONCAT(t.auction_date, ' 00:00:00')), NOW())) as elapsed_seconds,
+                GREATEST(0, LEAST(86400, 86400 - GREATEST(0, TIMESTAMPDIFF(SECOND, COALESCE(t.created_at, CONCAT(t.auction_date, ' 00:00:00')), NOW())))) as remaining_seconds,
+                CASE 
+                    WHEN TIMESTAMPDIFF(SECOND, COALESCE(t.created_at, CONCAT(t.auction_date, ' 00:00:00')), NOW()) <= 86400 THEN 1 
+                    ELSE 0 
+                END as is_within_24h,
                 t.event_id,
                 t.event_name,
                 t.contrib_dr_code,
@@ -220,6 +227,13 @@ class Auction extends Model {
                 t.notes,
                 t.created_by,
                 t.created_at,
+                NOW() as current_time_bahrain,
+                GREATEST(0, TIMESTAMPDIFF(SECOND, COALESCE(t.created_at, CONCAT(t.auction_date, ' 00:00:00')), NOW())) as elapsed_seconds,
+                GREATEST(0, LEAST(86400, 86400 - GREATEST(0, TIMESTAMPDIFF(SECOND, COALESCE(t.created_at, CONCAT(t.auction_date, ' 00:00:00')), NOW())))) as remaining_seconds,
+                CASE 
+                    WHEN TIMESTAMPDIFF(SECOND, COALESCE(t.created_at, CONCAT(t.auction_date, ' 00:00:00')), NOW()) <= 86400 THEN 1 
+                    ELSE 0 
+                END as is_within_24h,
                 t.event_id,
                 t.event_name,
                 t.contrib_dr_code,

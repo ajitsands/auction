@@ -176,11 +176,70 @@ function parseBahrainDate(dateStr) {
     return isNaN(fallback.getTime()) ? null : fallback;
 }
 
-// --- Entry Age & 24h Window Helper for Live Floor Pay Balance (Asia/Bahrain UTC+3) ---
-function getEntryAgeInfo(createdAt, auctionDate) {
-    if (!createdAt && !auctionDate) {
-        return { isWithin24h: true, remainingHours: 24, hoursAgo: 0, text: 'Active', formattedDate: '' };
+// Format date-time into Asia/Bahrain timezone string (e.g. 21-10-2026 10:49 AM)
+function formatDateTimeBahrain(dateStr) {
+    if (!dateStr) return '';
+    const d = parseBahrainDate(dateStr);
+    if (!d) return String(dateStr);
+    try {
+        const parts = new Intl.DateTimeFormat('en-GB', {
+            timeZone: 'Asia/Bahrain',
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true
+        }).formatToParts(d);
+        const map = {};
+        parts.forEach(p => map[p.type] = p.value);
+        const ampm = map.dayPeriod ? ` ${map.dayPeriod.toUpperCase()}` : '';
+        return `${map.day}-${map.month}-${map.year} ${map.hour}:${map.minute}${ampm}`;
+    } catch (e) {
+        return formatDateDMY(dateStr);
     }
+}
+
+// Global server time offset (difference between server Bahrain time and client Date.now())
+let serverBahrainTimeOffset = 0;
+function setServerBahrainTime(serverTimeStr) {
+    if (!serverTimeStr) return;
+    const sDate = parseBahrainDate(serverTimeStr);
+    if (sDate) {
+        serverBahrainTimeOffset = sDate.getTime() - Date.now();
+    }
+}
+function getCurrentBahrainTimeMs() {
+    return Date.now() + serverBahrainTimeOffset;
+}
+
+// --- Entry Age & 24h Window Helper for Live Floor Pay Balance (Asia/Bahrain UTC+3) ---
+function getEntryAgeInfo(transactionOrCreatedAt, maybeAuctionDate) {
+    let createdAt = null;
+    let auctionDate = null;
+    let serverRemainingSec = null;
+    let serverIsWithin24h = null;
+
+    if (transactionOrCreatedAt && typeof transactionOrCreatedAt === 'object') {
+        const t = transactionOrCreatedAt;
+        createdAt = t.created_at;
+        auctionDate = t.auction_date;
+        if (t.remaining_seconds !== undefined && t.remaining_seconds !== null) {
+            serverRemainingSec = Number(t.remaining_seconds);
+        }
+        if (t.is_within_24h !== undefined && t.is_within_24h !== null) {
+            serverIsWithin24h = Number(t.is_within_24h) === 1;
+        }
+    } else {
+        createdAt = transactionOrCreatedAt;
+        auctionDate = maybeAuctionDate;
+    }
+
+    if (!createdAt && !auctionDate) {
+        return { isWithin24h: true, remainingHours: 24, remainingSeconds: 86400, timeLeftText: '24h left', text: 'Active', formattedDate: '', entryDisplay: '' };
+    }
+
     const cleanCreatedAt = createdAt ? String(createdAt).trim() : null;
     const cleanAuctionDate = auctionDate ? String(auctionDate).trim() : null;
 
@@ -195,26 +254,56 @@ function getEntryAgeInfo(createdAt, auctionDate) {
         formattedDate = formatDateDMY(cleanAuctionDate);
     }
 
-    if (!entryDate) {
-        return { isWithin24h: true, remainingHours: 24, hoursAgo: 0, text: 'Active', formattedDate };
+    const currentBahrainMs = getCurrentBahrainTimeMs();
+
+    let diffSeconds = 0;
+    if (entryDate) {
+        const entryTime = entryDate.getTime();
+        // Clock drift protection: elapsed time is at least 0
+        const diffMs = Math.max(0, currentBahrainMs - entryTime);
+        diffSeconds = Math.floor(diffMs / 1000);
+    } else if (serverRemainingSec !== null) {
+        diffSeconds = Math.max(0, 86400 - serverRemainingSec);
     }
 
-    const now = Date.now();
-    const entryTime = entryDate.getTime();
-    // Clock drift guard: if client device clock is slightly behind server clock, diff is at least 0
-    const diffMs = Math.max(0, now - entryTime);
-    const diffHours = diffMs / (1000 * 60 * 60);
+    // 24-hour floor settlement window is exactly 86,400 seconds
+    const totalWindowSeconds = 86400;
+    const remainingSeconds = Math.max(0, totalWindowSeconds - diffSeconds);
+    const isWithin24h = remainingSeconds > 0 && (serverIsWithin24h !== null ? (serverIsWithin24h && remainingSeconds > 0) : true);
+    const diffHours = diffSeconds / 3600;
+    const remainingHours = remainingSeconds / 3600;
 
-    // 24-hour validation rule: active only within 24 hours of creation in Asia/Bahrain
-    const isWithin24h = diffHours <= 24;
-    const remainingHours = Math.max(0, 24 - diffHours);
+    // Exact hours, minutes, and seconds calculation
+    const remHours = Math.floor(remainingSeconds / 3600);
+    const remMinutes = Math.floor((remainingSeconds % 3600) / 60);
+    const remSecs = remainingSeconds % 60;
+
+    let timeLeftText = '';
+    if (isWithin24h) {
+        if (remHours >= 1) {
+            timeLeftText = `${remHours}h ${remMinutes}m left`;
+        } else if (remMinutes >= 1) {
+            timeLeftText = `${remMinutes}m ${remSecs}s left`;
+        } else {
+            timeLeftText = `${remSecs}s left`;
+        }
+    } else {
+        timeLeftText = '24h Expired';
+    }
 
     return {
         isWithin24h,
         diffHours,
+        diffSeconds,
         remainingHours,
-        entryTime,
-        formattedDate
+        remainingSeconds,
+        remHours,
+        remMinutes,
+        remSecs,
+        timeLeftText,
+        entryTime: entryDate ? entryDate.getTime() : null,
+        formattedDate,
+        entryDisplay: cleanCreatedAt ? formatDateTimeBahrain(cleanCreatedAt) : (cleanAuctionDate ? formatDateDMY(cleanAuctionDate) : '')
     };
 }
 
@@ -2649,6 +2738,13 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
     const [paymentModalData, setPaymentModalData] = useState(null);
     const [ledgerSettingsOpen, setLedgerSettingsOpen] = useState(false);
 
+    // Periodic ticker to recalculate and refresh live countdown remaining time
+    const [, setCountdownTick] = useState(0);
+    useEffect(() => {
+        const interval = setInterval(() => setCountdownTick(c => c + 1), 10000);
+        return () => clearInterval(interval);
+    }, []);
+
     // Accounting heads data
     const [accountsData, setAccountsData] = useState({
         contribution_debit_heads: [],
@@ -2717,7 +2813,12 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
                 api.get(`/api/articles?year=${year}&status=Available`),
                 api.get('/api/accounts/heads')
             ]);
-            if (transRes.success) setTransactions(transRes.transactions);
+            if (transRes.success) {
+                if (transRes.server_time) {
+                    setServerBahrainTime(transRes.server_time);
+                }
+                setTransactions(transRes.transactions);
+            }
             if (artRes.success) setAvailableArticles(artRes.articles);
             if (accRes && accRes.success) {
                 setAccountsData(accRes);
@@ -3989,7 +4090,7 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
                                     return <span className="badge badge-success" style={{ fontSize: '11px' }}>Settled</span>;
                                 }
 
-                                const ageInfo = getEntryAgeInfo(t.created_at, t.auction_date);
+                                const ageInfo = getEntryAgeInfo(t);
 
                                 if (ageInfo.isWithin24h) {
                                     return (
@@ -4008,15 +4109,13 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
                                                     cursor: 'pointer'
                                                 }}
                                                 onClick={() => setPaymentModalData(t)}
-                                                title={`Pay Balance Active: ${ageInfo.remainingHours.toFixed(1)}h remaining of 24-hour floor settlement window (Asia/Bahrain)`}
+                                                title={`Pay Balance Active: ${ageInfo.timeLeftText} remaining of 24h window (Entry: ${ageInfo.entryDisplay} Asia/Bahrain)`}
                                             >
                                                 <i className="material-icons" style={{ fontSize: '15px' }}>payments</i> Pay Balance
                                             </button>
-                                            <span style={{ fontSize: '10px', color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: '3px', fontWeight: 600 }}>
+                                            <span style={{ fontSize: '10px', color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: '3px', fontWeight: 600 }} title={`Entry: ${ageInfo.entryDisplay} | Time Left: ${ageInfo.timeLeftText} (Asia/Bahrain)`}>
                                                 <i className="material-icons" style={{ fontSize: '12px' }}>schedule</i>
-                                                {ageInfo.remainingHours >= 1 
-                                                    ? `${Math.floor(ageInfo.remainingHours)}h ${Math.round((ageInfo.remainingHours % 1) * 60)}m left`
-                                                    : `${Math.max(1, Math.round(ageInfo.remainingHours * 60))}m left`}
+                                                {ageInfo.timeLeftText}
                                             </span>
                                         </div>
                                     );
@@ -4039,11 +4138,11 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
                                                 alignItems: 'center',
                                                 gap: '4px'
                                             }}
-                                            title="Pay Balance window has expired (active only within 24 hours of auction entry in Asia/Bahrain). Settle dues through Cathedral Promises."
+                                            title={`Pay Balance window has expired (Entry: ${ageInfo.entryDisplay} Asia/Bahrain). Settle dues through Cathedral Promises.`}
                                         >
                                             <i className="material-icons" style={{ fontSize: '13px' }}>lock_clock</i> Pay Balance
                                         </button>
-                                        <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '2px' }} title="Auction entry is older than 24 hours in Asia/Bahrain">
+                                        <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '2px' }} title={`Auction entry is older than 24 hours in Asia/Bahrain (Entry: ${ageInfo.entryDisplay})`}>
                                             <i className="material-icons" style={{ fontSize: '11px' }}>history</i>
                                             24h Expired
                                         </span>
@@ -4137,7 +4236,7 @@ function RecordPaymentModal({ transaction, isOpen, onClose, onSuccess, onOpenRec
     const isFullSettlement = !isOverpaying && amountNum > 0 && remainingBal <= 0.0001;
     const isPartialSettlement = !isOverpaying && amountNum > 0 && remainingBal > 0.0001;
 
-    const ageInfo = getEntryAgeInfo(transaction.created_at, transaction.auction_date);
+    const ageInfo = getEntryAgeInfo(transaction);
     const isFromPromises = !!transaction.hf_promise_id;
     const isExpired = !isFromPromises && !ageInfo.isWithin24h;
 
@@ -4265,9 +4364,7 @@ function RecordPaymentModal({ transaction, isOpen, onClose, onSuccess, onOpenRec
                                         24-Hour Live Floor Window Active (Asia/Bahrain)
                                     </span>
                                     <span style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: 600 }}>
-                                        {ageInfo.remainingHours >= 1 
-                                            ? `${Math.floor(ageInfo.remainingHours)}h ${Math.round((ageInfo.remainingHours % 1) * 60)}m remaining`
-                                            : `${Math.max(1, Math.round(ageInfo.remainingHours * 60))}m remaining`}
+                                        {ageInfo.timeLeftText} remaining
                                     </span>
                                 </div>
                             ) : (

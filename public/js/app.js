@@ -7761,41 +7761,6 @@ function PromisesView({ year, showToast, onOpenReceipt, refreshTrigger, onDataCh
                                     {p.promise_status}
                                 </span>
                             )
-                        },
-                        {
-                            header: 'Actions',
-                            id: 'actions',
-                            searchable: false,
-                            sortable: false,
-                            headerStyle: { textAlign: 'center', width: '130px' },
-                            style: { textAlign: 'center', width: '130px' },
-                            footer: () => null,
-                            render: (p) => (
-                                <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', alignItems: 'center' }}>
-                                    {Number(p.balance_amount) > 0.0001 && (
-                                        <button 
-                                            type="button"
-                                            className="btn btn-primary btn-xs"
-                                            title="Record Payment / Settle Due"
-                                            onClick={() => setPaymentModalData({ ...p, buyer_name: p.member_name })}
-                                            style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '3px 8px' }}
-                                        >
-                                            <i className="material-icons" style={{ fontSize: '14px' }}>payments</i> Settle
-                                        </button>
-                                    )}
-                                    {typeof onOpenReceipt === 'function' && (p.receipt_no || p.auction_ref_no) && (
-                                        <button 
-                                            type="button"
-                                            className="btn btn-secondary btn-xs"
-                                            title="Print / View Receipt"
-                                            onClick={() => onOpenReceipt(p.receipt_no || p.auction_ref_no)}
-                                            style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '3px 6px' }}
-                                        >
-                                            <i className="material-icons" style={{ fontSize: '14px' }}>receipt</i>
-                                        </button>
-                                    )}
-                                </div>
-                            )
                         }
                     ]}
                     data={promises}

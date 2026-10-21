@@ -7185,8 +7185,10 @@ function ReceiptModal({ receiptNo, isOpen, onClose }) {
 // --- Promises Management View ---
 function PromisesView({ year, showToast, onOpenReceipt, refreshTrigger, onDataChanged }) {
     const [promises, setPromises] = useState([]);
+    const [summary, setSummary] = useState(null);
     const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState('All');
+    const [streamFilter, setStreamFilter] = useState('All'); // 'All' | 'Auction' | 'Gold' | 'BedSheet'
     const [search, setSearch] = useState('');
     const [paymentModalData, setPaymentModalData] = useState(null);
     const [accountsData, setAccountsData] = useState(null);
@@ -7194,8 +7196,11 @@ function PromisesView({ year, showToast, onOpenReceipt, refreshTrigger, onDataCh
     const fetchPromises = async () => {
         setLoading(true);
         try {
-            const res = await api.get(`/api/promises?year=${year}&status=${statusFilter}&search=${encodeURIComponent(search)}`);
-            if (res.success) setPromises(res.promises);
+            const res = await api.get(`/api/promises?year=${year}&status=${statusFilter}&stream=${streamFilter}&search=${encodeURIComponent(search)}`);
+            if (res.success) {
+                setPromises(res.promises || []);
+                if (res.summary) setSummary(res.summary);
+            }
         } catch (err) {
             showToast('error', err.message);
         } finally {
@@ -7205,7 +7210,7 @@ function PromisesView({ year, showToast, onOpenReceipt, refreshTrigger, onDataCh
 
     useEffect(() => {
         fetchPromises();
-    }, [year, statusFilter, search, refreshTrigger]);
+    }, [year, statusFilter, streamFilter, search, refreshTrigger]);
 
     useEffect(() => {
         api.get('/api/accounts/heads')
@@ -7215,22 +7220,312 @@ function PromisesView({ year, showToast, onOpenReceipt, refreshTrigger, onDataCh
             .catch(err => console.error("Could not load account heads in PromisesView", err));
     }, []);
 
+    const s = summary || {
+        overall: { count: 0, total_promise: 0, paid_amount: 0, balance_amount: 0, active_count: 0, fulfilled_count: 0 },
+        auction: { count: 0, total_promise: 0, paid_amount: 0, balance_amount: 0, active_count: 0, fulfilled_count: 0 },
+        gold: { count: 0, total_promise: 0, paid_amount: 0, balance_amount: 0, active_count: 0, fulfilled_count: 0 },
+        bedsheet: { count: 0, total_promise: 0, paid_amount: 0, balance_amount: 0, active_count: 0, fulfilled_count: 0 }
+    };
+
+    const streamCards = [
+        {
+            key: 'All',
+            streamKey: 'overall',
+            title: 'All Streams Altogether',
+            sub: 'Floor Auction + Gold + Bed Sheet',
+            icon: 'layers',
+            gradient: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)',
+            themeColor: '#6366f1',
+            lightBg: 'rgba(99, 102, 241, 0.04)',
+            borderColor: '#6366f1',
+            amtLabel: 'Total Promised',
+            data: s.overall
+        },
+        {
+            key: 'Auction',
+            streamKey: 'auction',
+            title: 'Floor Auction Only',
+            sub: 'Live Floor Bidding Purchases',
+            icon: 'gavel',
+            gradient: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+            themeColor: '#2563eb',
+            lightBg: 'rgba(37, 99, 235, 0.04)',
+            borderColor: '#2563eb',
+            amtLabel: 'Total Bid',
+            data: s.auction
+        },
+        {
+            key: 'Gold',
+            streamKey: 'gold',
+            title: 'Gold Offerings Only',
+            sub: 'Special Gold Desk Offerings',
+            icon: 'stars',
+            gradient: 'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)',
+            themeColor: '#d97706',
+            lightBg: 'rgba(245, 158, 11, 0.05)',
+            borderColor: '#f59e0b',
+            amtLabel: 'Total Offered',
+            data: s.gold
+        },
+        {
+            key: 'BedSheet',
+            streamKey: 'bedsheet',
+            title: 'Bed Sheet Only',
+            sub: 'Special Bed Sheet Desk Offerings',
+            icon: 'hotel',
+            gradient: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+            themeColor: '#7c3aed',
+            lightBg: 'rgba(139, 92, 246, 0.05)',
+            borderColor: '#8b5cf6',
+            amtLabel: 'Total Offered',
+            data: s.bedsheet
+        }
+    ];
+
     return (
         <div>
+            {/* 4 Interactive Stream Financial Summary Cards */}
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                gap: '16px',
+                marginBottom: '20px'
+            }}>
+                {streamCards.map(c => {
+                    const isSelected = streamFilter === c.key;
+                    const dueAmt = Number(c.data.balance_amount || 0);
+                    const promisedAmt = Number(c.data.total_promise || 0);
+                    const paidAmt = Number(c.data.paid_amount || 0);
+                    const recoveryPct = promisedAmt > 0 ? ((paidAmt / promisedAmt) * 100).toFixed(0) : 0;
+
+                    return (
+                        <div
+                            key={c.key}
+                            onClick={() => setStreamFilter(c.key)}
+                            style={{
+                                background: isSelected ? c.lightBg : 'var(--bg-card)',
+                                border: isSelected ? `2px solid ${c.borderColor}` : '1px solid var(--border-color)',
+                                borderRadius: 'var(--radius-md, 10px)',
+                                padding: '16px 18px',
+                                cursor: 'pointer',
+                                position: 'relative',
+                                boxShadow: isSelected 
+                                    ? `0 6px 20px ${c.themeColor}33, 0 1px 3px rgba(0,0,0,0.06)` 
+                                    : '0 2px 8px rgba(0,0,0,0.04)',
+                                transition: 'all 0.2s ease',
+                                transform: isSelected ? 'translateY(-2px)' : 'none'
+                            }}
+                            onMouseEnter={e => {
+                                if (!isSelected) {
+                                    e.currentTarget.style.borderColor = c.themeColor;
+                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                }
+                            }}
+                            onMouseLeave={e => {
+                                if (!isSelected) {
+                                    e.currentTarget.style.borderColor = 'var(--border-color)';
+                                    e.currentTarget.style.transform = 'none';
+                                }
+                            }}
+                            title={`Click to filter by ${c.title}`}
+                        >
+                            {/* Card Header */}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <div style={{
+                                        width: '36px',
+                                        height: '36px',
+                                        borderRadius: '8px',
+                                        background: c.gradient,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        boxShadow: `0 3px 10px ${c.themeColor}40`
+                                    }}>
+                                        <i className="material-icons" style={{ fontSize: '20px', color: '#ffffff' }}>{c.icon}</i>
+                                    </div>
+                                    <div>
+                                        <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2 }}>
+                                            {c.title}
+                                        </div>
+                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                            {c.sub}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    {isSelected ? (
+                                        <span style={{
+                                            fontSize: '10px',
+                                            fontWeight: 800,
+                                            letterSpacing: '0.5px',
+                                            padding: '2px 8px',
+                                            borderRadius: '12px',
+                                            background: c.themeColor,
+                                            color: '#ffffff',
+                                            textTransform: 'uppercase'
+                                        }}>
+                                            ACTIVE
+                                        </span>
+                                    ) : (
+                                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                            View
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Prominent Outstanding Due Box */}
+                            <div style={{
+                                background: dueAmt > 0.0001 ? 'rgba(239, 68, 68, 0.08)' : 'rgba(34, 197, 94, 0.08)',
+                                border: `1px solid ${dueAmt > 0.0001 ? 'rgba(239, 68, 68, 0.25)' : 'rgba(34, 197, 94, 0.25)'}`,
+                                borderRadius: '8px',
+                                padding: '10px 14px',
+                                marginBottom: '12px'
+                            }}>
+                                <div style={{
+                                    fontSize: '10px',
+                                    fontWeight: 700,
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.6px',
+                                    color: dueAmt > 0.0001 ? 'var(--danger)' : 'var(--success)',
+                                    marginBottom: '2px'
+                                }}>
+                                    Outstanding Due
+                                </div>
+                                <div style={{
+                                    fontSize: '22px',
+                                    fontWeight: 800,
+                                    color: dueAmt > 0.0001 ? 'var(--danger)' : 'var(--success)',
+                                    lineHeight: 1.2
+                                }}>
+                                    BHD {dueAmt.toFixed(3)}
+                                </div>
+                            </div>
+
+                            {/* Promised / Bid vs Paid 2-Col Breakdown */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+                                <div style={{ background: 'rgba(0,0,0,0.03)', padding: '6px 10px', borderRadius: '6px' }}>
+                                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                                        {c.amtLabel}
+                                    </div>
+                                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
+                                        BHD {promisedAmt.toFixed(3)}
+                                    </div>
+                                </div>
+                                <div style={{ background: 'rgba(34, 197, 94, 0.06)', padding: '6px 10px', borderRadius: '6px' }}>
+                                    <div style={{ fontSize: '10px', color: 'var(--success)', textTransform: 'uppercase', fontWeight: 600 }}>
+                                        Paid / Collected
+                                    </div>
+                                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--success)', marginTop: '2px' }}>
+                                        BHD {paidAmt.toFixed(3)}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Card Footer: Counts & Progress */}
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                fontSize: '11px',
+                                color: 'var(--text-muted)',
+                                borderTop: '1px solid var(--border-color)',
+                                paddingTop: '8px'
+                            }}>
+                                <span>
+                                    <strong>{c.data.count || 0}</strong> Promises
+                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ color: 'var(--warning)', fontWeight: 600 }}>
+                                        {c.data.active_count || 0} Active
+                                    </span>
+                                    <span>•</span>
+                                    <span style={{ color: 'var(--success)', fontWeight: 600 }}>
+                                        {c.data.fulfilled_count || 0} Fulfilled
+                                    </span>
+                                    <span style={{
+                                        fontSize: '10px',
+                                        background: 'rgba(0,0,0,0.05)',
+                                        padding: '1px 5px',
+                                        borderRadius: '4px',
+                                        fontWeight: 600
+                                    }}>
+                                        {recoveryPct}%
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* Main Promises Table Card */}
             <div className="card">
-                <div className="card-header" style={{ flexWrap: 'wrap', gap: '14px' }}>
+                <div className="card-header" style={{ flexWrap: 'wrap', gap: '14px', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <i className="material-icons" style={{ fontSize: '28px', color: 'var(--primary)' }}>account_balance_wallet</i>
                         <div>
                             <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--primary)' }}>
-                                Auction Promises & Receivables ({year})
+                                Cathedral Promises & Dues Ledger ({year})
                             </h3>
                             <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
-                                Track member credit purchases, pending balances, and record collections
+                                {streamFilter === 'All' ? 'Showing all Floor Auction, Gold & Bed Sheet receivables' :
+                                 streamFilter === 'Auction' ? 'Showing Floor Live Auction receivables only' :
+                                 streamFilter === 'Gold' ? 'Showing Special Gold Desk receivables only' :
+                                 'Showing Special Bed Sheet Desk receivables only'}
                             </p>
                         </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        {/* Stream Pill Filters */}
+                        <div style={{ display: 'inline-flex', gap: '4px', background: 'rgba(0,0,0,0.04)', padding: '3px', borderRadius: '8px' }}>
+                            <button 
+                                type="button" 
+                                className={`btn btn-xs ${streamFilter === 'All' ? 'btn-primary' : 'btn-secondary'}`} 
+                                onClick={() => setStreamFilter('All')}
+                                style={{ fontWeight: streamFilter === 'All' ? 700 : 500 }}
+                            >
+                                All Streams ({s.overall.count})
+                            </button>
+                            <button 
+                                type="button" 
+                                className={`btn btn-xs ${streamFilter === 'Auction' ? 'btn-primary' : 'btn-secondary'}`} 
+                                onClick={() => setStreamFilter('Auction')}
+                                style={{ fontWeight: streamFilter === 'Auction' ? 700 : 500 }}
+                            >
+                                Auction Only ({s.auction.count})
+                            </button>
+                            <button 
+                                type="button" 
+                                className={`btn btn-xs ${streamFilter === 'Gold' ? 'btn-warning' : 'btn-secondary'}`} 
+                                onClick={() => setStreamFilter('Gold')}
+                                style={{ 
+                                    fontWeight: streamFilter === 'Gold' ? 700 : 500,
+                                    ...(streamFilter === 'Gold' ? { background: '#f59e0b', borderColor: '#d97706', color: '#fff' } : {})
+                                }}
+                            >
+                                Gold Only ({s.gold.count})
+                            </button>
+                            <button 
+                                type="button" 
+                                className={`btn btn-xs ${streamFilter === 'BedSheet' ? 'btn-primary' : 'btn-secondary'}`} 
+                                onClick={() => setStreamFilter('BedSheet')}
+                                style={{ 
+                                    fontWeight: streamFilter === 'BedSheet' ? 700 : 500,
+                                    ...(streamFilter === 'BedSheet' ? { background: '#8b5cf6', borderColor: '#7c3aed', color: '#fff' } : {})
+                                }}
+                            >
+                                Bed Sheet Only ({s.bedsheet.count})
+                            </button>
+                        </div>
+
+                        <select className="form-control" style={{ width: '145px' }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+                            <option value="All">All Statuses</option>
+                            <option value="Active">Active / Pending</option>
+                            <option value="Fulfilled">Fulfilled / Cleared</option>
+                        </select>
+
                         <button 
                             type="button" 
                             className="btn btn-secondary btn-sm" 
@@ -7241,13 +7536,8 @@ function PromisesView({ year, showToast, onOpenReceipt, refreshTrigger, onDataCh
                             title="Reload Promises Table"
                             style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                         >
-                            <i className="material-icons" style={{ fontSize: '16px' }}>refresh</i> Reload Table
+                            <i className="material-icons" style={{ fontSize: '16px' }}>refresh</i> Reload
                         </button>
-                        <select className="form-control" style={{ width: '150px' }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-                            <option value="All">All Statuses</option>
-                            <option value="Active">Active / Pending</option>
-                            <option value="Fulfilled">Fulfilled / Cleared</option>
-                        </select>
                     </div>
                 </div>
 
@@ -7258,8 +7548,8 @@ function PromisesView({ year, showToast, onOpenReceipt, refreshTrigger, onDataCh
                             id: 'sl_no',
                             searchable: false,
                             sortable: false,
-                            headerStyle: { width: '60px', textAlign: 'center' },
-                            style: { textAlign: 'center', width: '60px', fontWeight: 600, color: 'var(--text-muted)' },
+                            headerStyle: { width: '55px', textAlign: 'center' },
+                            style: { textAlign: 'center', width: '55px', fontWeight: 600, color: 'var(--text-muted)' },
                             footer: () => (
                                 <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', fontWeight: 700 }}>
                                     Total
@@ -7278,7 +7568,14 @@ function PromisesView({ year, showToast, onOpenReceipt, refreshTrigger, onDataCh
                             ),
                             render: (p) => (
                                 <div>
-                                    <strong style={{ color: 'var(--text-primary)' }}>PRM-{p.hf_promise_id}</strong>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <strong style={{ color: 'var(--text-primary)' }}>PRM-{p.hf_promise_id}</strong>
+                                        {p.auction_ref_no && (
+                                            <span className="badge badge-secondary" style={{ fontSize: '10px', padding: '1px 5px' }}>
+                                                {p.auction_ref_no}
+                                            </span>
+                                        )}
+                                    </div>
                                     {p.acc_promise_id ? (
                                         <div style={{ fontSize: '11px', color: 'var(--warning)', fontWeight: 600 }}>
                                             Acc ID: #{p.acc_promise_id}
@@ -7291,6 +7588,36 @@ function PromisesView({ year, showToast, onOpenReceipt, refreshTrigger, onDataCh
                                     ) : null}
                                 </div>
                             )
+                        },
+                        {
+                            header: 'Stream',
+                            accessor: 'offering_type',
+                            sortable: true,
+                            headerStyle: { width: '115px' },
+                            style: { width: '115px' },
+                            footer: () => null,
+                            render: (p) => {
+                                const st = p.offering_type || 'Auction';
+                                if (st === 'Gold') {
+                                    return (
+                                        <span className="badge" style={{ background: '#f59e0b', color: '#fff', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                            <i className="material-icons" style={{ fontSize: '12px' }}>stars</i> Gold
+                                        </span>
+                                    );
+                                }
+                                if (st === 'BedSheet') {
+                                    return (
+                                        <span className="badge" style={{ background: '#8b5cf6', color: '#fff', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                            <i className="material-icons" style={{ fontSize: '12px' }}>hotel</i> Bed Sheet
+                                        </span>
+                                    );
+                                }
+                                return (
+                                    <span className="badge badge-primary" style={{ fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                        <i className="material-icons" style={{ fontSize: '12px' }}>gavel</i> Auction
+                                    </span>
+                                );
+                            }
                         },
                         {
                             header: 'Member Name',
@@ -7313,33 +7640,45 @@ function PromisesView({ year, showToast, onOpenReceipt, refreshTrigger, onDataCh
                             footer: () => null,
                             render: (p) => (
                                 <div>
-                                    {p.member_code_c && <div>Roll No: <strong style={{ color: 'var(--primary)' }}>{p.member_code_c}</strong></div>}
+                                    {p.member_code_c && <div>Roll: <strong style={{ color: 'var(--primary)' }}>{p.member_code_c}</strong></div>}
                                     {p.member_cpr && <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>CPR: {p.member_cpr}</div>}
                                 </div>
                             )
                         },
                         {
-                            header: 'Tag No & Tag Name',
+                            header: 'Tag / Item Description',
                             accessor: 'article_name',
                             sortable: true,
-                            searchValue: (p) => `${p.tag_number || ''} ${p.article_name || ''} ${p.article_number || ''}`,
+                            searchValue: (p) => `${p.tag_number || ''} ${p.article_name || ''} ${p.article_number || ''} ${p.item_description || ''}`,
                             footer: () => null,
-                            render: (p) => (
-                                <div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
-                                        <span className="tag-badge">{p.tag_number}</span>
-                                        {p.article_number && (
-                                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace', background: 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: '4px' }}>
-                                                {p.article_number}
-                                            </span>
+                            render: (p) => {
+                                const isSpecial = p.offering_type === 'Gold' || p.offering_type === 'BedSheet';
+                                return (
+                                    <div>
+                                        {!isSpecial && (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+                                                {p.tag_number && <span className="tag-badge">{p.tag_number}</span>}
+                                                {p.article_number && (
+                                                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace', background: 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: '4px' }}>
+                                                        {p.article_number}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
+                                        <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                                            {p.item_description || p.article_name}
+                                        </div>
+                                        {isSpecial && p.article_name && p.item_description && (
+                                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                                {p.article_name}
+                                            </div>
                                         )}
                                     </div>
-                                    <div style={{ fontWeight: 600 }}>{p.article_name}</div>
-                                </div>
-                            )
+                                );
+                            }
                         },
                         {
-                            header: 'Total Bid',
+                            header: 'Bid / Promised',
                             accessor: 'total_promise_amount',
                             sortable: true,
                             sortValue: (p) => Number(p.total_promise_amount) || 0,
@@ -7347,7 +7686,7 @@ function PromisesView({ year, showToast, onOpenReceipt, refreshTrigger, onDataCh
                                 const total = allRows.reduce((sum, p) => sum + (Number(p.total_promise_amount) || 0), 0);
                                 return (
                                     <div className="dt-footer-amount-box">
-                                        <span className="dt-footer-amount-label">Bid Total</span>
+                                        <span className="dt-footer-amount-label">Promised Total</span>
                                         <span className="dt-footer-amount-val" style={{ color: 'var(--primary)' }}>
                                             BHD {total.toFixed(3)}
                                         </span>
@@ -7390,7 +7729,11 @@ function PromisesView({ year, showToast, onOpenReceipt, refreshTrigger, onDataCh
                                     </div>
                                 );
                             },
-                            render: (p) => <strong style={{ color: 'var(--danger)', fontSize: '14px' }}>BHD {Number(p.balance_amount).toFixed(3)}</strong>
+                            render: (p) => (
+                                <strong style={{ color: Number(p.balance_amount) > 0.0001 ? 'var(--danger)' : 'var(--text-muted)', fontSize: '13.5px' }}>
+                                    BHD {Number(p.balance_amount).toFixed(3)}
+                                </strong>
+                            )
                         },
                         {
                             header: 'Due Date',
@@ -7418,13 +7761,48 @@ function PromisesView({ year, showToast, onOpenReceipt, refreshTrigger, onDataCh
                                     {p.promise_status}
                                 </span>
                             )
+                        },
+                        {
+                            header: 'Actions',
+                            id: 'actions',
+                            searchable: false,
+                            sortable: false,
+                            headerStyle: { textAlign: 'center', width: '130px' },
+                            style: { textAlign: 'center', width: '130px' },
+                            footer: () => null,
+                            render: (p) => (
+                                <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', alignItems: 'center' }}>
+                                    {Number(p.balance_amount) > 0.0001 && (
+                                        <button 
+                                            type="button"
+                                            className="btn btn-primary btn-xs"
+                                            title="Record Payment / Settle Due"
+                                            onClick={() => setPaymentModalData({ ...p, buyer_name: p.member_name })}
+                                            style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '3px 8px' }}
+                                        >
+                                            <i className="material-icons" style={{ fontSize: '14px' }}>payments</i> Settle
+                                        </button>
+                                    )}
+                                    {typeof onOpenReceipt === 'function' && (p.receipt_no || p.auction_ref_no) && (
+                                        <button 
+                                            type="button"
+                                            className="btn btn-secondary btn-xs"
+                                            title="Print / View Receipt"
+                                            onClick={() => onOpenReceipt(p.receipt_no || p.auction_ref_no)}
+                                            style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '3px 6px' }}
+                                        >
+                                            <i className="material-icons" style={{ fontSize: '14px' }}>receipt</i>
+                                        </button>
+                                    )}
+                                </div>
+                            )
                         }
                     ]}
                     data={promises}
                     loading={loading}
                     keyField="hf_promise_id"
                     initialPageSize={10}
-                    searchPlaceholder="Search by SL No, Promise ID, Member, Roll, CPR, Tag No, Tag Name..."
+                    searchPlaceholder="Search by SL No, Promise ID, Member, Roll No, CPR, Tag No, Item Description, Ref No..."
                     emptyMessage="No promises found matching filters."
                 />
             </div>

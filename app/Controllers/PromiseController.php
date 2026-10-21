@@ -16,12 +16,17 @@ class PromiseController extends Controller {
         $year = isset($_GET['year']) ? (int)$_GET['year'] : (int)date('Y');
         $status = $_GET['status'] ?? null;
         $search = $_GET['search'] ?? null;
+        $stream = $_GET['stream'] ?? $_GET['offering_type'] ?? 'All';
 
-        $promises = $this->promiseModel->getAll($year, $status, $search);
+        $promises = $this->promiseModel->getAll($year, $status, $search, $stream);
+        $summary = $this->promiseModel->getStreamSummary($year);
+
         $this->jsonResponse([
             'success'  => true,
             'year'     => $year,
+            'stream'   => $stream,
             'count'    => count($promises),
+            'summary'  => $summary,
             'promises' => $promises
         ]);
     }

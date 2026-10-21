@@ -5,7 +5,7 @@ use App\Core\Model;
 use PDO;
 
 class Promise extends Model {
-    public function getAll(int $year, ?string $status = null, ?string $search = null): array {
+    public function getAll(int $year, ?string $status = null, ?string $search = null, ?string $stream = null): array {
         $baseSql = "
             SELECT 
                 p.hf_promise_id,
@@ -80,7 +80,9 @@ class Promise extends Model {
                 p.acc_promise_id,
                 p.event_id,
                 p.event_name,
-                t.auction_ref_no, t.auction_date,
+                t.auction_ref_no, t.auction_date, t.receipt_no,
+                COALESCE(t.offering_type, 'Auction') as offering_type,
+                t.item_description,
                 a.article_number, a.tag_number, a.article_name, a.category,
                 m.cpr_no as member_cpr, m.prayer_group_name as member_prayer_group
             FROM hf_promises p
@@ -93,6 +95,16 @@ class Promise extends Model {
         $sql = "SELECT * FROM ({$baseSql}) q WHERE 1=1";
         $params = ['year' => $year];
 
+        if ($stream && $stream !== 'All') {
+            if ($stream === 'Auction') {
+                $sql .= " AND (q.offering_type = 'Auction' OR q.offering_type IS NULL OR q.offering_type = '')";
+            } elseif ($stream === 'Gold') {
+                $sql .= " AND q.offering_type = 'Gold'";
+            } elseif ($stream === 'BedSheet') {
+                $sql .= " AND q.offering_type = 'BedSheet'";
+            }
+        }
+
         if ($status && $status !== 'All') {
             $sql .= " AND q.promise_status = :status";
             $params['status'] = $status;
@@ -103,13 +115,17 @@ class Promise extends Model {
                         OR q.auction_ref_no LIKE :search2
                         OR q.article_number LIKE :search3
                         OR q.tag_number LIKE :search4
-                        OR q.article_name LIKE :search5)";
+                        OR q.article_name LIKE :search5
+                        OR q.item_description LIKE :search6
+                        OR q.member_code_c LIKE :search7)";
             $term = "%" . trim($search) . "%";
             $params['search1'] = $term;
             $params['search2'] = $term;
             $params['search3'] = $term;
             $params['search4'] = $term;
             $params['search5'] = $term;
+            $params['search6'] = $term;
+            $params['search7'] = $term;
         }
 
         $sql .= " ORDER BY q.balance_amount DESC, q.hf_promise_id DESC";
@@ -194,7 +210,9 @@ class Promise extends Model {
                 p.acc_promise_id,
                 p.event_id,
                 p.event_name,
-                t.auction_ref_no, t.auction_date,
+                t.auction_ref_no, t.auction_date, t.receipt_no,
+                COALESCE(t.offering_type, 'Auction') as offering_type,
+                t.item_description,
                 a.article_number, a.tag_number, a.article_name, a.category,
                 m.cpr_no as member_cpr, m.prayer_group_name as member_prayer_group
             FROM hf_promises p
@@ -207,5 +225,60 @@ class Promise extends Model {
         $stmt->execute(['id' => $id]);
         $row = $stmt->fetch();
         return $row ?: null;
+    }
+
+    /**
+     * Get consolidated & per-stream promises summary (All, Auction, Gold, BedSheet)
+     */
+    public function getStreamSummary(int $year): array {
+        $all = $this->getAll($year, null, null, null);
+
+        $initBucket = fn() => [
+            'count'           => 0,
+            'total_promise'   => 0.0,
+            'paid_amount'     => 0.0,
+            'balance_amount'  => 0.0,
+            'active_count'    => 0,
+            'fulfilled_count' => 0
+        ];
+
+        $summary = [
+            'overall'  => $initBucket(),
+            'auction'  => $initBucket(),
+            'gold'     => $initBucket(),
+            'bedsheet' => $initBucket(),
+        ];
+
+        foreach ($all as $p) {
+            $st = $p['offering_type'] ?? 'Auction';
+            $bucketKey = match($st) {
+                'Gold'     => 'gold',
+                'BedSheet' => 'bedsheet',
+                default    => 'auction'
+            };
+
+            $pAmt = (float)($p['total_promise_amount'] ?? 0);
+            $paid = (float)($p['paid_amount'] ?? 0);
+            $bal  = (float)($p['balance_amount'] ?? 0);
+            $isAct = (($p['promise_status'] ?? '') === 'Active');
+
+            // Stream Bucket
+            $summary[$bucketKey]['count']++;
+            $summary[$bucketKey]['total_promise'] += $pAmt;
+            $summary[$bucketKey]['paid_amount'] += $paid;
+            $summary[$bucketKey]['balance_amount'] += $bal;
+            if ($isAct) $summary[$bucketKey]['active_count']++;
+            else $summary[$bucketKey]['fulfilled_count']++;
+
+            // Overall Combined Bucket
+            $summary['overall']['count']++;
+            $summary['overall']['total_promise'] += $pAmt;
+            $summary['overall']['paid_amount'] += $paid;
+            $summary['overall']['balance_amount'] += $bal;
+            if ($isAct) $summary['overall']['active_count']++;
+            else $summary['overall']['fulfilled_count']++;
+        }
+
+        return $summary;
     }
 }

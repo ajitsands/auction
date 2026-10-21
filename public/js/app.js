@@ -6859,11 +6859,6 @@ function App() {
                             >
                                 <i className="material-icons">more_horiz</i>
                                 <span>More</span>
-                                {stats?.active_promises_count > 0 && (
-                                    <span className="nav-badge" style={{ background: 'rgba(255, 82, 82, 0.45)', color: '#ffffff' }}>
-                                        {stats.active_promises_count}
-                                    </span>
-                                )}
                                 <i className="material-icons dropdown-caret">{reportsDropdownOpen ? 'expand_less' : 'expand_more'}</i>
                             </div>
 
@@ -6878,11 +6873,6 @@ function App() {
                                     >
                                         <i className="material-icons">account_balance_wallet</i>
                                         <span style={{ flex: 1 }}>Promises & Dues</span>
-                                        {stats?.active_promises_count > 0 && (
-                                            <span className="nav-badge" style={{ background: 'rgba(255, 82, 82, 0.25)', color: 'var(--danger)', fontWeight: 700 }}>
-                                                {stats.active_promises_count}
-                                            </span>
-                                        )}
                                     </div>
 
                                     <div 
@@ -7016,7 +7006,7 @@ function App() {
                         onClick={() => { setCurrentTab('promises'); setSidebarOpen(false); }}
                     >
                         <i className="material-icons">account_balance_wallet</i>
-                        <span>Promises & Dues ({stats?.active_promises_count || 0})</span>
+                        <span>Promises & Dues</span>
                     </div>
                     <div 
                         className={`top-nav-item ${currentTab === 'reports' ? 'active' : ''}`}

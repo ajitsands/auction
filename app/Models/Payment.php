@@ -43,6 +43,22 @@ class Payment extends Model {
                 throw new \Exception("Payment amount ({$amount}) exceeds outstanding balance ({$currentBalance}).");
             }
 
+            // Enforce 24-hour floor settlement validation in Asia/Bahrain timezone
+            $isFloorSettlement = empty($data['from_promises']);
+            if ($isFloorSettlement) {
+                $createdAtStr = !empty($trans['created_at']) 
+                    ? $trans['created_at'] 
+                    : (!empty($trans['auction_date']) ? $trans['auction_date'] . ' 00:00:00' : null);
+                if ($createdAtStr) {
+                    $entryTimestamp = strtotime($createdAtStr);
+                    $nowTimestamp = time();
+                    $diffHours = ($nowTimestamp - $entryTimestamp) / 3600;
+                    if ($diffHours > 24) {
+                        throw new \Exception("The 24-hour floor settlement window for this auction entry has expired (Asia/Bahrain). Please settle dues through Cathedral Promises & Dues.");
+                    }
+                }
+            }
+
             $newPaid = (float)$trans['paid_amount'] + $amount;
             $newBalance = max(0, (float)$trans['winning_bid_amount'] - $newPaid);
             $newStatus = ($newBalance <= 0) ? 'Paid' : 'Partial';

@@ -11,6 +11,7 @@ abstract class Model {
 
     public function __construct() {
         $this->db = Database::getConnection();
+        date_default_timezone_set('Asia/Bahrain');
         $this->ensureAuctionSchema();
     }
 
@@ -79,6 +80,7 @@ abstract class Model {
         $this->ensureColumn('acc_promises', 'article_id', 'int(11) DEFAULT 0');
         $this->ensureColumn('acc_contribution', 'article_id', 'int(11) DEFAULT 0');
         $this->ensureColumn('acc_ledger_entries', 'article_id', 'int(11) DEFAULT 0');
+        $this->ensureColumn('hf_auction_transactions', 'created_at', 'DATETIME DEFAULT CURRENT_TIMESTAMP');
         $this->ensureSettingsTable();
     }
 

@@ -9,6 +9,7 @@ if (php_sapi_name() === 'cli-server') {
 
 // Start output buffering and session
 ob_start();
+date_default_timezone_set('Asia/Bahrain');
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }

@@ -4,6 +4,9 @@ namespace App\Config;
 use PDO;
 use PDOException;
 
+// Ensure Asia/Bahrain timezone is active globally across all database & application operations
+date_default_timezone_set('Asia/Bahrain');
+
 class Database {
     private static ?PDO $instance = null;
 
@@ -52,16 +55,20 @@ class Database {
             $pass = getenv('DB_PASS') !== false ? getenv('DB_PASS') : ($_ENV['DB_PASS'] ?? $defaultPass);
             $charset = 'utf8mb4';
 
+            date_default_timezone_set('Asia/Bahrain');
+
             $options = [
                 PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES   => false,
+                PDO::MYSQL_ATTR_INIT_COMMAND => "SET time_zone = '+03:00'"
             ];
 
             $dsn = "mysql:host=$host;port=$port;dbname=$db;charset=$charset";
 
             try {
                 self::$instance = new PDO($dsn, $user, $pass, $options);
+                self::$instance->exec("SET time_zone = '+03:00'");
             } catch (PDOException $e) {
                 // If primary connection fails and no explicit .env was provided, attempt fallback credentials
                 if (!$hasEnv) {
@@ -72,6 +79,7 @@ class Database {
 
                     try {
                         self::$instance = new PDO($fallbackDsn, $fallbackUser, $fallbackPass, $options);
+                        self::$instance->exec("SET time_zone = '+03:00'");
                         return self::$instance;
                     } catch (PDOException) {
                         // Fallback also failed, bubble up original exception

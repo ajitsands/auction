@@ -724,7 +724,8 @@ class Auction extends Model {
                     contrib_voucher_no, acc_contribution_id,
                     promise_dr_code, promise_dr_name, promise_cr_code, promise_cr_name,
                     promise_voucher_no, acc_promise_id,
-                    receipt_book_no, manual_receipt_no
+                    receipt_book_no, manual_receipt_no,
+                    created_at
                 ) VALUES (
                     :auction_ref_no, :article_id, :applicable_year, :buyer_member_id,
                     :buyer_name, :buyer_code_c, :buyer_phone, :winning_bid_amount,
@@ -734,7 +735,8 @@ class Auction extends Model {
                     :contrib_voucher_no, :acc_contribution_id,
                     :promise_dr_code, :promise_dr_name, :promise_cr_code, :promise_cr_name,
                     :promise_voucher_no, :acc_promise_id,
-                    :receipt_book_no, :manual_receipt_no
+                    :receipt_book_no, :manual_receipt_no,
+                    :created_at
                 )
             ");
             $stmt->execute([
@@ -767,7 +769,8 @@ class Auction extends Model {
                 'promise_voucher_no'  => $promiseVoucherNo,
                 'acc_promise_id'      => $accPromiseId,
                 'receipt_book_no'     => $receiptBookNo !== '0' ? $receiptBookNo : null,
-                'manual_receipt_no'   => $receiptNoInput !== '0' ? $receiptNoInput : null
+                'manual_receipt_no'   => $receiptNoInput !== '0' ? $receiptNoInput : null,
+                'created_at'          => date('Y-m-d H:i:s')
             ]);
             $transactionId = (int)$this->db->lastInsertId();
 

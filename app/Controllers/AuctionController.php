@@ -19,10 +19,12 @@ class AuctionController extends Controller {
 
         $transactions = $this->auctionModel->getAll($year, $status, $search);
         $this->jsonResponse([
-            'success'      => true,
-            'year'         => $year,
-            'count'        => count($transactions),
-            'transactions' => $transactions
+            'success'         => true,
+            'year'            => $year,
+            'count'           => count($transactions),
+            'server_time'     => date('c'),
+            'server_timezone' => 'Asia/Bahrain',
+            'transactions'    => $transactions
         ]);
     }
 

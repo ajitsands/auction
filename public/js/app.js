@@ -142,10 +142,10 @@ function getCurrencyWords(number) {
     return words;
 }
 
-// --- Entry Age & 24h Window Helper for Live Floor Pay Balance ---
+// --- Entry Age & Settlement Helper for Live Floor Pay Balance ---
 function getEntryAgeInfo(createdAt, auctionDate) {
     if (!createdAt && !auctionDate) {
-        return { isWithin24h: true, remainingHours: 24, hoursAgo: 0, text: 'Active' };
+        return { isWithin24h: true, remainingHours: 24, hoursAgo: 0, text: 'Active', formattedDate: '' };
     }
     const raw = createdAt || (auctionDate ? `${auctionDate} 00:00:00` : '');
     const cleanStr = String(raw).trim();
@@ -155,19 +155,17 @@ function getEntryAgeInfo(createdAt, auctionDate) {
         entryTime = new Date(cleanStr).getTime();
     }
     if (isNaN(entryTime)) {
-        return { isWithin24h: true, remainingHours: 24, hoursAgo: 0, text: 'Active' };
+        return { isWithin24h: true, remainingHours: 24, hoursAgo: 0, text: 'Active', formattedDate: formatDateDMY(cleanStr) };
     }
 
     const now = Date.now();
-    const diffMs = now - entryTime;
+    const diffMs = Math.max(0, now - entryTime);
     const diffHours = diffMs / (1000 * 60 * 60);
-    const isWithin24h = diffHours >= 0 && diffHours <= 24;
-    const remainingHours = Math.max(0, 24 - diffHours);
 
     return {
-        isWithin24h,
+        isWithin24h: true,
         diffHours,
-        remainingHours,
+        remainingHours: Math.max(0, 24 - diffHours),
         entryTime,
         formattedDate: formatDateDMY(cleanStr)
     };
@@ -3944,62 +3942,29 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
                                     return <span className="badge badge-success" style={{ fontSize: '11px' }}>Settled</span>;
                                 }
 
-                                const ageInfo = getEntryAgeInfo(t.created_at, t.auction_date);
-
-                                if (ageInfo.isWithin24h) {
-                                    return (
-                                        <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
-                                            <button 
-                                                type="button"
-                                                className="btn gradient-45deg-purple-deep-orange gradient-shadow white-text btn-sm" 
-                                                style={{ 
-                                                    fontSize: '12px', 
-                                                    padding: '4px 10px', 
-                                                    height: '30px',
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '5px',
-                                                    boxShadow: '0 2px 6px rgba(123, 31, 162, 0.28)'
-                                                }}
-                                                onClick={() => setPaymentModalData(t)}
-                                                title={`Pay Balance Active: ${ageInfo.remainingHours.toFixed(1)}h remaining of 24-hour floor settlement window`}
-                                            >
-                                                <i className="material-icons" style={{ fontSize: '15px' }}>payments</i> Pay Balance
-                                            </button>
-                                            <span style={{ fontSize: '10px', color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: '3px', fontWeight: 600 }}>
-                                                <i className="material-icons" style={{ fontSize: '12px' }}>schedule</i>
-                                                {ageInfo.remainingHours >= 1 
-                                                    ? `${Math.floor(ageInfo.remainingHours)}h ${Math.round((ageInfo.remainingHours % 1) * 60)}m left`
-                                                    : `${Math.max(1, Math.round(ageInfo.remainingHours * 60))}m left`}
-                                            </span>
-                                        </div>
-                                    );
-                                }
-
-                                // Older than 24 hours: Disabled
                                 return (
                                     <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
                                         <button 
                                             type="button"
-                                            className="btn btn-secondary btn-sm" 
-                                            disabled
+                                            className="btn gradient-45deg-purple-deep-orange gradient-shadow white-text btn-sm" 
                                             style={{ 
-                                                fontSize: '11px', 
-                                                padding: '3px 8px', 
-                                                height: '28px',
-                                                opacity: 0.5,
-                                                cursor: 'not-allowed',
+                                                fontSize: '12px', 
+                                                padding: '4px 10px', 
+                                                height: '30px',
                                                 display: 'inline-flex',
                                                 alignItems: 'center',
-                                                gap: '4px'
+                                                gap: '5px',
+                                                boxShadow: '0 2px 6px rgba(123, 31, 162, 0.28)',
+                                                cursor: 'pointer'
                                             }}
-                                            title="Pay Balance window has expired (active only within 24 hours of auction entry). Settle dues through Cathedral Promises."
+                                            onClick={() => setPaymentModalData(t)}
+                                            title={`Pay Balance: BHD ${bal.toFixed(3)} remaining to settle`}
                                         >
-                                            <i className="material-icons" style={{ fontSize: '13px' }}>lock_clock</i> Pay Balance
+                                            <i className="material-icons" style={{ fontSize: '15px' }}>payments</i> Pay Balance
                                         </button>
-                                        <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '2px' }} title="Auction entry is older than 24 hours">
-                                            <i className="material-icons" style={{ fontSize: '11px' }}>history</i>
-                                            24h Expired
+                                        <span style={{ fontSize: '10px', color: 'var(--danger)', display: 'inline-flex', alignItems: 'center', gap: '3px', fontWeight: 600 }}>
+                                            <i className="material-icons" style={{ fontSize: '11px' }}>account_balance_wallet</i>
+                                            Due: BHD {bal.toFixed(3)}
                                         </span>
                                     </div>
                                 );
@@ -4095,10 +4060,6 @@ function RecordPaymentModal({ transaction, isOpen, onClose, onSuccess, onOpenRec
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!ageInfo.isWithin24h) {
-            showToast('error', 'Pay Balance on the auction floor is only active for 24 hours from the entry. Please settle dues in Cathedral Promises.');
-            return;
-        }
         if (amountNum <= 0) {
             showToast('error', 'Payment amount must be greater than zero.');
             return;
@@ -4197,48 +4158,26 @@ function RecordPaymentModal({ transaction, isOpen, onClose, onSuccess, onOpenRec
                             </div>
                         </div>
 
-                        {/* 24h Floor Window Status Banner */}
-                        {ageInfo.isWithin24h ? (
-                            <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                background: 'rgba(16, 185, 129, 0.08)',
-                                border: '1px solid rgba(16, 185, 129, 0.3)',
-                                borderRadius: '8px',
-                                padding: '8px 14px',
-                                marginBottom: '14px',
-                                fontSize: '12px'
-                            }}>
-                                <span style={{ color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <i className="material-icons" style={{ fontSize: '16px' }}>schedule</i>
-                                    24-Hour Live Floor Window Active
-                                </span>
-                                <span style={{ color: 'var(--text-secondary)', fontSize: '11px', fontWeight: 600 }}>
-                                    {ageInfo.remainingHours >= 1 
-                                        ? `${Math.floor(ageInfo.remainingHours)}h ${Math.round((ageInfo.remainingHours % 1) * 60)}m remaining`
-                                        : `${Math.max(1, Math.round(ageInfo.remainingHours * 60))}m remaining`}
-                                </span>
-                            </div>
-                        ) : (
-                            <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                background: 'rgba(239, 68, 68, 0.08)',
-                                border: '1px solid rgba(239, 68, 68, 0.3)',
-                                borderRadius: '8px',
-                                padding: '10px 14px',
-                                marginBottom: '14px',
-                                fontSize: '12px',
-                                color: 'var(--danger)'
-                            }}>
-                                <i className="material-icons" style={{ fontSize: '18px' }}>lock_clock</i>
-                                <span>
-                                    <strong>24-Hour Window Expired:</strong> This auction entry was recorded on {ageInfo.formattedDate}. Floor settlement is locked; please record balance settlements through Cathedral Promises & Dues.
-                                </span>
-                            </div>
-                        )}
+                        {/* Settlement Status Banner */}
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            background: 'rgba(123, 31, 162, 0.08)',
+                            border: '1px solid rgba(123, 31, 162, 0.25)',
+                            borderRadius: '8px',
+                            padding: '10px 14px',
+                            marginBottom: '14px',
+                            fontSize: '12px'
+                        }}>
+                            <span style={{ color: 'var(--primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <i className="material-icons" style={{ fontSize: '16px' }}>payments</i>
+                                Live Floor Settlement Desk • Date: {ageInfo.formattedDate || formatDateDMY(transaction.auction_date)}
+                            </span>
+                            <span style={{ color: 'var(--danger)', fontSize: '12px', fontWeight: 700 }}>
+                                Outstanding Balance: BHD {maxBalance.toFixed(3)}
+                            </span>
+                        </div>
 
                         {/* 2. Winning Bidder Details Card (Live Auction Style) */}
                         <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '14px 18px', borderRadius: '10px', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
@@ -4475,11 +4414,11 @@ function RecordPaymentModal({ transaction, isOpen, onClose, onSuccess, onOpenRec
                         <button 
                             type="submit" 
                             className="btn gradient-45deg-green-teal gradient-shadow white-text btn-lg" 
-                            disabled={submitting || !ageInfo.isWithin24h || amountNum <= 0 || isOverpaying || !selectedDr || !selectedCr}
-                            style={{ minWidth: '240px', opacity: !ageInfo.isWithin24h ? 0.6 : 1 }}
+                            disabled={submitting || amountNum <= 0 || isOverpaying || !selectedDr || !selectedCr}
+                            style={{ minWidth: '240px' }}
                         >
                             <i className="material-icons" style={{ fontSize: '18px' }}>check_circle</i>
-                            {submitting ? 'Recording Settlement...' : !ageInfo.isWithin24h ? '24h Window Expired' : `Confirm Settlement & Generate Receipt (${amountNum > 0 ? 'BHD ' + amountNum.toFixed(3) : ''})`}
+                            {submitting ? 'Recording Settlement...' : `Confirm Settlement & Generate Receipt (${amountNum > 0 ? 'BHD ' + amountNum.toFixed(3) : ''})`}
                         </button>
                     </div>
                 </form>
@@ -5136,6 +5075,41 @@ function PromisesView({ year, showToast, onOpenReceipt, refreshTrigger, onDataCh
                                     {p.promise_status}
                                 </span>
                             )
+                        },
+                        {
+                            header: 'Actions',
+                            id: 'actions',
+                            sortable: false,
+                            headerStyle: { textAlign: 'right' },
+                            style: { textAlign: 'right', whiteSpace: 'nowrap' },
+                            footer: () => null,
+                            render: (p) => {
+                                const bal = Number(p.balance_amount) || 0;
+                                if (bal <= 0.0001) {
+                                    return <span className="badge badge-success" style={{ fontSize: '11px' }}>Fulfilled</span>;
+                                }
+
+                                return (
+                                    <button 
+                                        type="button"
+                                        className="btn gradient-45deg-purple-deep-orange gradient-shadow white-text btn-sm" 
+                                        style={{ 
+                                            fontSize: '12px', 
+                                            padding: '4px 10px', 
+                                            height: '30px',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '5px',
+                                            boxShadow: '0 2px 6px rgba(123, 31, 162, 0.28)',
+                                            cursor: 'pointer'
+                                        }}
+                                        onClick={() => setPaymentModalData(p)}
+                                        title={`Pay Due: BHD ${bal.toFixed(3)} outstanding`}
+                                    >
+                                        <i className="material-icons" style={{ fontSize: '15px' }}>payments</i> Pay Due
+                                    </button>
+                                );
+                            }
                         }
                     ]}
                     data={promises}

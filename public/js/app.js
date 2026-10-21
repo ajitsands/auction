@@ -5284,41 +5284,6 @@ function PromisesView({ year, showToast, onOpenReceipt, refreshTrigger, onDataCh
                                     {p.promise_status}
                                 </span>
                             )
-                        },
-                        {
-                            header: 'Actions',
-                            id: 'actions',
-                            sortable: false,
-                            headerStyle: { textAlign: 'right' },
-                            style: { textAlign: 'right', whiteSpace: 'nowrap' },
-                            footer: () => null,
-                            render: (p) => {
-                                const bal = Number(p.balance_amount) || 0;
-                                if (bal <= 0.0001) {
-                                    return <span className="badge badge-success" style={{ fontSize: '11px' }}>Fulfilled</span>;
-                                }
-
-                                return (
-                                    <button 
-                                        type="button"
-                                        className="btn gradient-45deg-purple-deep-orange gradient-shadow white-text btn-sm" 
-                                        style={{ 
-                                            fontSize: '12px', 
-                                            padding: '4px 10px', 
-                                            height: '30px',
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            gap: '5px',
-                                            boxShadow: '0 2px 6px rgba(123, 31, 162, 0.28)',
-                                            cursor: 'pointer'
-                                        }}
-                                        onClick={() => setPaymentModalData(p)}
-                                        title={`Pay Due: BHD ${bal.toFixed(3)} outstanding`}
-                                    >
-                                        <i className="material-icons" style={{ fontSize: '15px' }}>payments</i> Pay Due
-                                    </button>
-                                );
-                            }
                         }
                     ]}
                     data={promises}

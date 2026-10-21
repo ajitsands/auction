@@ -76,7 +76,9 @@ CREATE TABLE IF NOT EXISTS `hf_auction_transactions` (
   PRIMARY KEY (`transaction_id`),
   UNIQUE KEY `auction_ref_no` (`auction_ref_no`),
   KEY `idx_article` (`article_id`),
-  KEY `idx_year_buyer` (`applicable_year`,`buyer_member_id`)
+  KEY `idx_year_buyer` (`applicable_year`,`buyer_member_id`),
+  KEY `idx_offering_type` (`offering_type`),
+  KEY `idx_year_offering` (`applicable_year`,`offering_type`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ------------------------------------------------------------------------------
@@ -179,8 +181,14 @@ ALTER TABLE `acc_promises` ADD INDEX `idx_article_id` (`article_id`);
 ALTER TABLE `acc_ledger_entries` ADD COLUMN `article_id` int(11) DEFAULT 0;
 ALTER TABLE `acc_ledger_entries` ADD INDEX `idx_article_id` (`article_id`);
 
+-- ------------------------------------------------------------------------------
+-- 7.1 Special Offerings (Gold & Bed Sheet) Schema Extension
+-- Run these queries on existing databases to upgrade for Special Offerings:
+-- ------------------------------------------------------------------------------
 ALTER TABLE `hf_auction_transactions` ADD COLUMN `offering_type` varchar(50) DEFAULT 'Auction';
 ALTER TABLE `hf_auction_transactions` ADD COLUMN `item_description` text DEFAULT NULL;
+ALTER TABLE `hf_auction_transactions` ADD INDEX `idx_offering_type` (`offering_type`);
+ALTER TABLE `hf_auction_transactions` ADD INDEX `idx_year_offering` (`applicable_year`, `offering_type`);
 
 -- ------------------------------------------------------------------------------
 -- 8. Seed Default Categories

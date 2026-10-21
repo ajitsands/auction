@@ -1062,16 +1062,26 @@ function DashboardView({ stats, year, onNavigate, onOpenNewArticle, onOpenImport
                         </div>
 
                         {/* Special Offerings Total Strip & Link */}
-                        <div style={{ marginTop: '20px', paddingTop: '14px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
+                        <div style={{ marginTop: '20px', paddingTop: '14px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', flexWrap: 'wrap', gap: '8px' }}>
                             <span style={{ color: 'var(--text-muted)' }}>
                                 Collected: <strong style={{ color: 'var(--success)' }}>BHD {totalOfferingsPaid.toFixed(3)}</strong> ({offeringsRecoveryPct}%)
                             </span>
-                            <span 
-                                style={{ color: '#d97706', cursor: 'pointer', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }} 
-                                onClick={() => onNavigate && onNavigate('offerings')}
-                            >
-                                Special Offerings Desk &rarr;
-                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                                <span 
+                                    style={{ color: '#d97706', cursor: 'pointer', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }} 
+                                    onClick={() => onNavigate && onNavigate('offerings')}
+                                    title="Open Special Offerings Desk"
+                                >
+                                    Offerings Desk &rarr;
+                                </span>
+                                <span 
+                                    style={{ color: 'var(--primary)', cursor: 'pointer', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }} 
+                                    onClick={() => onNavigate && onNavigate('reports', 'offerings')}
+                                    title="View Special Offerings Reports & Member Ledger"
+                                >
+                                    Reports &rarr;
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -7314,11 +7324,1261 @@ function PromisesView({ year, showToast, onOpenReceipt, refreshTrigger, onDataCh
     );
 }
 
+// --- Special Offerings Reports View (Gold & Bed Sheet) ---
+function SpecialOfferingsReportsView({ year, showToast, refreshTrigger }) {
+    const [offeringsSummary, setOfferingsSummary] = useState(null);
+    const [offeringsDevotees, setOfferingsDevotees] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [offeringTypeFilter, setOfferingTypeFilter] = useState('all');
+    const [offeringStatusFilter, setOfferingStatusFilter] = useState('all');
+
+    const fetchOfferingsReports = () => {
+        setLoading(true);
+        Promise.all([
+            api.get(`/api/reports/offerings-summary?year=${year}`),
+            api.get(`/api/reports/offerings-devotees?year=${year}`)
+        ]).then(([sumRes, devRes]) => {
+            if (sumRes.success) setOfferingsSummary(sumRes.summary);
+            if (devRes.success) setOfferingsDevotees(devRes.devotees);
+        }).catch(err => {
+            showToast('error', err.message);
+        }).finally(() => setLoading(false));
+    };
+
+    useEffect(() => {
+        fetchOfferingsReports();
+    }, [year, refreshTrigger]);
+
+    const exportOfferingsReport = () => {
+        if (!offeringsDevotees.length) {
+            showToast('info', 'No offerings member records to export.');
+            return;
+        }
+        const rows = offeringsDevotees.map((d, idx) => ({
+            'SL No': idx + 1,
+            'Member Details': d.buyer_name,
+            'Roll No': d.buyer_code_c || 'N/A',
+            'CPR': d.cpr_no || 'N/A',
+            'Phone': d.buyer_phone || 'N/A',
+            'Prayer Group': d.prayer_group_name || 'N/A',
+            'Offerings Count': d.offerings_count || (Array.isArray(d.items) ? d.items.length : 0),
+            'Offerings Details': Array.isArray(d.items) && d.items.length > 0
+                ? d.items.map(i => `[${i.auction_ref_no || (i.offering_type === 'Gold' ? 'GLD' : 'BED')}] ${i.offering_type} Offering: ${i.item_description || ''} (${Number(i.winning_bid_amount || 0).toFixed(3)} BHD) - ${i.payment_status}${i.receipt_no ? ' [RCP: ' + i.receipt_no + ']' : ''}`).join('; ')
+                : (d.offerings_count || 0),
+            'Total Offered (BHD)': Number(d.total_offered || 0).toFixed(3),
+            'Total Paid (BHD)': Number(d.total_paid || 0).toFixed(3),
+            'Balance Due (BHD)': Number(d.total_balance || 0).toFixed(3),
+            'Status': d.overall_status
+        }));
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, `Special_Offerings_${year}`);
+        XLSX.writeFile(wb, `cathedral_special_offerings_ledger_${year}.xlsx`);
+    };
+
+    const handlePrintOfferingsReport = () => {
+        if (!offeringsSummary) {
+            showToast('info', 'Special Offerings report data is still loading...');
+            return;
+        }
+
+        const oldIframe = document.getElementById('hf-offerings-report-print-frame');
+        if (oldIframe) {
+            oldIframe.remove();
+        }
+
+        const iframe = document.createElement('iframe');
+        iframe.id = 'hf-offerings-report-print-frame';
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '10px';
+        iframe.style.height = '10px';
+        iframe.style.border = '0';
+        iframe.style.opacity = '0.01';
+        iframe.style.pointerEvents = 'none';
+        iframe.style.zIndex = '-999';
+        document.body.appendChild(iframe);
+
+        const printDate = new Date().toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        const cats = offeringsSummary.category_breakdown || [];
+        const catTotalCount = cats.reduce((sum, c) => sum + (Number(c.offerings_count) || 0), 0);
+        const catTotalSettled = cats.reduce((sum, c) => sum + (Number(c.settled_count) || 0), 0);
+        const catTotalPartial = cats.reduce((sum, c) => sum + (Number(c.partial_count) || 0), 0);
+        const catTotalPending = cats.reduce((sum, c) => sum + (Number(c.pending_count) || 0), 0);
+        const catTotalOffered = cats.reduce((sum, c) => sum + (Number(c.total_offering_val) || 0), 0);
+        const catTotalCollected = cats.reduce((sum, c) => sum + (Number(c.total_collected_val) || 0), 0);
+        const catTotalBalance = cats.reduce((sum, c) => sum + (Number(c.total_balance_val) || 0), 0);
+
+        const devoteeTotalOffered = offeringsDevotees.reduce((sum, d) => sum + (Number(d.total_offered) || 0), 0);
+        const devoteeTotalPaid = offeringsDevotees.reduce((sum, d) => sum + (Number(d.total_paid) || 0), 0);
+        const devoteeTotalBalance = offeringsDevotees.reduce((sum, d) => sum + (Number(d.total_balance) || 0), 0);
+
+        const categoryRowsHtml = cats.map((c, idx) => `
+            <tr>
+                <td style="text-align: center;">${idx + 1}</td>
+                <td style="font-weight: bold;">
+                    ${c.offering_code === 'Gold' ? '⭐ ' : '🛏️ '}${c.category}
+                </td>
+                <td style="text-align: center;">${c.offerings_count || 0}</td>
+                <td style="text-align: center; color: #2e7d32; font-weight: bold;">${c.settled_count || 0}</td>
+                <td style="text-align: center; color: #e65100;">${c.partial_count || 0}</td>
+                <td style="text-align: center; color: #c62828;">${c.pending_count || 0}</td>
+                <td style="text-align: right; font-weight: bold; padding-right: 6px;">${Number(c.total_offering_val || 0).toFixed(3)}</td>
+                <td style="text-align: right; color: #2e7d32; font-weight: 600; padding-right: 6px;">${Number(c.total_collected_val || 0).toFixed(3)}</td>
+                <td style="text-align: right; font-weight: bold; color: ${Number(c.total_balance_val) > 0 ? '#c62828' : '#222'}; padding-right: 6px;">${Number(c.total_balance_val || 0).toFixed(3)}</td>
+            </tr>
+        `).join('');
+
+        const devoteeRowsHtml = offeringsDevotees.map((d, idx) => {
+            const itemsStr = Array.isArray(d.items) && d.items.length > 0 
+                ? d.items.map(i => `
+                    <div style="margin-bottom: 3px; line-height: 1.35;">
+                        <strong style="color: ${i.offering_type === 'Gold' ? '#b45309' : '#1d4ed8'};">[${i.auction_ref_no || i.offering_type}]</strong>
+                        <span>${i.item_description || (i.offering_type + ' Offering')}</span>
+                        <span style="color: #666; font-size: 9px; white-space: nowrap;"> (${Number(i.winning_bid_amount || 0).toFixed(3)} BHD)</span>
+                        ${i.receipt_no ? `<span style="display: inline-block; font-size: 8.5px; padding: 1px 4px; background: #e0f2fe; color: #0369a1; border-radius: 3px; margin-left: 3px;">RCP #${i.receipt_no}</span>` : ''}
+                    </div>
+                `).join('')
+                : `<span>${d.offerings_count || 0} Offering(s)</span>`;
+            
+            const statusColor = d.overall_status === 'Paid' ? '#2e7d32' : d.overall_status === 'Partial' ? '#e65100' : '#c62828';
+            const statusBg = d.overall_status === 'Paid' ? '#e8f5e9' : d.overall_status === 'Partial' ? '#fff3e0' : '#ffebee';
+
+            return `
+                <tr>
+                    <td style="text-align: center; vertical-align: top;">${idx + 1}</td>
+                    <td style="font-weight: bold; vertical-align: top; word-break: break-word;">
+                        ${d.buyer_name}
+                        ${d.prayer_group_name && d.prayer_group_name !== 'NA' ? `<br><small style="color: #666; font-weight: normal; font-size: 9px;">${d.prayer_group_name}</small>` : ''}
+                    </td>
+                    <td style="text-align: center; vertical-align: top;">${d.buyer_code_c || 'N/A'}</td>
+                    <td style="text-align: center; vertical-align: top;">${d.buyer_phone || '—'}</td>
+                    <td style="font-size: 10px; vertical-align: top; text-align: left;">${itemsStr}</td>
+                    <td style="text-align: right; font-weight: bold; vertical-align: top; white-space: nowrap; padding-right: 8px;">${Number(d.total_offered || 0).toFixed(3)}</td>
+                    <td style="text-align: right; color: #2e7d32; font-weight: 600; vertical-align: top; white-space: nowrap; padding-right: 8px;">${Number(d.total_paid || 0).toFixed(3)}</td>
+                    <td style="text-align: right; font-weight: bold; color: ${Number(d.total_balance) > 0 ? '#c62828' : '#222'}; vertical-align: top; white-space: nowrap; padding-right: 8px;">${Number(d.total_balance || 0).toFixed(3)}</td>
+                    <td style="text-align: center; vertical-align: top; white-space: nowrap;">
+                        <span style="display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: bold; background: ${statusBg}; color: ${statusColor};">
+                            ${d.overall_status}
+                        </span>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        const printHtml = `<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Special Offerings Official Report (${year})</title>
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 8mm 8mm;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: #ffffff;
+            color: #000000;
+            font-family: Arial, "Helvetica Neue", sans-serif;
+            font-size: 10.5px;
+            line-height: 1.3;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .report-header {
+            text-align: center;
+            border-bottom: 2px solid #000000;
+            padding-bottom: 6px;
+            margin-bottom: 10px;
+        }
+        .report-header img {
+            height: 38px;
+            max-width: 360px;
+            object-fit: contain;
+            margin-bottom: 4px;
+        }
+        .report-title {
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 2px 0;
+            color: #111111;
+        }
+        .report-subtitle {
+            font-size: 11px;
+            color: #444444;
+            margin: 2px 0 4px 0;
+        }
+        .report-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: #555555;
+            margin-top: 5px;
+            padding-top: 4px;
+            border-top: 1px dashed #cccccc;
+        }
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .kpi-card {
+            border: 1px solid #777777;
+            border-radius: 5px;
+            padding: 6px 8px;
+            background: #fafafa;
+            text-align: center;
+        }
+        .kpi-title {
+            font-size: 9px;
+            text-transform: uppercase;
+            font-weight: bold;
+            color: #555555;
+            margin-bottom: 2px;
+        }
+        .kpi-val {
+            font-size: 13.5px;
+            font-weight: bold;
+            color: #000000;
+        }
+        h4.section-title {
+            font-size: 11.5px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin: 10px 0 4px 0;
+            padding-bottom: 2px;
+            border-bottom: 1.5px solid #444444;
+            color: #000000;
+        }
+        table.report-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10px;
+            margin-bottom: 12px;
+            table-layout: fixed;
+        }
+        table.report-table th, table.report-table td {
+            box-sizing: border-box;
+        }
+        table.report-table th {
+            background-color: #f1f5f9 !important;
+            color: #000000 !important;
+            font-weight: bold;
+            border: 1px solid #94a3b8;
+            padding: 4px 5px;
+            text-align: left;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        table.report-table td {
+            border: 1px solid #cbd5e1;
+            padding: 4px 5px;
+        }
+        table.report-table tr:nth-child(even) td {
+            background-color: #f8fafc;
+        }
+        table.report-table tfoot td {
+            background-color: #e2e8f0 !important;
+            font-weight: bold;
+            border: 1px solid #94a3b8;
+            padding: 4px 5px;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        tr {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+    </style>
+</head>
+<body>
+    <div class="report-header">
+        <img src="/images/logo/red_full_logo.png" alt="St. Mary's Indian Orthodox Cathedral" onerror="this.src='/images/logo/login-page-logo.png'">
+        <div class="report-title">Harvest Festival — Special Offerings Official Sales & Financial Report</div>
+        <div class="report-subtitle">Gold & Bed Sheet Special Offerings Settlement, Member Ledger & Collections</div>
+        <div class="report-meta">
+            <div><strong>Year:</strong> ${year}</div>
+            <div><strong>Total Members:</strong> ${offeringsSummary.total_members || offeringsSummary.total_devotees || 0} (${offeringsSummary.total_offerings_count || 0} Offerings)</div>
+            <div><strong>Report Generated:</strong> ${printDate}</div>
+        </div>
+    </div>
+
+    <!-- KPI Summary Cards -->
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-title">Special Offerings Revenue</div>
+            <div class="kpi-val" style="color: #b45309;">BHD ${Number(offeringsSummary.total_offerings_revenue || 0).toFixed(3)}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-title">Cash Collections (Paid)</div>
+            <div class="kpi-val" style="color: #2e7d32;">BHD ${Number(offeringsSummary.total_collected_amount || 0).toFixed(3)}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-title">Outstanding Receivables</div>
+            <div class="kpi-val" style="color: #c62828;">BHD ${Number(offeringsSummary.total_receivable_promises || 0).toFixed(3)}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-title">Total Members / Offerings</div>
+            <div class="kpi-val">${offeringsSummary.total_members || offeringsSummary.total_devotees || 0} Members / ${offeringsSummary.total_offerings_count || 0} Offerings</div>
+        </div>
+    </div>
+
+    <!-- Category Breakdown Table -->
+    <h4 class="section-title">Offering Category Performance Summary</h4>
+    <table class="report-table">
+        <thead>
+            <tr>
+                <th style="width: 5%; text-align: center; vertical-align: middle;">#</th>
+                <th style="width: 25%; text-align: left; vertical-align: middle;">Offering Category</th>
+                <th style="width: 10%; text-align: center; vertical-align: middle;">Total Offerings</th>
+                <th style="width: 10%; text-align: center; vertical-align: middle;">Settled</th>
+                <th style="width: 10%; text-align: center; vertical-align: middle;">Partial</th>
+                <th style="width: 10%; text-align: center; vertical-align: middle;">Pending</th>
+                <th style="width: 15%; text-align: right; vertical-align: middle; padding-right: 6px;">Total Value (BHD)</th>
+                <th style="width: 15%; text-align: right; vertical-align: middle; padding-right: 6px;">Collected (BHD)</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${categoryRowsHtml || '<tr><td colspan="8" style="text-align: center;">No special offerings recorded.</td></tr>'}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="2" style="text-align: right; font-weight: bold;">Grand Total:</td>
+                <td style="text-align: center; font-weight: bold;">${catTotalCount}</td>
+                <td style="text-align: center; font-weight: bold; color: #2e7d32;">${catTotalSettled}</td>
+                <td style="text-align: center; font-weight: bold; color: #e65100;">${catTotalPartial}</td>
+                <td style="text-align: center; font-weight: bold; color: #c62828;">${catTotalPending}</td>
+                <td style="text-align: right; font-weight: bold; padding-right: 6px;">${catTotalOffered.toFixed(3)}</td>
+                <td style="text-align: right; font-weight: bold; color: #2e7d32; padding-right: 6px;">${catTotalCollected.toFixed(3)}</td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <!-- Member Settlement Ledger -->
+    <h4 class="section-title">Member Settlement Ledger</h4>
+    <table class="report-table">
+        <thead>
+            <tr>
+                <th style="width: 3%; text-align: center; vertical-align: middle;">#</th>
+                <th style="width: 18%; text-align: left; vertical-align: middle;">Member Details</th>
+                <th style="width: 6%; text-align: center; vertical-align: middle;">Roll No</th>
+                <th style="width: 9%; text-align: center; vertical-align: middle;">Phone</th>
+                <th style="width: 31%; text-align: left; vertical-align: middle;">Offerings & Receipts</th>
+                <th style="width: 10%; text-align: right; vertical-align: middle; padding-right: 8px;">Total Offered<br><span style="font-size: 8.5px; font-weight: normal; color: #444;">(BHD)</span></th>
+                <th style="width: 10%; text-align: right; vertical-align: middle; padding-right: 8px;">Total Paid<br><span style="font-size: 8.5px; font-weight: normal; color: #444;">(BHD)</span></th>
+                <th style="width: 8%; text-align: right; vertical-align: middle; padding-right: 8px;">Balance<br><span style="font-size: 8.5px; font-weight: normal; color: #444;">(BHD)</span></th>
+                <th style="width: 5%; text-align: center; vertical-align: middle;">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${devoteeRowsHtml || '<tr><td colspan="9" style="text-align: center;">No member records found.</td></tr>'}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="5" style="text-align: right; font-weight: bold;">Grand Totals (${offeringsDevotees.length} Members):</td>
+                <td style="text-align: right; white-space: nowrap; font-weight: bold; padding-right: 8px;">${devoteeTotalOffered.toFixed(3)}</td>
+                <td style="text-align: right; color: #2e7d32; white-space: nowrap; font-weight: bold; padding-right: 8px;">${devoteeTotalPaid.toFixed(3)}</td>
+                <td style="text-align: right; color: ${devoteeTotalBalance > 0 ? '#c62828' : '#222'}; white-space: nowrap; font-weight: bold; padding-right: 8px;">${devoteeTotalBalance.toFixed(3)}</td>
+                <td></td>
+            </tr>
+        </tfoot>
+    </table>
+</body>
+</html>`;
+
+        const doc = iframe.contentWindow.document;
+        doc.open();
+        doc.write(printHtml);
+        doc.close();
+
+        let printed = false;
+        const doPrint = () => {
+            if (printed) return;
+            printed = true;
+            try {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+            } catch (err) {
+                console.error("Iframe print error:", err);
+                window.print();
+            }
+        };
+
+        setTimeout(doPrint, 350);
+        iframe.onload = doPrint;
+    };
+
+    const filteredDevotees = useMemo(() => {
+        return (offeringsDevotees || []).filter(d => {
+            if (offeringTypeFilter !== 'all') {
+                const hasMatchingType = Array.isArray(d.items) && d.items.some(i => i.offering_type === offeringTypeFilter);
+                if (!hasMatchingType) return false;
+            }
+            if (offeringStatusFilter !== 'all') {
+                if (d.overall_status !== offeringStatusFilter) return false;
+            }
+            return true;
+        }).map(d => {
+            if (offeringTypeFilter !== 'all' && Array.isArray(d.items)) {
+                return {
+                    ...d,
+                    items: d.items.filter(i => i.offering_type === offeringTypeFilter)
+                };
+            }
+            return d;
+        });
+    }, [offeringsDevotees, offeringTypeFilter, offeringStatusFilter]);
+
+    return (
+        <div>
+            {/* Header Card with KPIs & Actions */}
+            <div className="card" style={{ marginBottom: '28px' }}>
+                <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '18px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ 
+                            width: '42px', 
+                            height: '42px', 
+                            borderRadius: '10px', 
+                            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center', 
+                            boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)' 
+                        }}>
+                            <i className="material-icons" style={{ fontSize: '24px', color: '#ffffff' }}>volunteer_activism</i>
+                        </div>
+                        <div>
+                            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--primary)' }}>
+                                Special Offerings Sales & Financial Reports ({year})
+                            </h3>
+                            <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
+                                Annual Cathedral Gold & Bed Sheet Offerings Summary, Member Settlement & Collections
+                            </p>
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <button 
+                            type="button" 
+                            className="btn btn-secondary btn-sm" 
+                            onClick={fetchOfferingsReports} 
+                            title="Reload Offerings Report Data"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        >
+                            <i className="material-icons" style={{ fontSize: '16px' }}>refresh</i> Reload
+                        </button>
+                        <button className="btn btn-excel btn-sm" onClick={exportOfferingsReport}>
+                            <i className="material-icons">file_download</i> Export Excel Ledger
+                        </button>
+                        <button 
+                            className="btn btn-sm" 
+                            onClick={handlePrintOfferingsReport}
+                            style={{ 
+                                background: 'linear-gradient(135deg, #d97706 0%, #b45309 100%)', 
+                                borderColor: '#b45309', 
+                                color: '#ffffff',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                            }}
+                        >
+                            <i className="material-icons">print</i> Print Report
+                        </button>
+                    </div>
+                </div>
+
+                <div className="card-body">
+                    {loading ? (
+                        <div style={{ textAlign: 'center', padding: '30px' }}><div className="spinner" style={{ margin: '0 auto' }}></div></div>
+                    ) : offeringsSummary && (
+                        <div>
+                            {/* 4 Financial Stat Cards */}
+                            <div className="stats-grid">
+                                <div className="stat-card">
+                                    <div className="stat-info-col">
+                                        <span className="stat-title">Offerings Revenue</span>
+                                        <div className="stat-value" style={{ color: '#b45309' }}>
+                                            BHD {Number(offeringsSummary.total_offerings_revenue || 0).toFixed(3)}
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
+                                            <span style={{ fontSize: '10px', background: 'rgba(245, 158, 11, 0.15)', color: '#d97706', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                                                Gold: BHD {Number(offeringsSummary.gold_revenue || 0).toFixed(3)}
+                                            </span>
+                                            <span style={{ fontSize: '10px', background: 'rgba(59, 130, 246, 0.15)', color: '#2563eb', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                                                Bed: BHD {Number(offeringsSummary.bedsheet_revenue || 0).toFixed(3)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <i className="material-icons background-round gradient-45deg-amber-amber gradient-shadow white-text">volunteer_activism</i>
+                                </div>
+
+                                <div className="stat-card">
+                                    <div className="stat-info-col">
+                                        <span className="stat-title">Cash Collections (Paid)</span>
+                                        <div className="stat-value" style={{ color: 'var(--success)' }}>
+                                            BHD {Number(offeringsSummary.total_collected_amount || 0).toFixed(3)}
+                                        </div>
+                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                            Recovery: <strong>{Number(offeringsSummary.total_offerings_revenue) > 0 ? ((Number(offeringsSummary.total_collected_amount) / Number(offeringsSummary.total_offerings_revenue)) * 100).toFixed(1) : 0}%</strong>
+                                        </div>
+                                    </div>
+                                    <i className="material-icons background-round gradient-45deg-green-teal gradient-shadow white-text">check_circle</i>
+                                </div>
+
+                                <div className="stat-card">
+                                    <div className="stat-info-col">
+                                        <span className="stat-title">Outstanding Receivables</span>
+                                        <div className="stat-value" style={{ color: 'var(--danger)' }}>
+                                            BHD {Number(offeringsSummary.total_receivable_promises || 0).toFixed(3)}
+                                        </div>
+                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                            Pending Settlement
+                                        </div>
+                                    </div>
+                                    <i className="material-icons background-round gradient-45deg-purple-deep-orange gradient-shadow white-text">account_balance_wallet</i>
+                                </div>
+
+                                <div className="stat-card">
+                                    <div className="stat-info-col">
+                                        <span className="stat-title">Total Members / Offerings</span>
+                                        <div className="stat-value">
+                                            {offeringsSummary.total_members || offeringsSummary.total_devotees || 0} Members
+                                        </div>
+                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                            {offeringsSummary.total_offerings_count || 0} Total Offerings
+                                        </div>
+                                    </div>
+                                    <i className="material-icons background-round gradient-45deg-light-blue-cyan gradient-shadow white-text">groups</i>
+                                </div>
+                            </div>
+
+                            {/* Category Performance Breakdown Table */}
+                            <h4 style={{ fontSize: '15px', marginTop: '28px', marginBottom: '14px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <i className="material-icons" style={{ fontSize: '20px', color: '#f59e0b' }}>category</i>
+                                Special Offerings Category Performance Summary
+                            </h4>
+
+                            <DataTable 
+                                columns={[
+                                    {
+                                        header: 'SL No',
+                                        id: 'sl_no',
+                                        searchable: false,
+                                        sortable: false,
+                                        headerStyle: { width: '60px', textAlign: 'center' },
+                                        style: { textAlign: 'center', width: '60px', fontWeight: 600, color: 'var(--text-muted)' },
+                                        render: (c, index) => <span style={{ fontSize: '12px' }}>{index + 1}</span>
+                                    },
+                                    {
+                                        header: 'Offering Category',
+                                        accessor: 'category',
+                                        sortable: true,
+                                        render: (c) => (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <span style={{ 
+                                                    display: 'inline-flex', 
+                                                    alignItems: 'center', 
+                                                    justifyContent: 'center', 
+                                                    width: '28px', 
+                                                    height: '28px', 
+                                                    borderRadius: '6px',
+                                                    background: c.offering_code === 'Gold' ? 'rgba(245, 158, 11, 0.18)' : 'rgba(59, 130, 246, 0.18)',
+                                                    color: c.offering_code === 'Gold' ? '#d97706' : '#2563eb'
+                                                }}>
+                                                    <i className="material-icons" style={{ fontSize: '16px' }}>
+                                                        {c.offering_code === 'Gold' ? 'stars' : 'layers'}
+                                                    </i>
+                                                </span>
+                                                <strong style={{ color: 'var(--text-primary)', fontSize: '14px' }}>
+                                                    {c.category}
+                                                </strong>
+                                            </div>
+                                        )
+                                    },
+                                    {
+                                        header: 'Total Offerings',
+                                        accessor: 'offerings_count',
+                                        sortable: true,
+                                        sortValue: (c) => Number(c.offerings_count) || 0,
+                                        render: (c) => <strong>{c.offerings_count}</strong>
+                                    },
+                                    {
+                                        header: 'Settled (Paid)',
+                                        accessor: 'settled_count',
+                                        sortable: true,
+                                        sortValue: (c) => Number(c.settled_count) || 0,
+                                        render: (c) => <span className="badge badge-success">{c.settled_count || 0}</span>
+                                    },
+                                    {
+                                        header: 'Partial',
+                                        accessor: 'partial_count',
+                                        sortable: true,
+                                        sortValue: (c) => Number(c.partial_count) || 0,
+                                        render: (c) => <span className="badge badge-warning">{c.partial_count || 0}</span>
+                                    },
+                                    {
+                                        header: 'Pending',
+                                        accessor: 'pending_count',
+                                        sortable: true,
+                                        sortValue: (c) => Number(c.pending_count) || 0,
+                                        render: (c) => <span className="badge badge-danger">{c.pending_count || 0}</span>
+                                    },
+                                    {
+                                        header: 'Total Value (BHD)',
+                                        accessor: 'total_offering_val',
+                                        sortable: true,
+                                        sortValue: (c) => Number(c.total_offering_val) || 0,
+                                        render: (c) => <strong style={{ color: 'var(--primary)' }}>BHD {Number(c.total_offering_val || 0).toFixed(3)}</strong>
+                                    },
+                                    {
+                                        header: 'Collected (BHD)',
+                                        accessor: 'total_collected_val',
+                                        sortable: true,
+                                        sortValue: (c) => Number(c.total_collected_val) || 0,
+                                        render: (c) => <span style={{ color: 'var(--success)', fontWeight: 600 }}>BHD {Number(c.total_collected_val || 0).toFixed(3)}</span>
+                                    },
+                                    {
+                                        header: 'Balance Due (BHD)',
+                                        accessor: 'total_balance_val',
+                                        sortable: true,
+                                        sortValue: (c) => Number(c.total_balance_val) || 0,
+                                        render: (c) => (
+                                            <span style={{ color: Number(c.total_balance_val) > 0 ? 'var(--danger)' : 'var(--text-muted)', fontWeight: 600 }}>
+                                                BHD {Number(c.total_balance_val || 0).toFixed(3)}
+                                            </span>
+                                        )
+                                    }
+                                ]}
+                                data={offeringsSummary.category_breakdown || []}
+                                keyField="offering_code"
+                                initialPageSize={10}
+                                searchPlaceholder="Search offering categories..."
+                                emptyMessage="No special offerings category performance data."
+                            />
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Member Settlement Ledger Card */}
+            <div className="card">
+                <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <i className="material-icons" style={{ fontSize: '28px', color: '#f59e0b' }}>receipt_long</i>
+                        <div>
+                            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--primary)' }}>
+                                Member Settlement Ledger ({year})
+                            </h3>
+                            <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
+                                Member-wise offering commitments, receipts, and settlement balances
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Filter Bar */}
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        {/* Category Switcher */}
+                        <div style={{ display: 'flex', border: '1px solid var(--border-color)', borderRadius: '6px', overflow: 'hidden' }}>
+                            <button 
+                                type="button"
+                                onClick={() => setOfferingTypeFilter('all')}
+                                style={{ 
+                                    padding: '4px 10px', 
+                                    fontSize: '11px', 
+                                    fontWeight: 600, 
+                                    background: offeringTypeFilter === 'all' ? 'var(--primary)' : 'var(--bg-card)', 
+                                    color: offeringTypeFilter === 'all' ? '#ffffff' : 'var(--text-primary)',
+                                    border: 'none',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                All Offerings
+                            </button>
+                            <button 
+                                type="button"
+                                onClick={() => setOfferingTypeFilter('Gold')}
+                                style={{ 
+                                    padding: '4px 10px', 
+                                    fontSize: '11px', 
+                                    fontWeight: 600, 
+                                    background: offeringTypeFilter === 'Gold' ? '#d97706' : 'var(--bg-card)', 
+                                    color: offeringTypeFilter === 'Gold' ? '#ffffff' : '#d97706',
+                                    border: 'none',
+                                    borderLeft: '1px solid var(--border-color)',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Gold Only
+                            </button>
+                            <button 
+                                type="button"
+                                onClick={() => setOfferingTypeFilter('BedSheet')}
+                                style={{ 
+                                    padding: '4px 10px', 
+                                    fontSize: '11px', 
+                                    fontWeight: 600, 
+                                    background: offeringTypeFilter === 'BedSheet' ? '#2563eb' : 'var(--bg-card)', 
+                                    color: offeringTypeFilter === 'BedSheet' ? '#ffffff' : '#2563eb',
+                                    border: 'none',
+                                    borderLeft: '1px solid var(--border-color)',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Bed Sheet Only
+                            </button>
+                        </div>
+
+                        {/* Status Switcher */}
+                        <select 
+                            className="form-control" 
+                            value={offeringStatusFilter} 
+                            onChange={e => setOfferingStatusFilter(e.target.value)}
+                            style={{ width: 'auto', padding: '4px 8px', fontSize: '12px', height: '32px' }}
+                        >
+                            <option value="all">All Statuses</option>
+                            <option value="Paid">Paid (Settled)</option>
+                            <option value="Partial">Partial</option>
+                            <option value="Pending">Pending</option>
+                        </select>
+
+                        <button 
+                            type="button" 
+                            className="btn btn-secondary btn-sm" 
+                            onClick={fetchOfferingsReports} 
+                            title="Reload Member Data"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        >
+                            <i className="material-icons" style={{ fontSize: '16px' }}>refresh</i> Reload
+                        </button>
+                        <button className="btn btn-excel btn-sm" onClick={exportOfferingsReport}>
+                            <i className="material-icons">file_download</i> Export Excel
+                        </button>
+                    </div>
+                </div>
+
+                {/* DataTable for Member Ledger */}
+                <DataTable 
+                    columns={[
+                        {
+                            header: 'SL No',
+                            id: 'sl_no',
+                            searchable: false,
+                            sortable: false,
+                            headerStyle: { width: '60px', textAlign: 'center' },
+                            style: { textAlign: 'center', width: '60px', fontWeight: 600, color: 'var(--text-muted)' },
+                            render: (d, index) => <span style={{ fontSize: '12px' }}>{index + 1}</span>
+                        },
+                        {
+                            header: 'Member Details',
+                            accessor: 'buyer_name',
+                            sortable: true,
+                            render: (d) => (
+                                <div>
+                                    <strong style={{ color: 'var(--text-primary)', fontSize: '13.5px' }}>{d.buyer_name}</strong>
+                                    {d.prayer_group_name && d.prayer_group_name !== 'NA' && (
+                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '1px' }}>
+                                            <i className="material-icons" style={{ fontSize: '12px' }}>place</i>
+                                            <span>{d.prayer_group_name}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        },
+                        {
+                            header: 'Roll No',
+                            accessor: 'buyer_code_c',
+                            sortable: true,
+                            render: (d) => d.buyer_code_c ? <strong style={{ color: '#d97706' }}>{d.buyer_code_c}</strong> : 'N/A'
+                        },
+                        {
+                            header: 'CPR No',
+                            accessor: 'cpr_no',
+                            sortable: true,
+                            render: (d) => d.cpr_no || 'N/A'
+                        },
+                        {
+                            header: 'Contact Phone',
+                            accessor: 'buyer_phone',
+                            sortable: true,
+                            render: (d) => d.buyer_phone || 'N/A'
+                        },
+                        {
+                            header: 'Offerings Log',
+                            accessor: 'offerings_count',
+                            sortable: true,
+                            sortValue: (d) => Number(d.offerings_count) || (Array.isArray(d.items) ? d.items.length : 0),
+                            searchValue: (d) => {
+                                const itemsStr = Array.isArray(d.items) 
+                                    ? d.items.map(i => `${i.auction_ref_no || ''} ${i.offering_type || ''} ${i.item_description || ''} ${i.receipt_no || ''}`).join(' ') 
+                                    : '';
+                                return `${d.offerings_count || ''} ${itemsStr}`;
+                            },
+                            style: { minWidth: '280px' },
+                            render: (d) => (
+                                <div>
+                                    <div style={{ marginBottom: (Array.isArray(d.items) && d.items.length > 0) ? '6px' : '0' }}>
+                                        <span className="badge badge-secondary" style={{ fontWeight: 700, fontSize: '11px', letterSpacing: '0.3px' }}>
+                                            {Array.isArray(d.items) ? d.items.length : (d.offerings_count || 0)} {Array.isArray(d.items) && d.items.length === 1 ? 'Offering' : 'Offerings'}
+                                        </span>
+                                    </div>
+                                    {Array.isArray(d.items) && d.items.length > 0 && (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                            {d.items.map((it, idx) => (
+                                                <div 
+                                                    key={idx} 
+                                                    style={{ 
+                                                        fontSize: '12px', 
+                                                        lineHeight: '1.3',
+                                                        padding: '5px 8px',
+                                                        background: 'var(--bg-card, rgba(255, 255, 255, 0.04))',
+                                                        border: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
+                                                        borderRadius: '6px'
+                                                    }}
+                                                >
+                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', marginBottom: '3px', flexWrap: 'wrap' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                            <span style={{ 
+                                                                fontSize: '10px', 
+                                                                padding: '1px 6px', 
+                                                                fontWeight: 700, 
+                                                                borderRadius: '4px',
+                                                                background: it.offering_type === 'Gold' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(59, 130, 246, 0.2)',
+                                                                color: it.offering_type === 'Gold' ? '#b45309' : '#1d4ed8'
+                                                            }}>
+                                                                {it.auction_ref_no || (it.offering_type === 'Gold' ? 'GLD' : 'BED')}
+                                                            </span>
+                                                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                                                {it.auction_date || ''}
+                                                            </span>
+                                                        </div>
+                                                        {it.receipt_no && (
+                                                            <span style={{ 
+                                                                fontSize: '10px', 
+                                                                color: '#0369a1', 
+                                                                background: '#e0f2fe', 
+                                                                padding: '1px 5px', 
+                                                                borderRadius: '3px',
+                                                                fontWeight: 600
+                                                            }}>
+                                                                RCP #{it.receipt_no}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                        <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                                                            {it.item_description || (it.offering_type + ' Offering')}
+                                                        </span>
+                                                        <strong style={{ fontSize: '12px', color: 'var(--primary)' }}>
+                                                            BHD {Number(it.winning_bid_amount || 0).toFixed(3)}
+                                                        </strong>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        },
+                        {
+                            header: 'Total Offered',
+                            accessor: 'total_offered',
+                            sortable: true,
+                            sortValue: (d) => Number(d.total_offered) || 0,
+                            render: (d) => <strong>BHD {Number(d.total_offered || 0).toFixed(3)}</strong>
+                        },
+                        {
+                            header: 'Paid Amount',
+                            accessor: 'total_paid',
+                            sortable: true,
+                            sortValue: (d) => Number(d.total_paid) || 0,
+                            render: (d) => <span style={{ color: 'var(--success)', fontWeight: 600 }}>{Number(d.total_paid || 0).toFixed(3)}</span>
+                        },
+                        {
+                            header: 'Balance Due',
+                            accessor: 'total_balance',
+                            sortable: true,
+                            sortValue: (d) => Number(d.total_balance) || 0,
+                            render: (d) => (
+                                <span style={{ color: Number(d.total_balance) > 0 ? 'var(--danger)' : 'var(--text-muted)', fontWeight: 600 }}>
+                                    {Number(d.total_balance || 0).toFixed(3)}
+                                </span>
+                            )
+                        },
+                        {
+                            header: 'Status',
+                            accessor: 'overall_status',
+                            sortable: true,
+                            render: (d) => (
+                                <span className={`badge badge-${
+                                    d.overall_status === 'Paid' ? 'success' :
+                                    d.overall_status === 'Partial' ? 'warning' : 'danger'
+                                }`}>
+                                    {d.overall_status}
+                                </span>
+                            )
+                        }
+                    ]}
+                    data={filteredDevotees}
+                    loading={loading}
+                    keyField={(d, i) => `${d.buyer_name}_${d.buyer_code_c}_${i}`}
+                    initialPageSize={10}
+                    searchPlaceholder="Search by Member Details, Roll No, CPR, Phone, Ref No..."
+                    emptyMessage="No member records found for the selected criteria."
+                />
+            </div>
+        </div>
+    );
+}
+
+// --- Consolidated Festival Reports View ---
+function ConsolidatedReportsView({ year, summary, showToast, refreshTrigger, onSelectTab }) {
+    const [offeringsSummary, setOfferingsSummary] = useState(null);
+    const [liveSummary, setLiveSummary] = useState(summary);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (summary) setLiveSummary(summary);
+    }, [summary]);
+
+    const fetchSummary = () => {
+        setLoading(true);
+        const reqs = [api.get(`/api/reports/offerings-summary?year=${year}`)];
+        if (!summary) {
+            reqs.push(api.get(`/api/reports/summary?year=${year}`));
+        }
+
+        Promise.all(reqs)
+            .then(([offRes, sumRes]) => {
+                if (offRes && offRes.success) setOfferingsSummary(offRes.summary);
+                if (sumRes && sumRes.success) setLiveSummary(sumRes.summary);
+            })
+            .catch(err => {
+                showToast('error', err.message);
+            })
+            .finally(() => setLoading(false));
+    };
+
+    useEffect(() => {
+        fetchSummary();
+    }, [year, refreshTrigger]);
+
+    const activeSummary = summary || liveSummary;
+    const combinedTotalRevenue = (Number(activeSummary?.total_auction_revenue || 0) + Number(offeringsSummary?.total_offerings_revenue || 0));
+    const combinedTotalCollected = (Number(activeSummary?.total_collected_amount || 0) + Number(offeringsSummary?.total_collected_amount || 0));
+    const combinedTotalReceivables = (Number(activeSummary?.total_receivable_promises || 0) + Number(offeringsSummary?.total_receivable_promises || 0));
+    const combinedRecoveryRate = combinedTotalRevenue > 0 ? ((combinedTotalCollected / combinedTotalRevenue) * 100).toFixed(1) : 0;
+
+    return (
+        <div className="card" style={{ marginBottom: '28px' }}>
+            <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '18px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ 
+                        width: '42px', 
+                        height: '42px', 
+                        borderRadius: '10px', 
+                        background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)' 
+                    }}>
+                        <i className="material-icons" style={{ fontSize: '24px', color: '#ffffff' }}>insights</i>
+                    </div>
+                    <div>
+                        <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--primary)' }}>
+                            Consolidated Harvest Festival Financial Summary ({year})
+                        </h3>
+                        <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
+                            Grand unified audit overview combining Live Floor Auction and Special Offerings (Gold & Bed Sheet)
+                        </p>
+                    </div>
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    <button 
+                        type="button" 
+                        className="btn btn-secondary btn-sm" 
+                        onClick={fetchSummary} 
+                        title="Reload Consolidated Summary"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                    >
+                        <i className="material-icons" style={{ fontSize: '16px' }}>refresh</i> Reload
+                    </button>
+                </div>
+            </div>
+
+            <div className="card-body">
+                {loading ? (
+                    <div style={{ textAlign: 'center', padding: '30px' }}><div className="spinner" style={{ margin: '0 auto' }}></div></div>
+                ) : (
+                    <div>
+                        {/* Consolidated KPI Grid */}
+                        <div className="stats-grid">
+                            <div className="stat-card">
+                                <div className="stat-info-col">
+                                    <span className="stat-title">Grand Festival Revenue</span>
+                                    <div className="stat-value" style={{ color: 'var(--primary)' }}>
+                                        BHD {combinedTotalRevenue.toFixed(3)}
+                                    </div>
+                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                        Auction + Gold + Bed Sheet
+                                    </div>
+                                </div>
+                                <i className="material-icons background-round gradient-45deg-indigo-purple gradient-shadow white-text">account_balance</i>
+                            </div>
+
+                            <div className="stat-card">
+                                <div className="stat-info-col">
+                                    <span className="stat-title">Cash Collections</span>
+                                    <div className="stat-value" style={{ color: 'var(--success)' }}>
+                                        BHD {combinedTotalCollected.toFixed(3)}
+                                    </div>
+                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                        Recovery Rate: <strong>{combinedRecoveryRate}%</strong>
+                                    </div>
+                                </div>
+                                <i className="material-icons background-round gradient-45deg-green-teal gradient-shadow white-text">check_circle</i>
+                            </div>
+
+                            <div className="stat-card">
+                                <div className="stat-info-col">
+                                    <span className="stat-title">Outstanding Receivables</span>
+                                    <div className="stat-value" style={{ color: 'var(--danger)' }}>
+                                        BHD {combinedTotalReceivables.toFixed(3)}
+                                    </div>
+                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                        Open Promises & Dues
+                                    </div>
+                                </div>
+                                <i className="material-icons background-round gradient-45deg-amber-amber gradient-shadow white-text">schedule</i>
+                            </div>
+
+                            <div className="stat-card">
+                                <div className="stat-info-col">
+                                    <span className="stat-title">Total Activity Items</span>
+                                    <div className="stat-value">
+                                        {(Number(activeSummary?.sold_articles || 0) + Number(offeringsSummary?.total_offerings_count || 0))} Entries
+                                    </div>
+                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                        {activeSummary?.sold_articles || 0} Auction / {offeringsSummary?.total_offerings_count || 0} Offerings
+                                    </div>
+                                </div>
+                                <i className="material-icons background-round gradient-45deg-purple-deep-orange gradient-shadow white-text">dataset</i>
+                            </div>
+                        </div>
+
+                        {/* Consolidated Stream Comparison Table */}
+                        <h4 style={{ fontSize: '15px', marginTop: '28px', marginBottom: '14px', fontWeight: '700' }}>
+                            Revenue Streams Comparison
+                        </h4>
+
+                        <div className="table-responsive">
+                            <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                    <tr>
+                                        <th style={{ padding: '10px 14px', textAlign: 'left' }}>Festival Stream</th>
+                                        <th style={{ padding: '10px 14px', textAlign: 'center' }}>Total Items / Offerings</th>
+                                        <th style={{ padding: '10px 14px', textAlign: 'right' }}>Total Gross Revenue</th>
+                                        <th style={{ padding: '10px 14px', textAlign: 'right' }}>Collected (Paid)</th>
+                                        <th style={{ padding: '10px 14px', textAlign: 'right' }}>Outstanding Dues</th>
+                                        <th style={{ padding: '10px 14px', textAlign: 'center' }}>Recovery %</th>
+                                        <th style={{ padding: '10px 14px', textAlign: 'center' }}>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {/* Row 1: Live Auction */}
+                                    <tr>
+                                        <td style={{ padding: '12px 14px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <i className="material-icons" style={{ color: 'var(--primary)', fontSize: '20px' }}>gavel</i>
+                                                <div>
+                                                    <strong>Live Floor Auction</strong>
+                                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Articles auction & bidding desk</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                            <span className="badge badge-primary">{activeSummary?.sold_articles || 0} / {activeSummary?.total_articles || 0} Sold</span>
+                                        </td>
+                                        <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700 }}>
+                                            BHD {Number(activeSummary?.total_auction_revenue || 0).toFixed(3)}
+                                        </td>
+                                        <td style={{ padding: '12px 14px', textAlign: 'right', color: 'var(--success)', fontWeight: 600 }}>
+                                            BHD {Number(activeSummary?.total_collected_amount || 0).toFixed(3)}
+                                        </td>
+                                        <td style={{ padding: '12px 14px', textAlign: 'right', color: Number(activeSummary?.total_receivable_promises) > 0 ? 'var(--danger)' : 'var(--text-muted)', fontWeight: 600 }}>
+                                            BHD {Number(activeSummary?.total_receivable_promises || 0).toFixed(3)}
+                                        </td>
+                                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                            <strong>
+                                                {Number(activeSummary?.total_auction_revenue) > 0 
+                                                    ? ((Number(activeSummary?.total_collected_amount) / Number(activeSummary?.total_auction_revenue)) * 100).toFixed(1) 
+                                                    : 0}%
+                                            </strong>
+                                        </td>
+                                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                            <button 
+                                                type="button" 
+                                                className="btn btn-secondary btn-sm" 
+                                                onClick={() => onSelectTab && onSelectTab('auction')}
+                                                style={{ fontSize: '11px', padding: '3px 8px' }}
+                                            >
+                                                View Report →
+                                            </button>
+                                        </td>
+                                    </tr>
+
+                                    {/* Row 2: Gold Special Offerings */}
+                                    <tr>
+                                        <td style={{ padding: '12px 14px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <i className="material-icons" style={{ color: '#d97706', fontSize: '20px' }}>stars</i>
+                                                <div>
+                                                    <strong style={{ color: '#d97706' }}>Gold Offerings</strong>
+                                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Special gold offerings and ornaments</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                            <span className="badge" style={{ background: '#fef3c7', color: '#b45309', fontWeight: 700 }}>
+                                                {offeringsSummary?.gold_count || 0} Offerings
+                                            </span>
+                                        </td>
+                                        <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700 }}>
+                                            BHD {Number(offeringsSummary?.gold_revenue || 0).toFixed(3)}
+                                        </td>
+                                        <td style={{ padding: '12px 14px', textAlign: 'right', color: 'var(--success)', fontWeight: 600 }}>
+                                            BHD {Number(offeringsSummary?.gold_collected || 0).toFixed(3)}
+                                        </td>
+                                        <td style={{ padding: '12px 14px', textAlign: 'right', color: Number(offeringsSummary?.gold_pending) > 0 ? 'var(--danger)' : 'var(--text-muted)', fontWeight: 600 }}>
+                                            BHD {Number(offeringsSummary?.gold_pending || 0).toFixed(3)}
+                                        </td>
+                                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                            <strong>
+                                                {Number(offeringsSummary?.gold_revenue) > 0 
+                                                    ? ((Number(offeringsSummary?.gold_collected) / Number(offeringsSummary?.gold_revenue)) * 100).toFixed(1) 
+                                                    : 0}%
+                                            </strong>
+                                        </td>
+                                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                            <button 
+                                                type="button" 
+                                                className="btn btn-secondary btn-sm" 
+                                                onClick={() => onSelectTab && onSelectTab('offerings')}
+                                                style={{ fontSize: '11px', padding: '3px 8px' }}
+                                            >
+                                                View Report →
+                                            </button>
+                                        </td>
+                                    </tr>
+
+                                    {/* Row 3: Bed Sheet Special Offerings */}
+                                    <tr>
+                                        <td style={{ padding: '12px 14px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <i className="material-icons" style={{ color: '#2563eb', fontSize: '20px' }}>layers</i>
+                                                <div>
+                                                    <strong style={{ color: '#2563eb' }}>Bed Sheet Offerings</strong>
+                                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Special bed sheet offerings</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                            <span className="badge" style={{ background: '#dbeafe', color: '#1d4ed8', fontWeight: 700 }}>
+                                                {offeringsSummary?.bedsheet_count || 0} Offerings
+                                            </span>
+                                        </td>
+                                        <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700 }}>
+                                            BHD {Number(offeringsSummary?.bedsheet_revenue || 0).toFixed(3)}
+                                        </td>
+                                        <td style={{ padding: '12px 14px', textAlign: 'right', color: 'var(--success)', fontWeight: 600 }}>
+                                            BHD {Number(offeringsSummary?.bedsheet_collected || 0).toFixed(3)}
+                                        </td>
+                                        <td style={{ padding: '12px 14px', textAlign: 'right', color: Number(offeringsSummary?.bedsheet_pending) > 0 ? 'var(--danger)' : 'var(--text-muted)', fontWeight: 600 }}>
+                                            BHD {Number(offeringsSummary?.bedsheet_pending || 0).toFixed(3)}
+                                        </td>
+                                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                            <strong>
+                                                {Number(offeringsSummary?.bedsheet_revenue) > 0 
+                                                    ? ((Number(offeringsSummary?.bedsheet_collected) / Number(offeringsSummary?.bedsheet_revenue)) * 100).toFixed(1) 
+                                                    : 0}%
+                                            </strong>
+                                        </td>
+                                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                            <button 
+                                                type="button" 
+                                                className="btn btn-secondary btn-sm" 
+                                                onClick={() => onSelectTab && onSelectTab('offerings')}
+                                                style={{ fontSize: '11px', padding: '3px 8px' }}
+                                            >
+                                                View Report →
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                                <tfoot>
+                                    <tr style={{ background: 'var(--bg-card)', fontWeight: 'bold' }}>
+                                        <td style={{ padding: '12px 14px' }}>
+                                            Grand Total Harvest Festival
+                                        </td>
+                                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                            {(Number(activeSummary?.sold_articles || 0) + Number(offeringsSummary?.total_offerings_count || 0))} Total Sold/Committed
+                                        </td>
+                                        <td style={{ padding: '12px 14px', textAlign: 'right', color: 'var(--primary)' }}>
+                                            BHD {combinedTotalRevenue.toFixed(3)}
+                                        </td>
+                                        <td style={{ padding: '12px 14px', textAlign: 'right', color: 'var(--success)' }}>
+                                            BHD {combinedTotalCollected.toFixed(3)}
+                                        </td>
+                                        <td style={{ padding: '12px 14px', textAlign: 'right', color: combinedTotalReceivables > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>
+                                            BHD {combinedTotalReceivables.toFixed(3)}
+                                        </td>
+                                        <td style={{ padding: '12px 14px', textAlign: 'center', color: 'var(--success)' }}>
+                                            {combinedRecoveryRate}%
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 // --- Reports & Analytics View ---
-function ReportsView({ year, showToast, refreshTrigger }) {
+
+function ReportsView({ year, showToast, refreshTrigger, initialSubTab = 'auction', onSubTabChange }) {
+    const [subTab, setSubTab] = useState(initialSubTab || 'auction');
     const [summary, setSummary] = useState(null);
     const [buyers, setBuyers] = useState([]);
     const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (initialSubTab) {
+            setSubTab(initialSubTab);
+        }
+    }, [initialSubTab]);
+
+    const handleSubTabChange = (newTab) => {
+        setSubTab(newTab);
+        if (onSubTabChange) {
+            onSubTabChange(newTab);
+        }
+    };
 
     const fetchReports = () => {
         setLoading(true);
@@ -7698,7 +8958,109 @@ function ReportsView({ year, showToast, refreshTrigger }) {
 
     return (
         <div>
-            <div className="card" style={{ marginBottom: '28px' }}>
+            {/* Top Report Sub-Navigation Tabs */}
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '12px',
+                marginBottom: '24px',
+                background: 'var(--bg-card, #ffffff)',
+                padding: '12px 18px',
+                borderRadius: '12px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                border: '1px solid var(--border-color, #e2e8f0)'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                        type="button"
+                        className={`btn btn-sm ${subTab === 'auction' ? 'btn-primary' : 'btn-outline'}`}
+                        style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            fontWeight: subTab === 'auction' ? 700 : 500,
+                            padding: '8px 16px',
+                            borderRadius: '8px',
+                            transition: 'all 0.2s ease'
+                        }}
+                        onClick={() => handleSubTabChange('auction')}
+                    >
+                        <i className="material-icons" style={{ fontSize: '18px' }}>gavel</i>
+                        <span>Live Floor Auction Reports</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        className={`btn btn-sm ${subTab === 'offerings' ? 'btn-primary' : 'btn-outline'}`}
+                        style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            fontWeight: subTab === 'offerings' ? 700 : 500,
+                            padding: '8px 16px',
+                            borderRadius: '8px',
+                            transition: 'all 0.2s ease',
+                            background: subTab === 'offerings' ? 'linear-gradient(45deg, #d97706, #b45309)' : undefined,
+                            borderColor: subTab === 'offerings' ? '#d97706' : undefined,
+                            color: subTab === 'offerings' ? '#ffffff' : undefined
+                        }}
+                        onClick={() => handleSubTabChange('offerings')}
+                    >
+                        <i className="material-icons" style={{ fontSize: '18px' }}>volunteer_activism</i>
+                        <span>Special Offerings Reports (Gold & Bed Sheet)</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        className={`btn btn-sm ${subTab === 'consolidated' ? 'btn-primary' : 'btn-outline'}`}
+                        style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            fontWeight: subTab === 'consolidated' ? 700 : 500,
+                            padding: '8px 16px',
+                            borderRadius: '8px',
+                            transition: 'all 0.2s ease'
+                        }}
+                        onClick={() => handleSubTabChange('consolidated')}
+                    >
+                        <i className="material-icons" style={{ fontSize: '18px' }}>pie_chart</i>
+                        <span>Consolidated Festival Summary</span>
+                    </button>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                    <i className="material-icons" style={{ fontSize: '18px', color: 'var(--primary)' }}>calendar_today</i>
+                    <span>Festival Year: <strong>{year}</strong></span>
+                </div>
+            </div>
+
+            {/* Sub-Tab 1: Special Offerings Reports */}
+            {subTab === 'offerings' && (
+                <SpecialOfferingsReportsView 
+                    year={year} 
+                    showToast={showToast} 
+                    refreshTrigger={refreshTrigger} 
+                />
+            )}
+
+            {/* Sub-Tab 2: Consolidated Festival Summary */}
+            {subTab === 'consolidated' && (
+                <ConsolidatedReportsView 
+                    year={year} 
+                    summary={summary} 
+                    showToast={showToast} 
+                    refreshTrigger={refreshTrigger} 
+                    onSelectTab={handleSubTabChange} 
+                />
+            )}
+
+            {/* Sub-Tab 3: Live Floor Auction Reports */}
+            {subTab === 'auction' && (
+                <>
+                    <div className="card" style={{ marginBottom: '28px' }}>
                 <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '18px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <i className="material-icons" style={{ fontSize: '28px', color: 'var(--primary)' }}>insert_chart</i>
@@ -7982,6 +9344,8 @@ function ReportsView({ year, showToast, refreshTrigger }) {
                     emptyMessage="No buyer ledger records found for this year."
                 />
             </div>
+            </>
+            )}
         </div>
     );
 }
@@ -8646,6 +10010,7 @@ function App() {
     const [user, setUser] = useState(null);
     const [authLoading, setAuthLoading] = useState(true);
     const [currentTab, setCurrentTab] = useState('dashboard');
+    const [reportsSubTab, setReportsSubTab] = useState('auction');
     const currentCalYear = new Date().getFullYear();
     const [year, setYear] = useState(currentCalYear);
     const [availableYears, setAvailableYears] = useState([currentCalYear]);
@@ -8888,14 +10253,39 @@ function App() {
                                     </div>
 
                                     <div 
-                                        className={`top-nav-dropdown-item ${currentTab === 'reports' ? 'active' : ''}`}
+                                        className={`top-nav-dropdown-item ${currentTab === 'reports' && reportsSubTab === 'auction' ? 'active' : ''}`}
                                         onClick={() => {
                                             setCurrentTab('reports');
+                                            setReportsSubTab('auction');
                                             setReportsDropdownOpen(false);
                                         }}
                                     >
-                                        <i className="material-icons">insert_chart</i>
-                                        <span>Sales Reports</span>
+                                        <i className="material-icons">gavel</i>
+                                        <span>Auction Sales Reports</span>
+                                    </div>
+
+                                    <div 
+                                        className={`top-nav-dropdown-item ${currentTab === 'reports' && reportsSubTab === 'offerings' ? 'active' : ''}`}
+                                        onClick={() => {
+                                            setCurrentTab('reports');
+                                            setReportsSubTab('offerings');
+                                            setReportsDropdownOpen(false);
+                                        }}
+                                    >
+                                        <i className="material-icons" style={{ color: '#d97706' }}>volunteer_activism</i>
+                                        <span>Special Offerings Reports</span>
+                                    </div>
+
+                                    <div 
+                                        className={`top-nav-dropdown-item ${currentTab === 'reports' && reportsSubTab === 'consolidated' ? 'active' : ''}`}
+                                        onClick={() => {
+                                            setCurrentTab('reports');
+                                            setReportsSubTab('consolidated');
+                                            setReportsDropdownOpen(false);
+                                        }}
+                                    >
+                                        <i className="material-icons" style={{ color: '#6366f1' }}>pie_chart</i>
+                                        <span>Consolidated Festival Summary</span>
                                     </div>
 
                                     {isAdmin && (
@@ -9028,11 +10418,25 @@ function App() {
                         <span>Promises & Dues</span>
                     </div>
                     <div 
-                        className={`top-nav-item ${currentTab === 'reports' ? 'active' : ''}`}
-                        onClick={() => { setCurrentTab('reports'); setSidebarOpen(false); }}
+                        className={`top-nav-item ${currentTab === 'reports' && reportsSubTab === 'auction' ? 'active' : ''}`}
+                        onClick={() => { setCurrentTab('reports'); setReportsSubTab('auction'); setSidebarOpen(false); }}
                     >
-                        <i className="material-icons">insert_chart</i>
-                        <span>Sales Reports</span>
+                        <i className="material-icons">gavel</i>
+                        <span>Auction Floor Reports</span>
+                    </div>
+                    <div 
+                        className={`top-nav-item ${currentTab === 'reports' && reportsSubTab === 'offerings' ? 'active' : ''}`}
+                        onClick={() => { setCurrentTab('reports'); setReportsSubTab('offerings'); setSidebarOpen(false); }}
+                    >
+                        <i className="material-icons" style={{ color: '#f59e0b' }}>volunteer_activism</i>
+                        <span>Special Offerings Reports</span>
+                    </div>
+                    <div 
+                        className={`top-nav-item ${currentTab === 'reports' && reportsSubTab === 'consolidated' ? 'active' : ''}`}
+                        onClick={() => { setCurrentTab('reports'); setReportsSubTab('consolidated'); setSidebarOpen(false); }}
+                    >
+                        <i className="material-icons" style={{ color: '#818cf8' }}>pie_chart</i>
+                        <span>Consolidated Summary</span>
                     </div>
 
                     {isAdmin && (
@@ -9063,7 +10467,12 @@ function App() {
                         key={year}
                         stats={stats} 
                         year={year} 
-                        onNavigate={setCurrentTab}
+                        onNavigate={(tab, sub) => {
+                            setCurrentTab(tab);
+                            if (tab === 'reports' && sub) {
+                                setReportsSubTab(sub);
+                            }
+                        }}
                         onOpenNewArticle={() => { setEditingArticle(null); setArticleModalOpen(true); }}
                         onOpenImport={() => setImportModalOpen(true)}
                     />
@@ -9130,6 +10539,8 @@ function App() {
                         year={year} 
                         refreshTrigger={dataRevision}
                         showToast={showToast}
+                        initialSubTab={reportsSubTab}
+                        onSubTabChange={(st) => setReportsSubTab(st)}
                     />
                 )}
 

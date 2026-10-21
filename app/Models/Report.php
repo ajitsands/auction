@@ -203,6 +203,7 @@ class Report extends Model {
                 COALESCE(SUM(winning_bid_amount), 0) as total_offerings_revenue,
                 COALESCE(SUM(paid_amount), 0) as total_collected_amount,
                 COALESCE(SUM(balance_amount), 0) as total_receivable_promises,
+                COUNT(DISTINCT buyer_name) as total_members,
                 COUNT(DISTINCT buyer_name) as total_devotees,
                 
                 SUM(CASE WHEN offering_type = 'Gold' THEN 1 ELSE 0 END) as gold_count,

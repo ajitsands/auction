@@ -37,7 +37,7 @@ class ReportController extends Controller {
         $year = isset($_GET['year']) ? (int)$_GET['year'] : (int)date('Y');
         $type = isset($_GET['type']) && in_array($_GET['type'], ['Gold', 'BedSheet']) ? $_GET['type'] : null;
         $devotees = $this->reportModel->getOfferingsDevoteesReport($year, $type);
-        $this->jsonResponse(['success' => true, 'year' => $year, 'devotees' => $devotees]);
+        $this->jsonResponse(['success' => true, 'year' => $year, 'members' => $devotees, 'devotees' => $devotees]);
     }
 }
 

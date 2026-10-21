@@ -501,6 +501,49 @@ function DataTable({
         return pages;
     };
 
+    // Helper to determine if a column is a currency column
+    const isCurrencyCol = (col) => {
+        if (col.footer === false || col.isCurrency === false || col.showTotal === false) return false;
+        if (col.isCurrency === true || col.showTotal === true) return true;
+        const header = String(col.header || '').trim();
+        const accessor = typeof col.accessor === 'string' ? col.accessor : (col.id || '');
+        if (/\(bhd\)|bhd/i.test(header) || /bhd/i.test(accessor)) return true;
+        if (/^(winning_bid_amount|paid_amount|balance_amount|estimated_value|estimated_val|total_bid_val|total_offering_val|total_collected_val|total_balance_val|total_purchased|total_offered|total_paid|total_balance|total_promise_amount|amount|price|bid|balance|fee)$/i.test(accessor)) {
+            return true;
+        }
+        if (/^(est\w*\s*price|est\w*\s*val|base\s*price|winning\s*bid|bid\s*amount|offered\s*amount|total\s*offered|total\s*purchases?|paid\s*amount|paid\s*so\s*far|balance\s*due|balance\s*amount|total\s*auction\s*sales)$/i.test(header)) {
+            return true;
+        }
+        return false;
+    };
+
+    // Calculate total sum across all filtered records for a currency column
+    const calculateColTotal = (col) => {
+        return filteredData.reduce((acc, row) => {
+            let val = 0;
+            if (typeof col.footerValue === 'function') {
+                val = col.footerValue(row);
+            } else if (typeof col.sortValue === 'function') {
+                val = col.sortValue(row);
+            } else if (typeof col.accessor === 'function') {
+                val = col.accessor(row);
+            } else if (col.accessor) {
+                val = row[col.accessor];
+            }
+            if (typeof val === 'number') return acc + (isNaN(val) ? 0 : val);
+            if (typeof val === 'string') {
+                const clean = val.replace(/[^0-9.-]/g, '');
+                const n = parseFloat(clean);
+                return acc + (isNaN(n) ? 0 : n);
+            }
+            return acc;
+        }, 0);
+    };
+
+    const hasAnyFooter = !loading && filteredRecordsCount > 0 && (
+        columns.some(col => col.footer !== undefined) || columns.some(col => isCurrencyCol(col))
+    );
+
     return (
         <div className="dataTables_wrapper">
             {(searchable || pageSizeOptions.length > 0 || toolbarExtras) && (
@@ -638,8 +681,8 @@ function DataTable({
                             })
                         )}
                     </tbody>
-                    {/* Optional DataTable Footer for column totals / summaries across all pages */}
-                    {!loading && filteredRecordsCount > 0 && columns.some(col => col.footer !== undefined) && (
+                    {/* DataTable Footer for column totals / summaries across all pages */}
+                    {hasAnyFooter && (
                         <tfoot className="dt-table-footer">
                             <tr>
                                 {columns.map((col, colIdx) => {
@@ -648,7 +691,46 @@ function DataTable({
                                         footerContent = col.footer(filteredData, data);
                                     } else if (col.footer !== undefined) {
                                         footerContent = col.footer;
+                                    } else if (isCurrencyCol(col)) {
+                                        const total = calculateColTotal(col);
+                                        const isDue = /balance|due/i.test(col.header || col.accessor);
+                                        const isPaid = /paid|collected/i.test(col.header || col.accessor);
+                                        const labelText = (typeof col.header === 'string' ? col.header : '')
+                                            .replace(/\s*\(BHD\)/i, '')
+                                            .replace(/Total\s*/i, '')
+                                            .trim();
+                                        footerContent = (
+                                            <div className="dt-footer-amount-box">
+                                                <span className="dt-footer-amount-label">
+                                                    {labelText ? `${labelText} Total` : 'Total'}
+                                                </span>
+                                                <span 
+                                                    className="dt-footer-amount-val"
+                                                    style={{
+                                                        color: isDue 
+                                                            ? (total > 0.0001 ? 'var(--danger)' : 'var(--text-muted)')
+                                                            : isPaid 
+                                                            ? 'var(--success)'
+                                                            : 'var(--primary)'
+                                                    }}
+                                                >
+                                                    BHD {total.toFixed(3)}
+                                                </span>
+                                            </div>
+                                        );
+                                    } else if (colIdx === 0 && !columns.some((c, i) => i === 0 && c.footer !== undefined && c.footer !== null)) {
+                                        footerContent = (
+                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', fontWeight: 700 }}>
+                                                    Total
+                                                </span>
+                                                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                                                    {filteredRecordsCount} {filteredRecordsCount === 1 ? 'Record' : 'Records'}
+                                                </span>
+                                            </div>
+                                        );
                                     }
+
                                     return (
                                         <td 
                                             key={col.id || col.accessor || colIdx}
@@ -1625,12 +1707,22 @@ function ArticlesView({ year, onOpenNewArticle, onEditArticle, onOpenImport, sho
                             sortValue: (a) => Number(a.article_id) || 0,
                             headerStyle: { width: '70px', textAlign: 'center' },
                             style: { textAlign: 'center', width: '70px', fontWeight: 600, color: 'var(--text-muted)' },
+                            footer: () => (
+                                <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', fontWeight: 700 }}>
+                                    Total
+                                </span>
+                            ),
                             render: (a, index) => <span style={{ fontSize: '12px' }}>{index + 1}</span>
                         },
                         {
                             header: 'Article No',
                             accessor: 'article_number',
                             sortable: true,
+                            footer: (allRows) => (
+                                <span style={{ color: 'var(--text-primary)', fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                    {allRows.length} Articles
+                                </span>
+                            ),
                             render: (a) => <strong style={{ color: 'var(--text-primary)' }}>{a.article_number}</strong>
                         },
                         {
@@ -1638,6 +1730,7 @@ function ArticlesView({ year, onOpenNewArticle, onEditArticle, onOpenImport, sho
                             accessor: 'tag_number',
                             sortable: true,
                             searchValue: (a) => a.tag_number || '',
+                            footer: () => null,
                             render: (a) => <span className="tag-badge">{a.tag_number}</span>
                         },
                         {
@@ -1645,6 +1738,7 @@ function ArticlesView({ year, onOpenNewArticle, onEditArticle, onOpenImport, sho
                             accessor: 'article_name',
                             sortable: true,
                             searchValue: (a) => `${a.tag_number || ''} ${a.article_name || ''} ${a.article_number || ''} ${a.description || ''}`,
+                            footer: () => null,
                             render: (a) => (
                                 <div>
                                     <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{a.article_name}</div>
@@ -1656,6 +1750,7 @@ function ArticlesView({ year, onOpenNewArticle, onEditArticle, onOpenImport, sho
                             header: 'Category',
                             accessor: 'category',
                             sortable: true,
+                            footer: () => null,
                             render: (a) => <span className="badge badge-secondary">{a.category}</span>
                         },
                         {
@@ -1663,6 +1758,17 @@ function ArticlesView({ year, onOpenNewArticle, onEditArticle, onOpenImport, sho
                             accessor: 'estimated_value',
                             sortable: true,
                             sortValue: (a) => Number(a.estimated_value) || 0,
+                            footer: (allRows) => {
+                                const total = allRows.reduce((sum, a) => sum + (Number(a.estimated_value) || 0), 0);
+                                return (
+                                    <div className="dt-footer-amount-box">
+                                        <span className="dt-footer-amount-label">Est. Value Total</span>
+                                        <span className="dt-footer-amount-val" style={{ color: 'var(--primary)' }}>
+                                            BHD {total.toFixed(3)}
+                                        </span>
+                                    </div>
+                                );
+                            },
                             render: (a) => <strong style={{ color: 'var(--primary)' }}>{Number(a.estimated_value).toFixed(3)}</strong>
                         },
                         {
@@ -2255,35 +2361,49 @@ function ExcelImportModal({ year, isOpen, onClose, onSuccess, showToast }) {
             id: 'index',
             sortable: false,
             style: { width: '50px' },
+            footer: () => (
+                <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', fontWeight: 700 }}>
+                    Total
+                </span>
+            ),
             render: (r, i) => i + 1
         },
         {
             header: 'Article No',
             accessor: 'article_number',
             sortable: true,
+            footer: (allRows) => (
+                <span style={{ color: 'var(--text-primary)', fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                    {allRows.length} Items
+                </span>
+            ),
             render: (r) => <strong>{r.article_number}</strong>
         },
         {
             header: 'Tag No',
             accessor: 'tag_number',
             sortable: true,
+            footer: () => null,
             render: (r) => <span className="tag-badge">{r.tag_number}</span>
         },
         {
             header: 'Year',
             accessor: 'applicable_year',
             sortable: true,
+            footer: () => null,
             style: { width: '75px' }
         },
         {
             header: 'Article Name',
             accessor: 'article_name',
+            footer: () => null,
             sortable: true
         },
         {
             header: 'Category',
             accessor: 'category',
             sortable: true,
+            footer: () => null,
             render: (r) => <span className="badge badge-secondary">{r.category || 'General'}</span>
         },
         {
@@ -2291,6 +2411,17 @@ function ExcelImportModal({ year, isOpen, onClose, onSuccess, showToast }) {
             accessor: 'estimated_value',
             sortable: true,
             sortValue: (r) => Number(r.estimated_value) || 0,
+            footer: (allRows) => {
+                const total = allRows.reduce((sum, r) => sum + (Number(r.estimated_value) || 0), 0);
+                return (
+                    <div className="dt-footer-amount-box">
+                        <span className="dt-footer-amount-label">Est. Value Total</span>
+                        <span className="dt-footer-amount-val" style={{ color: 'var(--primary)' }}>
+                            BHD {total.toFixed(3)}
+                        </span>
+                    </div>
+                );
+            },
             render: (r) => Number(r.estimated_value || 0).toFixed(3)
         }
     ];
@@ -4852,7 +4983,7 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
 
         const buyerName = selectedMember ? selectedMember.primary_member_name : memberSearch.trim();
         if (!buyerName) {
-            showToast('error', 'Please search and select a Parish Member or enter the Devotee name.');
+            showToast('error', 'Please search and select a Parish Member or enter the Member name.');
             return;
         }
 
@@ -5516,16 +5647,11 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
                             />
                         </div>
 
-                        {/* 2. Devotee / Member Picker */}
+                        {/* 2. Member Picker */}
                         <div className="form-group" style={{ marginBottom: '14px' }}>
-                            <label className="form-label" style={{ fontWeight: 700, fontSize: '13px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <i className="material-icons" style={{ fontSize: '16px', color: 'var(--primary)' }}>person</i>
-                                    Select Member *
-                                </span>
-                                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                                    Search by Name, Roll No, CPR or type Devotee Name
-                                </span>
+                            <label className="form-label" style={{ fontWeight: 700, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <i className="material-icons" style={{ fontSize: '16px', color: 'var(--primary)' }}>person</i>
+                                <span>Select Member *</span>
                             </label>
 
                             {selectedMember ? (
@@ -5686,7 +5812,7 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
                             <input 
                                 type="text"
                                 className="form-control"
-                                placeholder="Devotee remarks or special notes"
+                                placeholder="Member remarks or special notes"
                                 value={notes}
                                 onChange={e => setNotes(e.target.value)}
                             />
@@ -7879,12 +8005,22 @@ function SpecialOfferingsReportsView({ year, showToast, refreshTrigger }) {
                                         sortable: false,
                                         headerStyle: { width: '60px', textAlign: 'center' },
                                         style: { textAlign: 'center', width: '60px', fontWeight: 600, color: 'var(--text-muted)' },
+                                        footer: () => (
+                                            <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', fontWeight: 700 }}>
+                                                Total
+                                            </span>
+                                        ),
                                         render: (c, index) => <span style={{ fontSize: '12px' }}>{index + 1}</span>
                                     },
                                     {
                                         header: 'Offering Category',
                                         accessor: 'category',
                                         sortable: true,
+                                        footer: (allRows) => (
+                                            <span style={{ color: 'var(--text-primary)', fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                                {allRows.length} Categories
+                                            </span>
+                                        ),
                                         render: (c) => (
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                 <span style={{ 
@@ -7912,6 +8048,11 @@ function SpecialOfferingsReportsView({ year, showToast, refreshTrigger }) {
                                         accessor: 'offerings_count',
                                         sortable: true,
                                         sortValue: (c) => Number(c.offerings_count) || 0,
+                                        footer: (allRows) => (
+                                            <strong style={{ color: 'var(--text-primary)' }}>
+                                                {allRows.reduce((sum, c) => sum + (Number(c.offerings_count) || 0), 0)}
+                                            </strong>
+                                        ),
                                         render: (c) => <strong>{c.offerings_count}</strong>
                                     },
                                     {
@@ -7919,6 +8060,11 @@ function SpecialOfferingsReportsView({ year, showToast, refreshTrigger }) {
                                         accessor: 'settled_count',
                                         sortable: true,
                                         sortValue: (c) => Number(c.settled_count) || 0,
+                                        footer: (allRows) => (
+                                            <span className="badge badge-success">
+                                                {allRows.reduce((sum, c) => sum + (Number(c.settled_count) || 0), 0)}
+                                            </span>
+                                        ),
                                         render: (c) => <span className="badge badge-success">{c.settled_count || 0}</span>
                                     },
                                     {
@@ -7926,6 +8072,11 @@ function SpecialOfferingsReportsView({ year, showToast, refreshTrigger }) {
                                         accessor: 'partial_count',
                                         sortable: true,
                                         sortValue: (c) => Number(c.partial_count) || 0,
+                                        footer: (allRows) => (
+                                            <span className="badge badge-warning">
+                                                {allRows.reduce((sum, c) => sum + (Number(c.partial_count) || 0), 0)}
+                                            </span>
+                                        ),
                                         render: (c) => <span className="badge badge-warning">{c.partial_count || 0}</span>
                                     },
                                     {
@@ -7933,6 +8084,11 @@ function SpecialOfferingsReportsView({ year, showToast, refreshTrigger }) {
                                         accessor: 'pending_count',
                                         sortable: true,
                                         sortValue: (c) => Number(c.pending_count) || 0,
+                                        footer: (allRows) => (
+                                            <span className="badge badge-danger">
+                                                {allRows.reduce((sum, c) => sum + (Number(c.pending_count) || 0), 0)}
+                                            </span>
+                                        ),
                                         render: (c) => <span className="badge badge-danger">{c.pending_count || 0}</span>
                                     },
                                     {
@@ -7940,6 +8096,17 @@ function SpecialOfferingsReportsView({ year, showToast, refreshTrigger }) {
                                         accessor: 'total_offering_val',
                                         sortable: true,
                                         sortValue: (c) => Number(c.total_offering_val) || 0,
+                                        footer: (allRows) => {
+                                            const total = allRows.reduce((sum, c) => sum + (Number(c.total_offering_val) || 0), 0);
+                                            return (
+                                                <div className="dt-footer-amount-box">
+                                                    <span className="dt-footer-amount-label">Offering Total</span>
+                                                    <span className="dt-footer-amount-val" style={{ color: 'var(--primary)' }}>
+                                                        BHD {total.toFixed(3)}
+                                                    </span>
+                                                </div>
+                                            );
+                                        },
                                         render: (c) => <strong style={{ color: 'var(--primary)' }}>BHD {Number(c.total_offering_val || 0).toFixed(3)}</strong>
                                     },
                                     {
@@ -7947,6 +8114,17 @@ function SpecialOfferingsReportsView({ year, showToast, refreshTrigger }) {
                                         accessor: 'total_collected_val',
                                         sortable: true,
                                         sortValue: (c) => Number(c.total_collected_val) || 0,
+                                        footer: (allRows) => {
+                                            const total = allRows.reduce((sum, c) => sum + (Number(c.total_collected_val) || 0), 0);
+                                            return (
+                                                <div className="dt-footer-amount-box">
+                                                    <span className="dt-footer-amount-label">Collected Total</span>
+                                                    <span className="dt-footer-amount-val" style={{ color: 'var(--success)' }}>
+                                                        BHD {total.toFixed(3)}
+                                                    </span>
+                                                </div>
+                                            );
+                                        },
                                         render: (c) => <span style={{ color: 'var(--success)', fontWeight: 600 }}>BHD {Number(c.total_collected_val || 0).toFixed(3)}</span>
                                     },
                                     {
@@ -7954,6 +8132,17 @@ function SpecialOfferingsReportsView({ year, showToast, refreshTrigger }) {
                                         accessor: 'total_balance_val',
                                         sortable: true,
                                         sortValue: (c) => Number(c.total_balance_val) || 0,
+                                        footer: (allRows) => {
+                                            const total = allRows.reduce((sum, c) => sum + (Number(c.total_balance_val) || 0), 0);
+                                            return (
+                                                <div className="dt-footer-amount-box">
+                                                    <span className="dt-footer-amount-label">Balance Total</span>
+                                                    <span className="dt-footer-amount-val" style={{ color: total > 0.0001 ? 'var(--danger)' : 'var(--text-muted)' }}>
+                                                        BHD {total.toFixed(3)}
+                                                    </span>
+                                                </div>
+                                            );
+                                        },
                                         render: (c) => (
                                             <span style={{ color: Number(c.total_balance_val) > 0 ? 'var(--danger)' : 'var(--text-muted)', fontWeight: 600 }}>
                                                 BHD {Number(c.total_balance_val || 0).toFixed(3)}
@@ -8078,12 +8267,22 @@ function SpecialOfferingsReportsView({ year, showToast, refreshTrigger }) {
                             sortable: false,
                             headerStyle: { width: '60px', textAlign: 'center' },
                             style: { textAlign: 'center', width: '60px', fontWeight: 600, color: 'var(--text-muted)' },
+                            footer: () => (
+                                <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', fontWeight: 700 }}>
+                                    Total
+                                </span>
+                            ),
                             render: (d, index) => <span style={{ fontSize: '12px' }}>{index + 1}</span>
                         },
                         {
                             header: 'Member Details',
                             accessor: 'buyer_name',
                             sortable: true,
+                            footer: (allRows) => (
+                                <span style={{ color: 'var(--text-primary)', fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                    {allRows.length} Members
+                                </span>
+                            ),
                             render: (d) => (
                                 <div>
                                     <strong style={{ color: 'var(--text-primary)', fontSize: '13.5px' }}>{d.buyer_name}</strong>
@@ -8100,18 +8299,21 @@ function SpecialOfferingsReportsView({ year, showToast, refreshTrigger }) {
                             header: 'Roll No',
                             accessor: 'buyer_code_c',
                             sortable: true,
+                            footer: () => null,
                             render: (d) => d.buyer_code_c ? <strong style={{ color: '#d97706' }}>{d.buyer_code_c}</strong> : 'N/A'
                         },
                         {
                             header: 'CPR No',
                             accessor: 'cpr_no',
                             sortable: true,
+                            footer: () => null,
                             render: (d) => d.cpr_no || 'N/A'
                         },
                         {
                             header: 'Contact Phone',
                             accessor: 'buyer_phone',
                             sortable: true,
+                            footer: () => null,
                             render: (d) => d.buyer_phone || 'N/A'
                         },
                         {
@@ -8126,6 +8328,14 @@ function SpecialOfferingsReportsView({ year, showToast, refreshTrigger }) {
                                 return `${d.offerings_count || ''} ${itemsStr}`;
                             },
                             style: { minWidth: '280px' },
+                            footer: (allRows) => {
+                                const totalCount = allRows.reduce((sum, d) => sum + (Number(d.offerings_count) || (Array.isArray(d.items) ? d.items.length : 0)), 0);
+                                return (
+                                    <span className="badge badge-secondary" style={{ fontWeight: 700, fontSize: '11px' }}>
+                                        {totalCount} Total Offerings
+                                    </span>
+                                );
+                            },
                             render: (d) => (
                                 <div>
                                     <div style={{ marginBottom: (Array.isArray(d.items) && d.items.length > 0) ? '6px' : '0' }}>
@@ -8196,6 +8406,17 @@ function SpecialOfferingsReportsView({ year, showToast, refreshTrigger }) {
                             accessor: 'total_offered',
                             sortable: true,
                             sortValue: (d) => Number(d.total_offered) || 0,
+                            footer: (allRows) => {
+                                const total = allRows.reduce((sum, d) => sum + (Number(d.total_offered) || 0), 0);
+                                return (
+                                    <div className="dt-footer-amount-box">
+                                        <span className="dt-footer-amount-label">Offered Total</span>
+                                        <span className="dt-footer-amount-val" style={{ color: 'var(--primary)' }}>
+                                            BHD {total.toFixed(3)}
+                                        </span>
+                                    </div>
+                                );
+                            },
                             render: (d) => <strong>BHD {Number(d.total_offered || 0).toFixed(3)}</strong>
                         },
                         {
@@ -8203,6 +8424,17 @@ function SpecialOfferingsReportsView({ year, showToast, refreshTrigger }) {
                             accessor: 'total_paid',
                             sortable: true,
                             sortValue: (d) => Number(d.total_paid) || 0,
+                            footer: (allRows) => {
+                                const total = allRows.reduce((sum, d) => sum + (Number(d.total_paid) || 0), 0);
+                                return (
+                                    <div className="dt-footer-amount-box">
+                                        <span className="dt-footer-amount-label">Paid Total</span>
+                                        <span className="dt-footer-amount-val" style={{ color: 'var(--success)' }}>
+                                            BHD {total.toFixed(3)}
+                                        </span>
+                                    </div>
+                                );
+                            },
                             render: (d) => <span style={{ color: 'var(--success)', fontWeight: 600 }}>{Number(d.total_paid || 0).toFixed(3)}</span>
                         },
                         {
@@ -8210,6 +8442,17 @@ function SpecialOfferingsReportsView({ year, showToast, refreshTrigger }) {
                             accessor: 'total_balance',
                             sortable: true,
                             sortValue: (d) => Number(d.total_balance) || 0,
+                            footer: (allRows) => {
+                                const total = allRows.reduce((sum, d) => sum + (Number(d.total_balance) || 0), 0);
+                                return (
+                                    <div className="dt-footer-amount-box">
+                                        <span className="dt-footer-amount-label">Balance Total</span>
+                                        <span className="dt-footer-amount-val" style={{ color: total > 0.0001 ? 'var(--danger)' : 'var(--text-muted)' }}>
+                                            BHD {total.toFixed(3)}
+                                        </span>
+                                    </div>
+                                );
+                            },
                             render: (d) => (
                                 <span style={{ color: Number(d.total_balance) > 0 ? 'var(--danger)' : 'var(--text-muted)', fontWeight: 600 }}>
                                     {Number(d.total_balance || 0).toFixed(3)}
@@ -8220,6 +8463,7 @@ function SpecialOfferingsReportsView({ year, showToast, refreshTrigger }) {
                             header: 'Status',
                             accessor: 'overall_status',
                             sortable: true,
+                            footer: () => null,
                             render: (d) => (
                                 <span className={`badge badge-${
                                     d.overall_status === 'Paid' ? 'success' :
@@ -9123,25 +9367,46 @@ function ReportsView({ year, showToast, refreshTrigger, initialSubTab = 'auction
                                         sortable: false,
                                         headerStyle: { width: '60px', textAlign: 'center' },
                                         style: { textAlign: 'center', width: '60px', fontWeight: 600, color: 'var(--text-muted)' },
+                                        footer: () => (
+                                            <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', fontWeight: 700 }}>
+                                                Total
+                                            </span>
+                                        ),
                                         render: (c, index) => <span style={{ fontSize: '12px' }}>{index + 1}</span>
                                     },
                                     {
                                         header: 'Category',
                                         accessor: 'category',
                                         sortable: true,
+                                        footer: (allRows) => (
+                                            <span style={{ color: 'var(--text-primary)', fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                                {allRows.length} Categories
+                                            </span>
+                                        ),
                                         render: (c) => <strong style={{ color: 'var(--text-primary)' }}>{c.category}</strong>
                                     },
                                     {
                                         header: 'Articles Count',
                                         accessor: 'article_count',
                                         sortable: true,
-                                        sortValue: (c) => Number(c.article_count) || 0
+                                        sortValue: (c) => Number(c.article_count) || 0,
+                                        footer: (allRows) => (
+                                            <strong style={{ color: 'var(--text-primary)' }}>
+                                                {allRows.reduce((sum, c) => sum + (Number(c.article_count) || 0), 0)} Articles
+                                            </strong>
+                                        ),
+                                        render: (c) => <span>{c.article_count}</span>
                                     },
                                     {
                                         header: 'Sold Count',
                                         accessor: 'sold_count',
                                         sortable: true,
                                         sortValue: (c) => Number(c.sold_count) || 0,
+                                        footer: (allRows) => (
+                                            <span className="badge badge-success">
+                                                {allRows.reduce((sum, c) => sum + (Number(c.sold_count) || 0), 0)} Sold
+                                            </span>
+                                        ),
                                         render: (c) => <span className="badge badge-success">{c.sold_count}</span>
                                     },
                                     {
@@ -9149,6 +9414,17 @@ function ReportsView({ year, showToast, refreshTrigger, initialSubTab = 'auction
                                         accessor: 'estimated_val',
                                         sortable: true,
                                         sortValue: (c) => Number(c.estimated_val) || 0,
+                                        footer: (allRows) => {
+                                            const total = allRows.reduce((sum, c) => sum + (Number(c.estimated_val) || 0), 0);
+                                            return (
+                                                <div className="dt-footer-amount-box">
+                                                    <span className="dt-footer-amount-label">Est. Value Total</span>
+                                                    <span className="dt-footer-amount-val" style={{ color: 'var(--primary)' }}>
+                                                        BHD {total.toFixed(3)}
+                                                    </span>
+                                                </div>
+                                            );
+                                        },
                                         render: (c) => `BHD ${Number(c.estimated_val).toFixed(3)}`
                                     },
                                     {
@@ -9156,6 +9432,17 @@ function ReportsView({ year, showToast, refreshTrigger, initialSubTab = 'auction
                                         accessor: 'total_bid_val',
                                         sortable: true,
                                         sortValue: (c) => Number(c.total_bid_val) || 0,
+                                        footer: (allRows) => {
+                                            const total = allRows.reduce((sum, c) => sum + (Number(c.total_bid_val) || 0), 0);
+                                            return (
+                                                <div className="dt-footer-amount-box">
+                                                    <span className="dt-footer-amount-label">Sales Total</span>
+                                                    <span className="dt-footer-amount-val" style={{ color: 'var(--primary)' }}>
+                                                        BHD {total.toFixed(3)}
+                                                    </span>
+                                                </div>
+                                            );
+                                        },
                                         render: (c) => <strong style={{ color: 'var(--primary)' }}>BHD {Number(c.total_bid_val).toFixed(3)}</strong>
                                     }
                                 ]}
@@ -9209,30 +9496,43 @@ function ReportsView({ year, showToast, refreshTrigger, initialSubTab = 'auction
                             sortable: false,
                             headerStyle: { width: '60px', textAlign: 'center' },
                             style: { textAlign: 'center', width: '60px', fontWeight: 600, color: 'var(--text-muted)' },
+                            footer: () => (
+                                <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', fontWeight: 700 }}>
+                                    Total
+                                </span>
+                            ),
                             render: (b, index) => <span style={{ fontSize: '12px' }}>{index + 1}</span>
                         },
                         {
                             header: 'Buyer / Member Name',
                             accessor: 'buyer_name',
                             sortable: true,
+                            footer: (allRows) => (
+                                <span style={{ color: 'var(--text-primary)', fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                    {allRows.length} Members
+                                </span>
+                            ),
                             render: (b) => <strong style={{ color: 'var(--text-primary)' }}>{b.buyer_name}</strong>
                         },
                         {
                             header: 'Roll No',
                             accessor: 'buyer_code_c',
                             sortable: true,
+                            footer: () => null,
                             render: (b) => b.buyer_code_c ? <strong style={{ color: 'var(--primary)' }}>{b.buyer_code_c}</strong> : 'N/A'
                         },
                         {
                             header: 'CPR No',
                             accessor: 'cpr_no',
                             sortable: true,
+                            footer: () => null,
                             render: (b) => b.cpr_no || 'N/A'
                         },
                         {
                             header: 'Contact Phone',
                             accessor: 'buyer_phone',
                             sortable: true,
+                            footer: () => null,
                             render: (b) => b.buyer_phone || 'N/A'
                         },
                         {
@@ -9247,6 +9547,14 @@ function ReportsView({ year, showToast, refreshTrigger, initialSubTab = 'auction
                                 return `${b.items_purchased || ''} ${itemsStr}`;
                             },
                             style: { minWidth: '260px' },
+                            footer: (allRows) => {
+                                const totalCount = allRows.reduce((sum, b) => sum + (Number(b.items_purchased) || (Array.isArray(b.items) ? b.items.length : 0)), 0);
+                                return (
+                                    <span className="badge badge-secondary" style={{ fontWeight: 700, fontSize: '11px' }}>
+                                        {totalCount} Total Items
+                                    </span>
+                                );
+                            },
                             render: (b) => (
                                 <div>
                                     <div style={{ marginBottom: (Array.isArray(b.items) && b.items.length > 0) ? '6px' : '0' }}>
@@ -9302,6 +9610,17 @@ function ReportsView({ year, showToast, refreshTrigger, initialSubTab = 'auction
                             accessor: 'total_purchased',
                             sortable: true,
                             sortValue: (b) => Number(b.total_purchased) || 0,
+                            footer: (allRows) => {
+                                const total = allRows.reduce((sum, b) => sum + (Number(b.total_purchased) || 0), 0);
+                                return (
+                                    <div className="dt-footer-amount-box">
+                                        <span className="dt-footer-amount-label">Purchases Total</span>
+                                        <span className="dt-footer-amount-val" style={{ color: 'var(--primary)' }}>
+                                            BHD {total.toFixed(3)}
+                                        </span>
+                                    </div>
+                                );
+                            },
                             render: (b) => <strong>BHD {Number(b.total_purchased).toFixed(3)}</strong>
                         },
                         {
@@ -9309,6 +9628,17 @@ function ReportsView({ year, showToast, refreshTrigger, initialSubTab = 'auction
                             accessor: 'total_paid',
                             sortable: true,
                             sortValue: (b) => Number(b.total_paid) || 0,
+                            footer: (allRows) => {
+                                const total = allRows.reduce((sum, b) => sum + (Number(b.total_paid) || 0), 0);
+                                return (
+                                    <div className="dt-footer-amount-box">
+                                        <span className="dt-footer-amount-label">Paid Total</span>
+                                        <span className="dt-footer-amount-val" style={{ color: 'var(--success)' }}>
+                                            BHD {total.toFixed(3)}
+                                        </span>
+                                    </div>
+                                );
+                            },
                             render: (b) => <span style={{ color: 'var(--success)' }}>{Number(b.total_paid).toFixed(3)}</span>
                         },
                         {
@@ -9316,6 +9646,17 @@ function ReportsView({ year, showToast, refreshTrigger, initialSubTab = 'auction
                             accessor: 'total_balance',
                             sortable: true,
                             sortValue: (b) => Number(b.total_balance) || 0,
+                            footer: (allRows) => {
+                                const total = allRows.reduce((sum, b) => sum + (Number(b.total_balance) || 0), 0);
+                                return (
+                                    <div className="dt-footer-amount-box">
+                                        <span className="dt-footer-amount-label">Balance Total</span>
+                                        <span className="dt-footer-amount-val" style={{ color: total > 0.0001 ? 'var(--danger)' : 'var(--text-muted)' }}>
+                                            BHD {total.toFixed(3)}
+                                        </span>
+                                    </div>
+                                );
+                            },
                             render: (b) => (
                                 <span style={{ color: Number(b.total_balance) > 0 ? 'var(--danger)' : 'var(--text-muted)', fontWeight: 600 }}>
                                     {Number(b.total_balance).toFixed(3)}
@@ -9326,6 +9667,7 @@ function ReportsView({ year, showToast, refreshTrigger, initialSubTab = 'auction
                             header: 'Status',
                             accessor: 'overall_status',
                             sortable: true,
+                            footer: () => null,
                             render: (b) => (
                                 <span className={`badge badge-${
                                     b.overall_status === 'Paid' ? 'success' :

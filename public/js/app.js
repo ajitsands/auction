@@ -10917,7 +10917,6 @@ function App() {
                         >
                             <i className="material-icons">inventory_2</i>
                             <span>Article Master</span>
-                            {stats?.total_articles > 0 && <span className="nav-badge">{stats.total_articles}</span>}
                         </div>
 
                         <div 
@@ -10926,11 +10925,6 @@ function App() {
                         >
                             <i className="material-icons">gavel</i>
                             <span>Live Auction Desk</span>
-                            {stats?.available_articles > 0 && (
-                                <span className="nav-badge" style={{ background: 'rgba(255, 255, 255, 0.3)', color: '#ffffff' }}>
-                                    {stats.available_articles}
-                                </span>
-                            )}
                         </div>
 
                         <div 
@@ -10940,11 +10934,6 @@ function App() {
                         >
                             <i className="material-icons">volunteer_activism</i>
                             <span>Special Offerings</span>
-                            {stats?.total_offerings > 0 && (
-                                <span className="nav-badge" style={{ background: '#f59e0b', color: '#1e293b' }}>
-                                    {stats.total_offerings}
-                                </span>
-                            )}
                         </div>
 
                         {/* Sub Menu: More Dropdown (Promises & Dues, Sales Reports, User Management) */}
@@ -11110,21 +11099,21 @@ function App() {
                         onClick={() => { setCurrentTab('articles'); setSidebarOpen(false); }}
                     >
                         <i className="material-icons">inventory_2</i>
-                        <span>Article Master ({stats?.total_articles || 0})</span>
+                        <span>Article Master</span>
                     </div>
                     <div 
                         className={`top-nav-item ${currentTab === 'auction' ? 'active' : ''}`}
                         onClick={() => { setCurrentTab('auction'); setSidebarOpen(false); }}
                     >
                         <i className="material-icons">gavel</i>
-                        <span>Live Auction Desk ({stats?.available_articles || 0})</span>
+                        <span>Live Auction Desk</span>
                     </div>
                     <div 
                         className={`top-nav-item ${currentTab === 'offerings' ? 'active' : ''}`}
                         onClick={() => { setCurrentTab('offerings'); setSidebarOpen(false); }}
                     >
                         <i className="material-icons">volunteer_activism</i>
-                        <span>Special Offerings ({stats?.total_offerings || 0})</span>
+                        <span>Special Offerings</span>
                     </div>
 
                     <div className="mobile-nav-section-title">

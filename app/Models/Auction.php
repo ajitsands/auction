@@ -5,13 +5,15 @@ use App\Core\Model;
 use PDO;
 
 class Auction extends Model {
-    public function getAll(int $year, ?string $paymentStatus = null, ?string $search = null): array {
+    public function getAll(int $year, ?string $paymentStatus = null, ?string $search = null, ?string $offeringType = null): array {
         $baseSql = "
             SELECT 
                 t.transaction_id,
                 t.auction_ref_no,
                 t.article_id,
                 t.applicable_year,
+                COALESCE(t.offering_type, 'Auction') as offering_type,
+                t.item_description,
                 t.buyer_member_id,
                 t.buyer_name,
                 t.buyer_code_c,
@@ -121,6 +123,17 @@ class Auction extends Model {
             $params['status'] = $paymentStatus;
         }
 
+        if ($offeringType && $offeringType !== 'All') {
+            if ($offeringType === 'Auction') {
+                $sql .= " AND (q.offering_type = 'Auction' OR q.offering_type IS NULL OR q.offering_type = '')";
+            } elseif ($offeringType === 'Offerings') {
+                $sql .= " AND q.offering_type IN ('Gold', 'BedSheet')";
+            } elseif (in_array($offeringType, ['Gold', 'BedSheet'])) {
+                $sql .= " AND q.offering_type = :offering_type";
+                $params['offering_type'] = $offeringType;
+            }
+        }
+
         if ($search && trim($search) !== '') {
             $sql .= " AND (q.auction_ref_no LIKE :search1
                         OR q.buyer_name LIKE :search2
@@ -129,16 +142,12 @@ class Auction extends Model {
                         OR q.article_name LIKE :search5
                         OR q.buyer_code_c LIKE :search6
                         OR q.buyer_phone LIKE :search7
-                        OR q.buyer_cpr LIKE :search8)";
+                        OR q.buyer_cpr LIKE :search8
+                        OR q.item_description LIKE :search9)";
             $term = "%" . trim($search) . "%";
-            $params['search1'] = $term;
-            $params['search2'] = $term;
-            $params['search3'] = $term;
-            $params['search4'] = $term;
-            $params['search5'] = $term;
-            $params['search6'] = $term;
-            $params['search7'] = $term;
-            $params['search8'] = $term;
+            for ($i = 1; $i <= 9; $i++) {
+                $params["search{$i}"] = $term;
+            }
         }
 
         $sql .= " ORDER BY q.transaction_id DESC";
@@ -224,6 +233,8 @@ class Auction extends Model {
                     ELSE 'Pending'
                 END as payment_status,
                 t.auction_date,
+                COALESCE(t.offering_type, 'Auction') as offering_type,
+                t.item_description,
                 t.notes,
                 t.created_by,
                 t.created_at,
@@ -273,7 +284,8 @@ class Auction extends Model {
             return;
         }
 
-        $articleIds = array_values(array_unique(array_filter(array_column($rows, 'article_id'))));
+        $auctionRows = array_filter($rows, fn($r) => empty($r['offering_type']) || $r['offering_type'] === 'Auction');
+        $articleIds = array_values(array_unique(array_filter(array_column($auctionRows, 'article_id'))));
         $contribIds = array_values(array_unique(array_filter(array_column($rows, 'acc_contribution_id'))));
         $promiseIds = array_values(array_unique(array_filter(array_column($rows, 'acc_promise_id'))));
 
@@ -379,6 +391,7 @@ class Auction extends Model {
 
         // 3. Attach to transactions
         foreach ($rows as &$t) {
+            $isOffering = !empty($t['offering_type']) && $t['offering_type'] !== 'Auction';
             $artId = (int)($t['article_id'] ?? 0);
             $memId = (int)($t['buyer_member_id'] ?? 0);
             $cid = (int)($t['acc_contribution_id'] ?? 0);
@@ -389,12 +402,12 @@ class Auction extends Model {
             $cKeyId  = 'cid_' . $cid;
 
             $cList = [];
-            if ($artId > 0 && $memId > 0 && isset($contribMap[$cKeyMem])) {
-                $cList = $contribMap[$cKeyMem];
-            } elseif ($artId > 0 && isset($contribMap[$cKeyArt])) {
-                $cList = $contribMap[$cKeyArt];
-            } elseif ($cid > 0 && isset($contribMap[$cKeyId])) {
+            if ($cid > 0 && isset($contribMap[$cKeyId])) {
                 $cList = [$contribMap[$cKeyId]];
+            } elseif (!$isOffering && $artId > 0 && $memId > 0 && isset($contribMap[$cKeyMem])) {
+                $cList = $contribMap[$cKeyMem];
+            } elseif (!$isOffering && $artId > 0 && isset($contribMap[$cKeyArt])) {
+                $cList = $contribMap[$cKeyArt];
             } elseif (!empty($t['contrib_voucher_no'])) {
                 $cList = [[
                     'contribution_id'     => $t['acc_contribution_id'],
@@ -422,12 +435,12 @@ class Auction extends Model {
             $pKeyId  = 'pid_' . $pid;
 
             $pList = [];
-            if ($artId > 0 && $memId > 0 && isset($promiseMap[$pKeyMem])) {
-                $pList = $promiseMap[$pKeyMem];
-            } elseif ($artId > 0 && isset($promiseMap[$pKeyArt])) {
-                $pList = $promiseMap[$pKeyArt];
-            } elseif ($pid > 0 && isset($promiseMap[$pKeyId])) {
+            if ($pid > 0 && isset($promiseMap[$pKeyId])) {
                 $pList = [$promiseMap[$pKeyId]];
+            } elseif (!$isOffering && $artId > 0 && $memId > 0 && isset($promiseMap[$pKeyMem])) {
+                $pList = $promiseMap[$pKeyMem];
+            } elseif (!$isOffering && $artId > 0 && isset($promiseMap[$pKeyArt])) {
+                $pList = $promiseMap[$pKeyArt];
             } elseif (!empty($t['promise_voucher_no'])) {
                 $pList = [[
                     'promise_id'     => $t['acc_promise_id'],
@@ -452,27 +465,87 @@ class Auction extends Model {
         unset($t);
     }
 
+    /**
+     * Get or create default offering article master for Gold or Bed Sheet
+     */
+    public function getOrCreateDefaultOfferingArticle(int $year, string $type): array {
+        $tag = ($type === 'Gold') ? 'GOLD' : 'BEDSHEET';
+        $name = ($type === 'Gold') ? 'Gold Offering' : 'Bed Sheet Offering';
+        $artNum = ($type === 'Gold') ? "OFFER-GOLD-{$year}" : "OFFER-BEDSHEET-{$year}";
+        $category = ($type === 'Gold') ? 'Gold Offering' : 'Bed Sheet Offering';
+
+        $stmt = $this->db->prepare("SELECT * FROM hf_articles WHERE applicable_year = :year AND tag_number = :tag LIMIT 1");
+        $stmt->execute(['year' => $year, 'tag' => $tag]);
+        $existing = $stmt->fetch();
+        if ($existing) {
+            return $existing;
+        }
+
+        // Insert default article for this festival year
+        $ins = $this->db->prepare("
+            INSERT INTO hf_articles (
+                article_number, tag_number, applicable_year, article_name,
+                description, category, donor_name, estimated_value, reserve_price, status
+            ) VALUES (
+                :num, :tag, :year, :name,
+                :desc, :cat, 'Devotee / Well-Wisher', 0, 0, 'Available'
+            )
+        ");
+        $ins->execute([
+            'num'  => $artNum,
+            'tag'  => $tag,
+            'year' => $year,
+            'name' => $name,
+            'desc' => "Default master item for {$name}",
+            'cat'  => $category
+        ]);
+        $id = (int)$this->db->lastInsertId();
+
+        $getStmt = $this->db->prepare("SELECT * FROM hf_articles WHERE article_id = :id");
+        $getStmt->execute(['id' => $id]);
+        return $getStmt->fetch() ?: [];
+    }
+
     public function recordAuction(array $data, int $userId): array {
         try {
-            $articleId = (int)$data['article_id'];
-            // Fetch article info
-            $artStmt = $this->db->prepare("SELECT * FROM hf_articles WHERE article_id = :id");
-            $artStmt->execute(['id' => $articleId]);
-            $art = $artStmt->fetch() ?: [];
-
-            $year = !empty($data['applicable_year']) ? (int)$data['applicable_year'] : (!empty($art['applicable_year']) ? (int)$art['applicable_year'] : (int)date('Y'));
-            $bidAmount = (float)$data['winning_bid_amount'];
-            $paidAmount = (float)($data['paid_amount'] ?? 0);
+            $offeringType = in_array($data['offering_type'] ?? '', ['Gold', 'BedSheet']) ? $data['offering_type'] : 'Auction';
+            $isOffering = ($offeringType !== 'Auction');
+            $year = !empty($data['applicable_year']) ? (int)$data['applicable_year'] : (int)date('Y');
+            $bidAmount = (float)($data['winning_bid_amount'] ?? ($data['bid_amount'] ?? 0));
+            $paidAmount = (float)($data['paid_amount'] ?? ($data['amount_paid'] ?? 0));
             $balanceAmount = max(0, $bidAmount - $paidAmount);
 
-            // Validate against article reserve price
-            $reservePrice = !empty($art['reserve_price']) ? (float)$art['reserve_price'] : 0.0;
-            if ($reservePrice > 0.0001 && $bidAmount < ($reservePrice - 0.0001)) {
-                throw new \Exception(sprintf(
-                    "Winning bid amount (BHD %.3f) cannot be less than the article's reserve price of BHD %.3f.",
-                    $bidAmount,
-                    $reservePrice
-                ));
+            if ($isOffering) {
+                $itemDescription = trim($data['item_description'] ?? '');
+                if ($itemDescription === '') {
+                    throw new \Exception("Item description is required for {$offeringType} offerings.");
+                }
+                $art = $this->getOrCreateDefaultOfferingArticle($year, $offeringType);
+                $articleId = (int)$art['article_id'];
+            } else {
+                $articleId = (int)($data['article_id'] ?? 0);
+                if ($articleId <= 0) {
+                    throw new \Exception("Please select an article for Live Auction.");
+                }
+                // Fetch article info
+                $artStmt = $this->db->prepare("SELECT * FROM hf_articles WHERE article_id = :id");
+                $artStmt->execute(['id' => $articleId]);
+                $art = $artStmt->fetch() ?: [];
+                if (empty($art)) {
+                    throw new \Exception("Article not found.");
+                }
+
+                $year = !empty($art['applicable_year']) ? (int)$art['applicable_year'] : $year;
+
+                // Validate against article reserve price
+                $reservePrice = !empty($art['reserve_price']) ? (float)$art['reserve_price'] : 0.0;
+                if ($reservePrice > 0.0001 && $bidAmount < ($reservePrice - 0.0001)) {
+                    throw new \Exception(sprintf(
+                        "Winning bid amount (BHD %.3f) cannot be less than the article's reserve price of BHD %.3f.",
+                        $bidAmount,
+                        $reservePrice
+                    ));
+                }
             }
 
             // Fetch member code_m if buyer_member_id given
@@ -490,24 +563,41 @@ class Auction extends Model {
                 $paymentStatus = 'Partial';
             }
 
-            // Generate unique auction ref no
-            $countStmt = $this->db->prepare("SELECT COUNT(*) FROM hf_auction_transactions WHERE applicable_year = :year");
-            $countStmt->execute(['year' => $year]);
-            $seq = $countStmt->fetchColumn() + 1;
-            $auctionRefNo = sprintf("AUC-%d-%04d", $year, $seq);
+            // Generate unique auction/offering ref no with dedicated prefixes
+            if ($isOffering) {
+                $prefix = ($offeringType === 'Gold') ? 'GLD' : 'BED';
+                $countStmt = $this->db->prepare("SELECT COUNT(*) FROM hf_auction_transactions WHERE applicable_year = :year AND auction_ref_no LIKE :prefix");
+                $countStmt->execute(['year' => $year, 'prefix' => "{$prefix}-%"]);
+                $seq = $countStmt->fetchColumn() + 1;
+                $auctionRefNo = sprintf("%s-%d-%04d", $prefix, $year, $seq);
+            } else {
+                $countStmt = $this->db->prepare("SELECT COUNT(*) FROM hf_auction_transactions WHERE applicable_year = :year AND auction_ref_no LIKE 'AUC-%'");
+                $countStmt->execute(['year' => $year]);
+                $seq = $countStmt->fetchColumn() + 1;
+                $auctionRefNo = sprintf("AUC-%d-%04d", $year, $seq);
+            }
 
             $eventId = !empty($data['event_id']) ? (int)$data['event_id'] : 10;
             $eventName = !empty($data['event_name']) ? trim($data['event_name']) : ('Budget ' . $year);
             $auctionDate = !empty($data['auction_date']) ? $data['auction_date'] : date('Y-m-d');
 
-            // Build comprehensive article details string with both Tag and Article Number
-            $artTag = !empty($art['tag_number']) ? $art['tag_number'] : ('#' . $articleId);
+            // Build article details and narration
+            $artTag = !empty($art['tag_number']) ? $art['tag_number'] : ($isOffering ? strtoupper($offeringType) : ('#' . $articleId));
             $artNo = !empty($art['article_number']) ? $art['article_number'] : ('ART-' . $articleId);
-            $artName = !empty($art['article_name']) ? $art['article_name'] : 'Article';
-            $artCategory = !empty($art['category']) ? $art['category'] : 'General';
-            $artDonor = !empty($art['donor_name']) ? $art['donor_name'] : 'Well-Wisher';
-            $artEst = number_format((float)($art['estimated_value'] ?? 0), 3);
-            $articleDetails = sprintf("Tag: %s | Art No: %s | %s | Cat: %s | Donor: %s | Est: %s BHD", $artTag, $artNo, $artName, $artCategory, $artDonor, $artEst);
+            $artName = !empty($art['article_name']) ? $art['article_name'] : ($isOffering ? "{$offeringType} Offering" : 'Article');
+
+            if ($isOffering) {
+                $articleDetails = sprintf("[%s] %s", $artTag, $itemDescription);
+                $pNarration = sprintf("%s Offering: [%s] %s * %s * %s", $offeringType, $artTag, $itemDescription, $auctionRefNo, trim($data['buyer_name']));
+                $cNarration = sprintf("%s Offering Payment: [%s] %s * %s * %s", $offeringType, $artTag, $itemDescription, $auctionRefNo, trim($data['buyer_name']));
+            } else {
+                $artCategory = !empty($art['category']) ? $art['category'] : 'General';
+                $artDonor = !empty($art['donor_name']) ? $art['donor_name'] : 'Well-Wisher';
+                $artEst = number_format((float)($art['estimated_value'] ?? 0), 3);
+                $articleDetails = sprintf("Tag: %s | Art No: %s | %s | Cat: %s | Donor: %s | Est: %s BHD", $artTag, $artNo, $artName, $artCategory, $artDonor, $artEst);
+                $pNarration = sprintf("Auction Promise: [%s / %s] %s (Art ID: %d) * %s * %s", $artTag, $artNo, $artName, $articleId, $auctionRefNo, trim($data['buyer_name']));
+                $cNarration = sprintf("Auction Floor Payment: [%s / %s] %s (Art ID: %d) * %s * %s", $artTag, $artNo, $artName, $articleId, $auctionRefNo, trim($data['buyer_name']));
+            }
 
             $receiptBookNo = !empty($data['receipt_book_no']) ? trim($data['receipt_book_no']) : '0';
             $receiptNoInput = !empty($data['receipt_no']) ? trim($data['receipt_no']) : '0';
@@ -739,6 +829,7 @@ class Auction extends Model {
                     promise_dr_code, promise_dr_name, promise_cr_code, promise_cr_name,
                     promise_voucher_no, acc_promise_id,
                     receipt_book_no, manual_receipt_no,
+                    offering_type, item_description,
                     created_at
                 ) VALUES (
                     :auction_ref_no, :article_id, :applicable_year, :buyer_member_id,
@@ -750,6 +841,7 @@ class Auction extends Model {
                     :promise_dr_code, :promise_dr_name, :promise_cr_code, :promise_cr_name,
                     :promise_voucher_no, :acc_promise_id,
                     :receipt_book_no, :manual_receipt_no,
+                    :offering_type, :item_description,
                     :created_at
                 )
             ");
@@ -784,14 +876,18 @@ class Auction extends Model {
                 'acc_promise_id'      => $accPromiseId,
                 'receipt_book_no'     => $receiptBookNo !== '0' ? $receiptBookNo : null,
                 'manual_receipt_no'   => $receiptNoInput !== '0' ? $receiptNoInput : null,
+                'offering_type'       => $offeringType,
+                'item_description'    => $isOffering ? $itemDescription : null,
                 'created_at'          => date('Y-m-d H:i:s')
             ]);
             $transactionId = (int)$this->db->lastInsertId();
 
-            // Update article status to 'Sold' or 'Auctioned'
-            $artStatus = ($paymentStatus === 'Paid') ? 'Sold' : 'Auctioned';
-            $updArt = $this->db->prepare("UPDATE hf_articles SET status = :status WHERE article_id = :id");
-            $updArt->execute(['status' => $artStatus, 'id' => $articleId]);
+            if (!$isOffering) {
+                // Update article status to 'Sold' or 'Auctioned'
+                $artStatus = ($paymentStatus === 'Paid') ? 'Sold' : 'Auctioned';
+                $updArt = $this->db->prepare("UPDATE hf_articles SET status = :status WHERE article_id = :id");
+                $updArt->execute(['status' => $artStatus, 'id' => $articleId]);
+            }
 
             $receiptNo = null;
             // --- 4. Record payment in hf_payments if paidAmount > 0 ---
@@ -898,7 +994,7 @@ class Auction extends Model {
     }
 
     public function getStats(int $year): array {
-        // Article stats
+        // 1. Article stats
         $artStmt = $this->db->prepare("
             SELECT 
                 COUNT(*) as total_articles,
@@ -911,11 +1007,11 @@ class Auction extends Model {
         $artStmt->execute(['year' => $year]);
         $artStats = $artStmt->fetch() ?: [];
 
-        // Auction stats populated from acc_contribution and acc_promises
-        $aucStmt = $this->db->prepare("
+        // 2. Live Floor Auction stats (excluding Gold and Bed Sheet special offerings)
+        $liveStmt = $this->db->prepare("
             SELECT 
-                COUNT(*) as total_transactions,
-                COALESCE(SUM(t.winning_bid_amount), 0) as total_auction_sales,
+                COUNT(*) as live_auction_count,
+                COALESCE(SUM(t.winning_bid_amount), 0) as live_auction_sales,
                 COALESCE(SUM(
                     COALESCE(
                         (SELECT SUM(c.contribution_amount) 
@@ -925,7 +1021,7 @@ class Auction extends Model {
                         t.paid_amount,
                         0
                     )
-                ), 0) as total_collected,
+                ), 0) as live_auction_collected,
                 COALESCE(SUM(
                     CASE 
                         WHEN EXISTS (
@@ -947,15 +1043,58 @@ class Auction extends Model {
                             0
                         ))
                     END
-                ), 0) as total_pending_promises,
+                ), 0) as live_auction_pending,
                 COUNT(DISTINCT t.buyer_name) as unique_buyers
             FROM hf_auction_transactions t
-            WHERE t.applicable_year = :year
+            WHERE t.applicable_year = :year 
+              AND (t.offering_type IS NULL OR t.offering_type NOT IN ('Gold', 'BedSheet'))
         ");
-        $aucStmt->execute(['year' => $year]);
-        $aucStats = $aucStmt->fetch() ?: [];
+        $liveStmt->execute(['year' => $year]);
+        $liveStats = $liveStmt->fetch() ?: [];
 
-        // Active promises count & balance directly from acc_promises
+        // 3. Special Offerings Stats (Gold and Bed Sheet detailed breakdown)
+        $offeringStmt = $this->db->prepare("
+            SELECT 
+                COUNT(*) as total_offerings,
+                COALESCE(SUM(t.winning_bid_amount), 0) as total_offerings_amount,
+                COALESCE(SUM(t.paid_amount), 0) as total_offerings_collected,
+                COALESCE(SUM(t.balance_amount), 0) as total_offerings_pending,
+                
+                -- Gold Offerings Breakdown
+                COALESCE(SUM(CASE WHEN t.offering_type = 'Gold' THEN 1 ELSE 0 END), 0) as gold_offerings_count,
+                COALESCE(SUM(CASE WHEN t.offering_type = 'Gold' THEN t.winning_bid_amount ELSE 0 END), 0) as gold_offerings_amount,
+                COALESCE(SUM(CASE WHEN t.offering_type = 'Gold' THEN t.paid_amount ELSE 0 END), 0) as gold_collected_amount,
+                COALESCE(SUM(CASE WHEN t.offering_type = 'Gold' THEN t.balance_amount ELSE 0 END), 0) as gold_pending_amount,
+
+                -- Bed Sheet Offerings Breakdown
+                COALESCE(SUM(CASE WHEN t.offering_type = 'BedSheet' THEN 1 ELSE 0 END), 0) as bedsheet_offerings_count,
+                COALESCE(SUM(CASE WHEN t.offering_type = 'BedSheet' THEN t.winning_bid_amount ELSE 0 END), 0) as bedsheet_offerings_amount,
+                COALESCE(SUM(CASE WHEN t.offering_type = 'BedSheet' THEN t.paid_amount ELSE 0 END), 0) as bedsheet_collected_amount,
+                COALESCE(SUM(CASE WHEN t.offering_type = 'BedSheet' THEN t.balance_amount ELSE 0 END), 0) as bedsheet_pending_amount
+            FROM hf_auction_transactions t
+            WHERE t.applicable_year = :year AND t.offering_type IN ('Gold', 'BedSheet')
+        ");
+        $offeringStmt->execute(['year' => $year]);
+        $offeringStats = $offeringStmt->fetch() ?: [];
+
+        // 4. Overall Festival Totals (Live Floor Auction + Special Offerings)
+        $grandSales = (float)($liveStats['live_auction_sales'] ?? 0) + (float)($offeringStats['total_offerings_amount'] ?? 0);
+        $grandCollected = (float)($liveStats['live_auction_collected'] ?? 0) + (float)($offeringStats['total_offerings_collected'] ?? 0);
+        $grandPending = (float)($liveStats['live_auction_pending'] ?? 0) + (float)($offeringStats['total_offerings_pending'] ?? 0);
+        $grandCount = (int)($liveStats['live_auction_count'] ?? 0) + (int)($offeringStats['total_offerings'] ?? 0);
+
+        $overallStats = [
+            'total_transactions'      => $grandCount,
+            'total_auction_sales'     => $grandSales,
+            'total_collected'         => $grandCollected,
+            'total_pending_promises'  => $grandPending,
+            'grand_total_sales'       => $grandSales,
+            'grand_total_collected'   => $grandCollected,
+            'grand_total_pending'     => $grandPending,
+            'grand_total_count'       => $grandCount
+        ];
+
+        // 5. Active promises count & balance directly from acc_promises
         $promStmt = $this->db->prepare("
             SELECT 
                 COUNT(*) as active_promises_count, 
@@ -967,6 +1106,6 @@ class Auction extends Model {
         $promStmt->execute(['year' => $year]);
         $promStats = $promStmt->fetch() ?: [];
 
-        return array_merge($artStats, $aucStats, $promStats);
+        return array_merge($artStats, $liveStats, $offeringStats, $overallStats, $promStats);
     }
 }

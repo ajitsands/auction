@@ -5,7 +5,7 @@ use App\Core\Model;
 use PDO;
 
 class Article extends Model {
-    public function getAll(int $year, ?string $status = null, ?string $search = null, ?string $category = null, string $order = 'ASC'): array {
+    public function getAll(int $year, ?string $status = null, ?string $search = null, ?string $category = null, string $order = 'ASC', bool $excludeOfferings = false): array {
         $sql = "
             SELECT a.*, 
                    COALESCE(a.donor_code_c, m.code_c) as donor_code_c, 
@@ -16,6 +16,10 @@ class Article extends Model {
             WHERE a.applicable_year = :year
         ";
         $params = ['year' => $year];
+
+        if ($excludeOfferings) {
+            $sql .= " AND a.tag_number NOT IN ('GOLD', 'BEDSHEET')";
+        }
 
         if ($status && $status !== 'All') {
             $sql .= " AND a.status = :status";

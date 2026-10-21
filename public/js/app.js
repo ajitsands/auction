@@ -804,6 +804,36 @@ function LoginScreen({ onLoginSuccess }) {
 
 // --- Dashboard View ---
 function DashboardView({ stats, year, onNavigate, onOpenNewArticle, onOpenImport }) {
+    // Breakdown computations
+    const goldAmount = Number(stats?.gold_offerings_amount || 0);
+    const goldPaid = Number(stats?.gold_collected_amount || 0);
+    const goldDue = Number(stats?.gold_pending_amount || 0);
+    const goldCount = Number(stats?.gold_offerings_count || 0);
+    const goldRecoveryPct = goldAmount > 0 ? Math.round((goldPaid / goldAmount) * 100) : 0;
+
+    const bedAmount = Number(stats?.bedsheet_offerings_amount || 0);
+    const bedPaid = Number(stats?.bedsheet_collected_amount || 0);
+    const bedDue = Number(stats?.bedsheet_pending_amount || 0);
+    const bedCount = Number(stats?.bedsheet_offerings_count || 0);
+    const bedRecoveryPct = bedAmount > 0 ? Math.round((bedPaid / bedAmount) * 100) : 0;
+
+    const totalOfferingsAmount = Number(stats?.total_offerings_amount || (goldAmount + bedAmount));
+    const totalOfferingsPaid = Number(stats?.total_offerings_collected || (goldPaid + bedPaid));
+    const totalOfferingsDue = Number(stats?.total_offerings_pending || (goldDue + bedDue));
+    const totalOfferingsCount = Number(stats?.total_offerings || (goldCount + bedCount));
+    const offeringsRecoveryPct = totalOfferingsAmount > 0 ? Math.round((totalOfferingsPaid / totalOfferingsAmount) * 100) : 0;
+
+    const liveSales = Number(stats?.live_auction_sales || 0);
+    const livePaid = Number(stats?.live_auction_collected || 0);
+    const liveDue = Number(stats?.live_auction_pending || 0);
+    const liveCount = Number(stats?.live_auction_count || 0);
+
+    const grandSales = Number(stats?.grand_total_sales || stats?.total_auction_sales || 0);
+    const grandPaid = Number(stats?.grand_total_collected || stats?.total_collected || 0);
+    const grandDue = Number(stats?.grand_total_pending || stats?.total_pending_promises || 0);
+    const grandCount = Number(stats?.grand_total_count || stats?.total_transactions || 0);
+    const grandRecoveryPct = grandSales > 0 ? Math.round((grandPaid / grandSales) * 100) : 0;
+
     return (
         <div>
             {/* Header */}
@@ -814,60 +844,87 @@ function DashboardView({ stats, year, onNavigate, onOpenNewArticle, onOpenImport
                 </div>
             </div>
 
-            {/* Stat Cards - Staging Parallel Gradient Round Accents */}
-            <div className="stats-grid">
+            {/* Stat Cards Grid - Row 1: Overall Highlights & Revenue Streams */}
+            <div className="stats-grid" style={{ marginBottom: '24px' }}>
+                {/* 1. Grand Total Revenue */}
                 <div className="stat-card">
                     <div className="stat-info-col">
-                        <span className="stat-title">Total Articles</span>
-                        <div className="stat-value">{stats?.total_articles || 0}</div>
-                        <div className="stat-sub">Registered for Year {year}</div>
+                        <span className="stat-title">Total Festival Revenue</span>
+                        <div className="stat-value">BHD {grandSales.toFixed(3)}</div>
+                        <div className="stat-sub">{grandCount} Total Entries (Floor + Offerings)</div>
                     </div>
-                    <i className="material-icons background-round gradient-45deg-purple-deep-orange gradient-shadow white-text">inventory_2</i>
+                    <i className="material-icons background-round gradient-45deg-purple-deep-orange gradient-shadow white-text">account_balance</i>
                 </div>
 
-                <div className="stat-card">
-                    <div className="stat-info-col">
-                        <span className="stat-title">Articles Sold</span>
-                        <div className="stat-value">{stats?.sold_articles || 0}</div>
-                        <div className="stat-sub">
-                            {stats?.total_articles > 0 
-                                ? `${Math.round(((stats.sold_articles || 0) / stats.total_articles) * 100)}% Clearance`
-                                : '0% Clearance'}
-                        </div>
-                    </div>
-                    <i className="material-icons background-round gradient-45deg-green-teal gradient-shadow white-text">check_circle</i>
-                </div>
-
-                <div className="stat-card">
-                    <div className="stat-info-col">
-                        <span className="stat-title">Total Auction Value</span>
-                        <div className="stat-value">BHD {Number(stats?.total_auction_sales || 0).toFixed(3)}</div>
-                        <div className="stat-sub">{stats?.total_transactions || 0} Winning Bids</div>
-                    </div>
-                    <i className="material-icons background-round gradient-45deg-indigo-purple gradient-shadow white-text">gavel</i>
-                </div>
-
+                {/* 2. Total Payments Collected */}
                 <div className="stat-card">
                     <div className="stat-info-col">
                         <span className="stat-title">Payments Collected</span>
-                        <div className="stat-value">BHD {Number(stats?.total_collected || 0).toFixed(3)}</div>
-                        <div className="stat-sub">Cash & BenefitPay</div>
+                        <div className="stat-value" style={{ color: 'var(--success)' }}>BHD {grandPaid.toFixed(3)}</div>
+                        <div className="stat-sub">{grandRecoveryPct}% Realized • Cash & BenefitPay</div>
                     </div>
-                    <i className="material-icons background-round gradient-45deg-light-blue-cyan gradient-shadow white-text">payments</i>
+                    <i className="material-icons background-round gradient-45deg-green-teal gradient-shadow white-text">payments</i>
                 </div>
 
+                {/* 3. Outstanding Promises */}
                 <div className="stat-card">
                     <div className="stat-info-col">
                         <span className="stat-title">Pending Promises</span>
-                        <div className="stat-value">BHD {Number(stats?.total_pending_promises || 0).toFixed(3)}</div>
+                        <div className="stat-value" style={{ color: grandDue > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>BHD {grandDue.toFixed(3)}</div>
                         <div className="stat-sub">{stats?.active_promises_count || 0} Open Member Dues</div>
                     </div>
                     <i className="material-icons background-round gradient-45deg-amber-amber gradient-shadow white-text">account_balance_wallet</i>
                 </div>
+
+                {/* 4. Live Floor Auction */}
+                <div 
+                    className="stat-card" 
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => onNavigate && onNavigate('auction')}
+                    title="View Live Floor Auction"
+                >
+                    <div className="stat-info-col">
+                        <span className="stat-title">Live Floor Auction</span>
+                        <div className="stat-value">BHD {liveSales.toFixed(3)}</div>
+                        <div className="stat-sub">{liveCount} Articles Sold • BHD {livePaid.toFixed(3)} Paid</div>
+                    </div>
+                    <i className="material-icons background-round gradient-45deg-indigo-purple gradient-shadow white-text">gavel</i>
+                </div>
+
+                {/* 5. Gold Offerings Total */}
+                <div 
+                    className="stat-card" 
+                    style={{ cursor: 'pointer', borderLeft: '4px solid #f59e0b' }}
+                    onClick={() => onNavigate && onNavigate('offerings')}
+                    title="View Gold Offerings in Special Offerings Desk"
+                >
+                    <div className="stat-info-col">
+                        <span className="stat-title" style={{ color: '#d97706' }}>Gold Offerings Total</span>
+                        <div className="stat-value" style={{ color: '#d97706' }}>BHD {goldAmount.toFixed(3)}</div>
+                        <div className="stat-sub">{goldCount} Gold • BHD {goldPaid.toFixed(3)} Paid</div>
+                    </div>
+                    <i className="material-icons background-round" style={{ background: 'linear-gradient(45deg, #f59e0b, #d97706)', color: '#ffffff' }}>stars</i>
+                </div>
+
+                {/* 6. Bed Sheet Offerings Total */}
+                <div 
+                    className="stat-card" 
+                    style={{ cursor: 'pointer', borderLeft: '4px solid #3b82f6' }}
+                    onClick={() => onNavigate && onNavigate('offerings')}
+                    title="View Bed Sheet Offerings in Special Offerings Desk"
+                >
+                    <div className="stat-info-col">
+                        <span className="stat-title" style={{ color: '#2563eb' }}>Bed Sheet Total</span>
+                        <div className="stat-value" style={{ color: '#2563eb' }}>BHD {bedAmount.toFixed(3)}</div>
+                        <div className="stat-sub">{bedCount} Bed Sheet • BHD {bedPaid.toFixed(3)} Paid</div>
+                    </div>
+                    <i className="material-icons background-round" style={{ background: 'linear-gradient(45deg, #3b82f6, #1d4ed8)', color: '#ffffff' }}>layers</i>
+                </div>
             </div>
 
-            {/* Visual Overview Columns */}
+            {/* Visual Overview Columns - 3 Cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px' }}>
+                {/* Card 1: Article Clearance */}
                 <div className="card">
                     <div className="card-header">
                         <h3>📦 Article Clearance Status</h3>
@@ -909,24 +966,23 @@ function DashboardView({ stats, year, onNavigate, onOpenNewArticle, onOpenImport
                     </div>
                 </div>
 
+                {/* Card 2: Financial Recovery Ratio */}
                 <div className="card">
                     <div className="card-header">
                         <h3>💰 Financial Recovery Ratio</h3>
                         <span className="badge badge-success">
-                            {Number(stats?.total_auction_sales || 0) > 0 
-                                ? `${Math.round(((stats.total_collected || 0) / stats.total_auction_sales) * 100)}% Collected`
-                                : '0%'}
+                            {grandSales > 0 ? `${grandRecoveryPct}% Collected` : '0%'}
                         </span>
                     </div>
                     <div className="card-body">
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
                             <div>
                                 <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Collected Revenue</div>
-                                <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--success)' }}>BHD {Number(stats?.total_collected || 0).toFixed(3)}</div>
+                                <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--success)' }}>BHD {grandPaid.toFixed(3)}</div>
                             </div>
                             <div style={{ textAlign: 'right' }}>
                                 <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Outstanding Promises</div>
-                                <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--danger)' }}>BHD {Number(stats?.total_pending_promises || 0).toFixed(3)}</div>
+                                <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--danger)' }}>BHD {grandDue.toFixed(3)}</div>
                             </div>
                         </div>
 
@@ -934,13 +990,88 @@ function DashboardView({ stats, year, onNavigate, onOpenNewArticle, onOpenImport
                             <div style={{ 
                                 height: '100%', 
                                 background: 'var(--success)', 
-                                width: `${stats?.total_auction_sales > 0 ? ((stats.total_collected || 0) / stats.total_auction_sales) * 100 : 0}%` 
+                                width: `${grandSales > 0 ? (grandPaid / grandSales) * 100 : 0}%` 
                             }}></div>
                         </div>
 
                         <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
                             <span style={{ color: 'var(--text-muted)' }}>Active Bidders: <strong>{stats?.unique_buyers || 0} Members</strong></span>
                             <span style={{ color: 'var(--accent)', cursor: 'pointer', fontWeight: 600 }} onClick={() => onNavigate('promises')}>Manage Promises →</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Card 3: Special Offerings Overview (Gold & Bed Sheet) */}
+                <div className="card">
+                    <div className="card-header">
+                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <i className="material-icons" style={{ fontSize: '20px', color: '#f59e0b' }}>volunteer_activism</i>
+                            Special Offerings Overview
+                        </h3>
+                        <span className="badge" style={{ background: 'linear-gradient(45deg, #7c3aed, #6d28d9)', color: '#ffffff', fontWeight: 700, fontSize: '11px' }}>
+                            BHD {totalOfferingsAmount.toFixed(3)} Total
+                        </span>
+                    </div>
+                    <div className="card-body">
+                        {/* Gold Offerings Progress & Stats */}
+                        <div style={{ marginBottom: '16px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', fontSize: '13px' }}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, color: '#d97706' }}>
+                                    <i className="material-icons" style={{ fontSize: '16px' }}>stars</i>
+                                    Gold Offerings ({goldCount})
+                                </span>
+                                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+                                    BHD {goldAmount.toFixed(3)}
+                                </span>
+                            </div>
+                            <div style={{ width: '100%', height: '8px', background: 'rgba(245, 158, 11, 0.15)', borderRadius: '4px', overflow: 'hidden' }}>
+                                <div style={{ 
+                                    height: '100%', 
+                                    background: 'linear-gradient(45deg, #f59e0b, #d97706)', 
+                                    width: `${goldRecoveryPct}%` 
+                                }}></div>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                                <span style={{ color: 'var(--success)' }}>Paid: BHD {goldPaid.toFixed(3)} ({goldRecoveryPct}%)</span>
+                                <span style={{ color: goldDue > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>Due: BHD {goldDue.toFixed(3)}</span>
+                            </div>
+                        </div>
+
+                        {/* Bed Sheet Offerings Progress & Stats */}
+                        <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', fontSize: '13px' }}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, color: '#2563eb' }}>
+                                    <i className="material-icons" style={{ fontSize: '16px' }}>layers</i>
+                                    Bed Sheet Offerings ({bedCount})
+                                </span>
+                                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+                                    BHD {bedAmount.toFixed(3)}
+                                </span>
+                            </div>
+                            <div style={{ width: '100%', height: '8px', background: 'rgba(59, 130, 246, 0.15)', borderRadius: '4px', overflow: 'hidden' }}>
+                                <div style={{ 
+                                    height: '100%', 
+                                    background: 'linear-gradient(45deg, #3b82f6, #1d4ed8)', 
+                                    width: `${bedRecoveryPct}%` 
+                                }}></div>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                                <span style={{ color: 'var(--success)' }}>Paid: BHD {bedPaid.toFixed(3)} ({bedRecoveryPct}%)</span>
+                                <span style={{ color: bedDue > 0 ? 'var(--danger)' : 'var(--text-muted)' }}>Due: BHD {bedDue.toFixed(3)}</span>
+                            </div>
+                        </div>
+
+                        {/* Special Offerings Total Strip & Link */}
+                        <div style={{ marginTop: '20px', paddingTop: '14px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>
+                                Collected: <strong style={{ color: 'var(--success)' }}>BHD {totalOfferingsPaid.toFixed(3)}</strong> ({offeringsRecoveryPct}%)
+                            </span>
+                            <span 
+                                style={{ color: '#d97706', cursor: 'pointer', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }} 
+                                onClick={() => onNavigate && onNavigate('offerings')}
+                            >
+                                Special Offerings Desk &rarr;
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -1278,7 +1409,7 @@ function ArticlesView({ year, onOpenNewArticle, onEditArticle, onOpenImport, sho
     const fetchArticles = async () => {
         setLoading(true);
         try {
-            const url = `/api/articles?year=${year}&status=${statusFilter}&category=${categoryFilter}&search=${encodeURIComponent(search)}&order=asc`;
+            const url = `/api/articles?year=${year}&status=${statusFilter}&category=${categoryFilter}&search=${encodeURIComponent(search)}&order=asc&exclude_offerings=1`;
             const res = await api.get(url);
             if (res.success) {
                 setArticles(res.articles);
@@ -2473,9 +2604,10 @@ function SearchableHeadSelect({
 }
 
 // --- Modal: Default Live Auction Ledger Heads Configuration (Admin Only) ---
-function DefaultLedgerSettingsModal({ isOpen, onClose, showToast, onSaved }) {
+function DefaultLedgerSettingsModal({ isOpen, onClose, showToast, onSaved, initialTab = 'live' }) {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [activeTab, setActiveTab] = useState(initialTab || 'live');
     const [accountsData, setAccountsData] = useState({
         contribution_debit_heads: [],
         contribution_credit_heads: [],
@@ -2485,10 +2617,30 @@ function DefaultLedgerSettingsModal({ isOpen, onClose, showToast, onSaved }) {
     });
 
     const [selectedEventId, setSelectedEventId] = useState('');
+    
+    // Live Auction Heads
     const [selectedContribDr, setSelectedContribDr] = useState(null);
     const [selectedContribCr, setSelectedContribCr] = useState(null);
     const [selectedPromiseDr, setSelectedPromiseDr] = useState(null);
     const [selectedPromiseCr, setSelectedPromiseCr] = useState(null);
+
+    // Gold Offering Heads
+    const [selectedGoldContribDr, setSelectedGoldContribDr] = useState(null);
+    const [selectedGoldContribCr, setSelectedGoldContribCr] = useState(null);
+    const [selectedGoldPromiseDr, setSelectedGoldPromiseDr] = useState(null);
+    const [selectedGoldPromiseCr, setSelectedGoldPromiseCr] = useState(null);
+
+    // Bed Sheet Offering Heads
+    const [selectedBedContribDr, setSelectedBedContribDr] = useState(null);
+    const [selectedBedContribCr, setSelectedBedContribCr] = useState(null);
+    const [selectedBedPromiseDr, setSelectedBedPromiseDr] = useState(null);
+    const [selectedBedPromiseCr, setSelectedBedPromiseCr] = useState(null);
+
+    useEffect(() => {
+        if (initialTab) {
+            setActiveTab(initialTab);
+        }
+    }, [initialTab, isOpen]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -2511,25 +2663,52 @@ function DefaultLedgerSettingsModal({ isOpen, onClose, showToast, onSaved }) {
                         setSelectedEventId(defEvt.event_id);
                     }
 
-                    // Contrib Dr
+                    // 1. Live Auction Defaults
                     const drCode = defs.contrib_dr_code || '02123';
-                    const cDr = res.contribution_debit_heads.find(h => h.head_code === drCode) || res.contribution_debit_heads[0] || null;
-                    setSelectedContribDr(cDr);
+                    setSelectedContribDr(res.contribution_debit_heads.find(h => h.head_code === drCode) || res.contribution_debit_heads[0] || null);
 
-                    // Contrib Cr
                     const crCode = defs.contrib_cr_code || '02206';
-                    const cCr = res.contribution_credit_heads.find(h => h.head_code === crCode) || res.contribution_credit_heads[0] || null;
-                    setSelectedContribCr(cCr);
+                    setSelectedContribCr(res.contribution_credit_heads.find(h => h.head_code === crCode) || res.contribution_credit_heads[0] || null);
 
-                    // Promise Dr
                     const pDrCode = defs.promise_dr_code || '08583';
-                    const pDr = res.promise_debit_heads.find(h => h.head_code === pDrCode) || res.promise_debit_heads[0] || null;
-                    setSelectedPromiseDr(pDr);
+                    setSelectedPromiseDr(res.promise_debit_heads.find(h => h.head_code === pDrCode) || res.promise_debit_heads[0] || null);
 
-                    // Promise Cr
                     const pCrCode = defs.promise_cr_code || '07503';
-                    const pCr = res.promise_credit_heads.find(h => h.head_code === pCrCode) || res.promise_credit_heads[0] || null;
-                    setSelectedPromiseCr(pCr);
+                    setSelectedPromiseCr(res.promise_credit_heads.find(h => h.head_code === pCrCode) || res.promise_credit_heads[0] || null);
+
+                    // 2. Gold Offerings Defaults
+                    const gDrCode = defs.gold_contrib_dr_code || '02123';
+                    const gDrName = defs.gold_contrib_dr_name || 'Cash on Hand-Harvest Festival';
+                    setSelectedGoldContribDr(res.contribution_debit_heads.find(h => h.head_code === gDrCode) || { head_code: gDrCode, head_name: gDrName });
+
+                    const gCrCode = defs.gold_contrib_cr_code || '07613';
+                    const gCrName = defs.gold_contrib_cr_name || 'Harvest Festival - Gold';
+                    setSelectedGoldContribCr(res.contribution_credit_heads.find(h => h.head_code === gCrCode) || { head_code: gCrCode, head_name: gCrName });
+
+                    const gpDrCode = defs.gold_promise_dr_code || '07743';
+                    const gpDrName = defs.gold_promise_dr_name || 'A/R Harvest Festival 2011 - Gold Offer';
+                    setSelectedGoldPromiseDr(res.promise_debit_heads.find(h => h.head_code === gpDrCode) || { head_code: gpDrCode, head_name: gpDrName });
+
+                    const gpCrCode = defs.gold_promise_cr_code || '07637';
+                    const gpCrName = defs.gold_promise_cr_name || 'Gold not auctioned from Vanchi';
+                    setSelectedGoldPromiseCr(res.promise_credit_heads.find(h => h.head_code === gpCrCode) || { head_code: gpCrCode, head_name: gpCrName });
+
+                    // 3. Bed Sheet Offerings Defaults
+                    const bDrCode = defs.bed_contrib_dr_code || '02123';
+                    const bDrName = defs.bed_contrib_dr_name || 'Cash on Hand-Harvest Festival';
+                    setSelectedBedContribDr(res.contribution_debit_heads.find(h => h.head_code === bDrCode) || { head_code: bDrCode, head_name: bDrName });
+
+                    const bCrCode = defs.bed_contrib_cr_code || '07502';
+                    const bCrName = defs.bed_contrib_cr_name || 'Harvest Festival - Bed Sheet';
+                    setSelectedBedContribCr(res.contribution_credit_heads.find(h => h.head_code === bCrCode) || { head_code: bCrCode, head_name: bCrName });
+
+                    const bpDrCode = defs.bed_promise_dr_code || '07744';
+                    const bpDrName = defs.bed_promise_dr_name || 'A/R Harvest Festival 2011 - Bedsheet Offer';
+                    setSelectedBedPromiseDr(res.promise_debit_heads.find(h => h.head_code === bpDrCode) || { head_code: bpDrCode, head_name: bpDrName });
+
+                    const bpCrCode = defs.bed_promise_cr_code || '07503';
+                    const bpCrName = defs.bed_promise_cr_name || 'Harvest Festival - Article Auction';
+                    setSelectedBedPromiseCr(res.promise_credit_heads.find(h => h.head_code === bpCrCode) || { head_code: bpCrCode, head_name: bpCrName });
                 }
             })
             .catch(err => {
@@ -2541,7 +2720,15 @@ function DefaultLedgerSettingsModal({ isOpen, onClose, showToast, onSaved }) {
     const handleSave = async (e) => {
         e.preventDefault();
         if (!selectedContribDr || !selectedContribCr || !selectedPromiseDr || !selectedPromiseCr) {
-            showToast('error', 'Please select all required default heads.');
+            showToast('error', 'Please select all Live Auction default heads.');
+            return;
+        }
+        if (!selectedGoldContribDr || !selectedGoldContribCr || !selectedGoldPromiseDr || !selectedGoldPromiseCr) {
+            showToast('error', 'Please select all Gold Offering default heads.');
+            return;
+        }
+        if (!selectedBedContribDr || !selectedBedContribCr || !selectedBedPromiseDr || !selectedBedPromiseCr) {
+            showToast('error', 'Please select all Bed Sheet Offering default heads.');
             return;
         }
 
@@ -2551,6 +2738,8 @@ function DefaultLedgerSettingsModal({ isOpen, onClose, showToast, onSaved }) {
             const payload = {
                 event_id: currentEvent ? currentEvent.event_id : null,
                 event_name: currentEvent ? currentEvent.event_name : null,
+
+                // Live Auction
                 contrib_dr_code: selectedContribDr.head_code,
                 contrib_dr_name: selectedContribDr.head_name,
                 contrib_cr_code: selectedContribCr.head_code,
@@ -2559,11 +2748,31 @@ function DefaultLedgerSettingsModal({ isOpen, onClose, showToast, onSaved }) {
                 promise_dr_name: selectedPromiseDr.head_name,
                 promise_cr_code: selectedPromiseCr.head_code,
                 promise_cr_name: selectedPromiseCr.head_name,
+
+                // Gold Offerings
+                gold_contrib_dr_code: selectedGoldContribDr.head_code,
+                gold_contrib_dr_name: selectedGoldContribDr.head_name,
+                gold_contrib_cr_code: selectedGoldContribCr.head_code,
+                gold_contrib_cr_name: selectedGoldContribCr.head_name,
+                gold_promise_dr_code: selectedGoldPromiseDr.head_code,
+                gold_promise_dr_name: selectedGoldPromiseDr.head_name,
+                gold_promise_cr_code: selectedGoldPromiseCr.head_code,
+                gold_promise_cr_name: selectedGoldPromiseCr.head_name,
+
+                // Bed Sheet Offerings
+                bed_contrib_dr_code: selectedBedContribDr.head_code,
+                bed_contrib_dr_name: selectedBedContribDr.head_name,
+                bed_contrib_cr_code: selectedBedContribCr.head_code,
+                bed_contrib_cr_name: selectedBedContribCr.head_name,
+                bed_promise_dr_code: selectedBedPromiseDr.head_code,
+                bed_promise_dr_name: selectedBedPromiseDr.head_name,
+                bed_promise_cr_code: selectedBedPromiseCr.head_code,
+                bed_promise_cr_name: selectedBedPromiseCr.head_name,
             };
 
             const res = await api.post('/api/accounts/default-heads', payload);
             if (res.success) {
-                showToast('success', 'Default posting ledgers saved! Non-admin users will now automatically use these accounts.');
+                showToast('success', 'Default posting ledgers saved for Live Auction, Gold & Bed Sheet Offerings!');
                 if (typeof onSaved === 'function') {
                     onSaved(res.default_heads);
                 }
@@ -2588,7 +2797,7 @@ function DefaultLedgerSettingsModal({ isOpen, onClose, showToast, onSaved }) {
                 onClick={e => e.stopPropagation()}
             >
                 <ModalHeader 
-                    title="Configure Default Live Auction Ledgers" 
+                    title="Configure Church Accounting Default Ledgers" 
                     icon="account_balance" 
                     onClose={onClose} 
                     badge="Admin Configuration"
@@ -2602,108 +2811,365 @@ function DefaultLedgerSettingsModal({ isOpen, onClose, showToast, onSaved }) {
                 ) : (
                     <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
                         <div className="modal-body" style={{ overflowY: 'auto', padding: '20px 26px', flex: 1 }}>
-                            <div style={{ background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '8px', padding: '10px 14px', fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                                <i className="material-icons" style={{ color: 'var(--primary)', fontSize: '20px' }}>info</i>
-                                <span>Set default church accounting heads. Non-admin users will automatically post to these ledgers on the Live Auction Desk and cannot change them.</span>
+                            
+                            {/* Global Active Budget Event */}
+                            <div style={{
+                                background: 'rgba(59, 130, 246, 0.05)',
+                                border: '1px solid rgba(59, 130, 246, 0.2)',
+                                borderRadius: '8px',
+                                padding: '12px 16px',
+                                marginBottom: '18px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                flexWrap: 'wrap',
+                                gap: '12px'
+                            }}>
+                                <div style={{ flex: '1 1 280px' }}>
+                                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <i className="material-icons" style={{ fontSize: '18px', color: 'var(--primary)' }}>event</i>
+                                        Default Budget Head / Festival Event *
+                                    </div>
+                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                        Applies globally to all Live Auction, Gold Offerings, and Bed Sheet Offerings transactions.
+                                    </div>
+                                </div>
+                                <div style={{ minWidth: '280px', flex: '0 0 auto' }}>
+                                    <select 
+                                        className="form-control"
+                                        value={selectedEventId}
+                                        onChange={e => setSelectedEventId(e.target.value)}
+                                        required
+                                        style={{ height: '36px', fontSize: '13px', fontWeight: 600 }}
+                                    >
+                                        {accountsData.events.map(ev => (
+                                            <option key={ev.event_id} value={ev.event_id}>
+                                                {ev.event_name} {ev.default_status === 'Yes' ? '(Default)' : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
-                            {/* Budget Event Head */}
-                            <div className="form-group" style={{ marginBottom: '16px' }}>
-                                <label className="form-label" style={{ fontWeight: 700 }}>Default Budget Head / Event *</label>
-                                <select 
-                                    className="form-control"
-                                    value={selectedEventId}
-                                    onChange={e => setSelectedEventId(e.target.value)}
-                                    required
+
+                            {/* Navigation Tabs */}
+                            <div style={{ display: 'flex', gap: '8px', borderBottom: '2px solid var(--border-color)', marginBottom: '18px', paddingBottom: '2px' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveTab('live')}
+                                    style={{
+                                        padding: '9px 18px',
+                                        border: 'none',
+                                        borderBottom: activeTab === 'live' ? '3px solid var(--primary)' : '3px solid transparent',
+                                        background: activeTab === 'live' ? 'rgba(59, 130, 246, 0.12)' : 'transparent',
+                                        color: activeTab === 'live' ? 'var(--primary)' : 'var(--text-secondary)',
+                                        fontWeight: 700,
+                                        fontSize: '13px',
+                                        borderRadius: '6px 6px 0 0',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px'
+                                    }}
                                 >
-                                    {accountsData.events.map(ev => (
-                                        <option key={ev.event_id} value={ev.event_id}>
-                                            {ev.event_name} {ev.default_status === 'Yes' ? '(Default)' : ''}
-                                        </option>
-                                    ))}
-                                </select>
-                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                                    Accounting event under which auction contributions & promises will be logged.
-                                </div>
+                                    <i className="material-icons" style={{ fontSize: '18px' }}>gavel</i>
+                                    Live Auction Ledgers
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveTab('gold')}
+                                    style={{
+                                        padding: '9px 18px',
+                                        border: 'none',
+                                        borderBottom: activeTab === 'gold' ? '3px solid #f59e0b' : '3px solid transparent',
+                                        background: activeTab === 'gold' ? 'rgba(245, 158, 11, 0.14)' : 'transparent',
+                                        color: activeTab === 'gold' ? '#d97706' : 'var(--text-secondary)',
+                                        fontWeight: 700,
+                                        fontSize: '13px',
+                                        borderRadius: '6px 6px 0 0',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px'
+                                    }}
+                                >
+                                    <i className="material-icons" style={{ fontSize: '18px', color: '#f59e0b' }}>stars</i>
+                                    Gold Offerings Ledgers
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveTab('bed')}
+                                    style={{
+                                        padding: '9px 18px',
+                                        border: 'none',
+                                        borderBottom: activeTab === 'bed' ? '3px solid #3b82f6' : '3px solid transparent',
+                                        background: activeTab === 'bed' ? 'rgba(59, 130, 246, 0.14)' : 'transparent',
+                                        color: activeTab === 'bed' ? '#2563eb' : 'var(--text-secondary)',
+                                        fontWeight: 700,
+                                        fontSize: '13px',
+                                        borderRadius: '6px 6px 0 0',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px'
+                                    }}
+                                >
+                                    <i className="material-icons" style={{ fontSize: '18px', color: '#3b82f6' }}>layers</i>
+                                    Bed Sheet Offerings Ledgers
+                                </button>
                             </div>
 
-                            {/* Contribution Posting Defaults */}
-                            <div style={{
-                                background: 'rgba(16, 185, 129, 0.04)',
-                                border: '1px solid rgba(16, 185, 129, 0.3)',
-                                borderLeft: '4px solid #10b981',
-                                borderRadius: '8px',
-                                padding: '16px',
-                                marginBottom: '16px'
-                            }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
-                                    <span className="badge badge-success" style={{ fontSize: '12px', padding: '4px 10px' }}>
-                                        <i className="material-icons" style={{ fontSize: '14px', verticalAlign: 'middle', marginRight: '4px' }}>receipt</i>
-                                        Default Contribution Posting Heads (Receipt)
-                                    </span>
-                                </div>
-                                <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: '16px' }}>
-                                    <SearchableHeadSelect
-                                        label="Default Debit Head (Receiving Cash/Bank)"
-                                        placeholder="Search debit head (e.g. 02123)..."
-                                        options={accountsData.contribution_debit_heads}
-                                        selectedHead={selectedContribDr}
-                                        onSelect={setSelectedContribDr}
-                                        required={true}
-                                        badgeColor="#3b82f6"
-                                    />
-                                    <SearchableHeadSelect
-                                        label="Default Credit Head (Harvest / Auction Income)"
-                                        placeholder="Search credit head (e.g. 02206 or group 214)..."
-                                        options={accountsData.contribution_credit_heads}
-                                        selectedHead={selectedContribCr}
-                                        onSelect={setSelectedContribCr}
-                                        required={true}
-                                        badgeColor="#10b981"
-                                    />
-                                </div>
-                            </div>
+                            {/* TAB 1: LIVE AUCTION */}
+                            {activeTab === 'live' && (
+                                <>
+                                    <div style={{ background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '8px', padding: '10px 14px', fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                                        <i className="material-icons" style={{ color: 'var(--primary)', fontSize: '20px' }}>info</i>
+                                        <span>Default church accounting heads for Live Auction. Non-admin users automatically post to these ledgers on the Live Auction Desk.</span>
+                                    </div>
 
-                            {/* Promise Posting Defaults */}
-                            <div style={{
-                                background: 'rgba(245, 158, 11, 0.04)',
-                                border: '1px solid rgba(245, 158, 11, 0.3)',
-                                borderLeft: '4px solid #f59e0b',
-                                borderRadius: '8px',
-                                padding: '16px',
-                                marginBottom: '12px'
-                            }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
-                                    <span className="badge badge-warning" style={{ fontSize: '12px', padding: '4px 10px' }}>
-                                        <i className="material-icons" style={{ fontSize: '14px', verticalAlign: 'middle', marginRight: '4px' }}>history_edu</i>
-                                        Default Promise Posting Heads (Member Receivable)
-                                    </span>
-                                </div>
-                                <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: '16px' }}>
-                                    <SearchableHeadSelect
-                                        label="Default Debit Head (A/R Member Receivable)"
-                                        placeholder="Search debit head (e.g. 08583)..."
-                                        options={accountsData.promise_debit_heads}
-                                        selectedHead={selectedPromiseDr}
-                                        onSelect={setSelectedPromiseDr}
-                                        required={true}
-                                        badgeColor="#f59e0b"
-                                    />
-                                    <SearchableHeadSelect
-                                        label="Default Credit Head (Harvest Article Auction Income)"
-                                        placeholder="Search credit head (e.g. 07503)..."
-                                        options={accountsData.promise_credit_heads}
-                                        selectedHead={selectedPromiseCr}
-                                        onSelect={setSelectedPromiseCr}
-                                        required={true}
-                                        badgeColor="#8b5cf6"
-                                    />
-                                </div>
-                            </div>
+                                    {/* Contribution Posting Defaults */}
+                                    <div style={{
+                                        background: 'rgba(16, 185, 129, 0.04)',
+                                        border: '1px solid rgba(16, 185, 129, 0.3)',
+                                        borderLeft: '4px solid #10b981',
+                                        borderRadius: '8px',
+                                        padding: '16px',
+                                        marginBottom: '16px'
+                                    }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
+                                            <span className="badge badge-success" style={{ fontSize: '12px', padding: '4px 10px' }}>
+                                                <i className="material-icons" style={{ fontSize: '14px', verticalAlign: 'middle', marginRight: '4px' }}>receipt</i>
+                                                Live Auction Contribution Posting Heads (Receipt)
+                                            </span>
+                                        </div>
+                                        <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: '16px' }}>
+                                            <SearchableHeadSelect
+                                                label="Default Debit Head (Receiving Cash/Bank)"
+                                                placeholder="Search debit head (e.g. 02123)..."
+                                                options={accountsData.contribution_debit_heads}
+                                                selectedHead={selectedContribDr}
+                                                onSelect={setSelectedContribDr}
+                                                required={true}
+                                                badgeColor="#3b82f6"
+                                            />
+                                            <SearchableHeadSelect
+                                                label="Default Credit Head (Harvest / Auction Income)"
+                                                placeholder="Search credit head (e.g. 02206)..."
+                                                options={accountsData.contribution_credit_heads}
+                                                selectedHead={selectedContribCr}
+                                                onSelect={setSelectedContribCr}
+                                                required={true}
+                                                badgeColor="#10b981"
+                                            />
+                                        </div>
+                                    </div>
 
-                            <div style={{ background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '6px', padding: '10px 14px', fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
-                                <i className="material-icons" style={{ color: 'var(--primary)', fontSize: '18px' }}>info</i>
-                                <span>When non-admin users submit an auction sale on the Live Auction Desk, the transaction will automatically be linked and posted to these exact heads.</span>
-                            </div>
+                                    {/* Promise Posting Defaults */}
+                                    <div style={{
+                                        background: 'rgba(245, 158, 11, 0.04)',
+                                        border: '1px solid rgba(245, 158, 11, 0.3)',
+                                        borderLeft: '4px solid #f59e0b',
+                                        borderRadius: '8px',
+                                        padding: '16px',
+                                        marginBottom: '12px'
+                                    }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
+                                            <span className="badge badge-warning" style={{ fontSize: '12px', padding: '4px 10px' }}>
+                                                <i className="material-icons" style={{ fontSize: '14px', verticalAlign: 'middle', marginRight: '4px' }}>history_edu</i>
+                                                Live Auction Promise Posting Heads (Member Receivable)
+                                            </span>
+                                        </div>
+                                        <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: '16px' }}>
+                                            <SearchableHeadSelect
+                                                label="Default Debit Head (A/R Member Receivable)"
+                                                placeholder="Search debit head (e.g. 08583)..."
+                                                options={accountsData.promise_debit_heads}
+                                                selectedHead={selectedPromiseDr}
+                                                onSelect={setSelectedPromiseDr}
+                                                required={true}
+                                                badgeColor="#f59e0b"
+                                            />
+                                            <SearchableHeadSelect
+                                                label="Default Credit Head (Harvest Article Auction Income)"
+                                                placeholder="Search credit head (e.g. 07503)..."
+                                                options={accountsData.promise_credit_heads}
+                                                selectedHead={selectedPromiseCr}
+                                                onSelect={setSelectedPromiseCr}
+                                                required={true}
+                                                badgeColor="#8b5cf6"
+                                            />
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
+                            {/* TAB 2: GOLD OFFERINGS */}
+                            {activeTab === 'gold' && (
+                                <>
+                                    <div style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.35)', borderRadius: '8px', padding: '10px 14px', fontSize: '12px', color: '#92400e', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                                        <i className="material-icons" style={{ color: '#d97706', fontSize: '20px' }}>stars</i>
+                                        <span><strong>Gold Offerings Ledgers:</strong> Set default accounts for Gold Offerings (Tag GOLD). Users on the Special Offerings desk will automatically use these ledgers and cannot change them.</span>
+                                    </div>
+
+                                    {/* Gold Contribution Posting */}
+                                    <div style={{
+                                        background: 'rgba(16, 185, 129, 0.04)',
+                                        border: '1px solid rgba(16, 185, 129, 0.3)',
+                                        borderLeft: '4px solid #10b981',
+                                        borderRadius: '8px',
+                                        padding: '16px',
+                                        marginBottom: '16px'
+                                    }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
+                                            <span className="badge badge-success" style={{ fontSize: '12px', padding: '4px 10px' }}>
+                                                <i className="material-icons" style={{ fontSize: '14px', verticalAlign: 'middle', marginRight: '4px' }}>receipt</i>
+                                                Gold Offerings Contribution Posting Heads (Receipt)
+                                            </span>
+                                        </div>
+                                        <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: '16px' }}>
+                                            <SearchableHeadSelect
+                                                label="Gold Debit Head (Receiving Cash/Bank)"
+                                                placeholder="Search debit head (e.g. 02123)..."
+                                                options={accountsData.contribution_debit_heads}
+                                                selectedHead={selectedGoldContribDr}
+                                                onSelect={setSelectedGoldContribDr}
+                                                required={true}
+                                                badgeColor="#0284c7"
+                                            />
+                                            <SearchableHeadSelect
+                                                label="Gold Credit Head (Gold Offering Income)"
+                                                placeholder="Search credit head (e.g. 02206)..."
+                                                options={accountsData.contribution_credit_heads}
+                                                selectedHead={selectedGoldContribCr}
+                                                onSelect={setSelectedGoldContribCr}
+                                                required={true}
+                                                badgeColor="#10b981"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Gold Promise Posting */}
+                                    <div style={{
+                                        background: 'rgba(245, 158, 11, 0.04)',
+                                        border: '1px solid rgba(245, 158, 11, 0.3)',
+                                        borderLeft: '4px solid #f59e0b',
+                                        borderRadius: '8px',
+                                        padding: '16px',
+                                        marginBottom: '12px'
+                                    }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
+                                            <span className="badge badge-warning" style={{ fontSize: '12px', padding: '4px 10px' }}>
+                                                <i className="material-icons" style={{ fontSize: '14px', verticalAlign: 'middle', marginRight: '4px' }}>history_edu</i>
+                                                Gold Offerings Promise Posting Heads (Member Receivable)
+                                            </span>
+                                        </div>
+                                        <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: '16px' }}>
+                                            <SearchableHeadSelect
+                                                label="Gold Debit Head (A/R Member Receivable)"
+                                                placeholder="Search debit head (e.g. 08583)..."
+                                                options={accountsData.promise_debit_heads}
+                                                selectedHead={selectedGoldPromiseDr}
+                                                onSelect={setSelectedGoldPromiseDr}
+                                                required={true}
+                                                badgeColor="#f59e0b"
+                                            />
+                                            <SearchableHeadSelect
+                                                label="Gold Credit Head (Gold Offering Income)"
+                                                placeholder="Search credit head (e.g. 07503)..."
+                                                options={accountsData.promise_credit_heads}
+                                                selectedHead={selectedGoldPromiseCr}
+                                                onSelect={setSelectedGoldPromiseCr}
+                                                required={true}
+                                                badgeColor="#8b5cf6"
+                                            />
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
+                            {/* TAB 3: BED SHEET OFFERINGS */}
+                            {activeTab === 'bed' && (
+                                <>
+                                    <div style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.35)', borderRadius: '8px', padding: '10px 14px', fontSize: '12px', color: '#1e40af', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                                        <i className="material-icons" style={{ color: '#2563eb', fontSize: '20px' }}>layers</i>
+                                        <span><strong>Bed Sheet Offerings Ledgers:</strong> Set default accounts for Bed Sheet Offerings (Tag BEDSHEET). Users on the Special Offerings desk will automatically use these ledgers and cannot change them.</span>
+                                    </div>
+
+                                    {/* Bed Sheet Contribution Posting */}
+                                    <div style={{
+                                        background: 'rgba(16, 185, 129, 0.04)',
+                                        border: '1px solid rgba(16, 185, 129, 0.3)',
+                                        borderLeft: '4px solid #10b981',
+                                        borderRadius: '8px',
+                                        padding: '16px',
+                                        marginBottom: '16px'
+                                    }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
+                                            <span className="badge badge-success" style={{ fontSize: '12px', padding: '4px 10px' }}>
+                                                <i className="material-icons" style={{ fontSize: '14px', verticalAlign: 'middle', marginRight: '4px' }}>receipt</i>
+                                                Bed Sheet Contribution Posting Heads (Receipt)
+                                            </span>
+                                        </div>
+                                        <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: '16px' }}>
+                                            <SearchableHeadSelect
+                                                label="Bed Sheet Debit Head (Receiving Cash/Bank)"
+                                                placeholder="Search debit head (e.g. 02123)..."
+                                                options={accountsData.contribution_debit_heads}
+                                                selectedHead={selectedBedContribDr}
+                                                onSelect={setSelectedBedContribDr}
+                                                required={true}
+                                                badgeColor="#0284c7"
+                                            />
+                                            <SearchableHeadSelect
+                                                label="Bed Sheet Credit Head (Bed Sheet Income)"
+                                                placeholder="Search credit head (e.g. 02206)..."
+                                                options={accountsData.contribution_credit_heads}
+                                                selectedHead={selectedBedContribCr}
+                                                onSelect={setSelectedBedContribCr}
+                                                required={true}
+                                                badgeColor="#10b981"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Bed Sheet Promise Posting */}
+                                    <div style={{
+                                        background: 'rgba(245, 158, 11, 0.04)',
+                                        border: '1px solid rgba(245, 158, 11, 0.3)',
+                                        borderLeft: '4px solid #f59e0b',
+                                        borderRadius: '8px',
+                                        padding: '16px',
+                                        marginBottom: '12px'
+                                    }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
+                                            <span className="badge badge-warning" style={{ fontSize: '12px', padding: '4px 10px' }}>
+                                                <i className="material-icons" style={{ fontSize: '14px', verticalAlign: 'middle', marginRight: '4px' }}>history_edu</i>
+                                                Bed Sheet Promise Posting Heads (Member Receivable)
+                                            </span>
+                                        </div>
+                                        <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: '16px' }}>
+                                            <SearchableHeadSelect
+                                                label="Bed Sheet Debit Head (A/R Member Receivable)"
+                                                placeholder="Search debit head (e.g. 08583)..."
+                                                options={accountsData.promise_debit_heads}
+                                                selectedHead={selectedBedPromiseDr}
+                                                onSelect={setSelectedBedPromiseDr}
+                                                required={true}
+                                                badgeColor="#f59e0b"
+                                            />
+                                            <SearchableHeadSelect
+                                                label="Bed Sheet Credit Head (Bed Sheet Income)"
+                                                placeholder="Search credit head (e.g. 07503)..."
+                                                options={accountsData.promise_credit_heads}
+                                                selectedHead={selectedBedPromiseCr}
+                                                onSelect={setSelectedBedPromiseCr}
+                                                required={true}
+                                                badgeColor="#8b5cf6"
+                                            />
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
                         </div>
 
                         <div className="modal-footer" style={{ padding: '14px 24px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
@@ -2717,7 +3183,7 @@ function DefaultLedgerSettingsModal({ isOpen, onClose, showToast, onSaved }) {
                                 ) : (
                                     <>
                                         <i className="material-icons" style={{ fontSize: '16px' }}>check</i>
-                                        Save Default Ledgers
+                                        Save All Default Ledgers
                                     </>
                                 )}
                             </button>
@@ -2809,8 +3275,8 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
         setLoading(true);
         try {
             const [transRes, artRes, accRes] = await Promise.all([
-                api.get(`/api/auctions?year=${year}`),
-                api.get(`/api/articles?year=${year}&status=Available`),
+                api.get(`/api/auctions?year=${year}&offering_type=Auction`),
+                api.get(`/api/articles?year=${year}&status=Available&exclude_offerings=1`),
                 api.get('/api/accounts/heads')
             ]);
             if (transRes.success) {
@@ -4192,6 +4658,1514 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
     );
 }
 
+// =========================================================================
+// --- Special Offerings Desk View (Gold & Bed Sheet Offerings)            ---
+// =========================================================================
+function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDataChanged, isAdmin }) {
+    const [transactions, setTransactions] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [recording, setRecording] = useState(false);
+    const [paymentModalData, setPaymentModalData] = useState(null);
+    const [ledgerSettingsOpen, setLedgerSettingsOpen] = useState(false);
+
+    // Offering Category Tab: 'Gold' or 'BedSheet'
+    const [offeringSubTab, setOfferingSubTab] = useState('Gold');
+    const [tableTab, setTableTab] = useState('Gold'); // 'Gold', 'BedSheet', 'Both'
+
+    // Table Filters
+    const [statusFilter, setStatusFilter] = useState('All');
+
+    // Periodic ticker to recalculate and refresh live countdown remaining time
+    const [, setCountdownTick] = useState(0);
+    useEffect(() => {
+        const interval = setInterval(() => setCountdownTick(c => c + 1), 10000);
+        return () => clearInterval(interval);
+    }, []);
+
+    // Accounting heads data
+    const [accountsData, setAccountsData] = useState({
+        contribution_debit_heads: [],
+        contribution_credit_heads: [],
+        promise_debit_heads: [],
+        promise_credit_heads: [],
+        events: []
+    });
+    const [selectedEventId, setSelectedEventId] = useState('');
+
+    // Offering Form states
+    const [itemDescription, setItemDescription] = useState('');
+    const [bidAmount, setBidAmount] = useState('');
+    const [paidAmount, setPaidAmount] = useState('');
+    const [auctionDate, setAuctionDate] = useState(() => new Date().toISOString().split('T')[0]);
+    const [receiptBookNo, setReceiptBookNo] = useState('');
+    const [receiptNo, setReceiptNo] = useState('');
+    const [notes, setNotes] = useState('');
+
+    // Member search and selection
+    const [memberSearch, setMemberSearch] = useState('');
+    const [memberResults, setMemberResults] = useState([]);
+    const [selectedMember, setSelectedMember] = useState(null);
+    const [memberBalanceLoading, setMemberBalanceLoading] = useState(false);
+
+    // Dynamic resolution of active default posting heads for current offering tab (Gold vs Bed Sheet)
+    const isGold = offeringSubTab === 'Gold';
+    const isBed = offeringSubTab === 'BedSheet';
+    const defs = accountsData?.default_heads || {};
+
+    const activeContribDrCode = isBed ? (defs.bed_contrib_dr_code || '02123') : (defs.gold_contrib_dr_code || '02123');
+    const activeContribDrName = isBed ? (defs.bed_contrib_dr_name || 'Cash on Hand-Harvest Festival') : (defs.gold_contrib_dr_name || 'Cash on Hand-Harvest Festival');
+    const activeContribCrCode = isBed ? (defs.bed_contrib_cr_code || '07502') : (defs.gold_contrib_cr_code || '07613');
+    const activeContribCrName = isBed ? (defs.bed_contrib_cr_name || 'Harvest Festival - Bed Sheet') : (defs.gold_contrib_cr_name || 'Harvest Festival - Gold');
+    const activePromiseDrCode = isBed ? (defs.bed_promise_dr_code || '07744') : (defs.gold_promise_dr_code || '07743');
+    const activePromiseDrName = isBed ? (defs.bed_promise_dr_name || 'A/R Harvest Festival 2011 - Bedsheet Offer') : (defs.gold_promise_dr_name || 'A/R Harvest Festival 2011 - Gold Offer');
+    const activePromiseCrCode = isBed ? (defs.bed_promise_cr_code || '07503') : (defs.gold_promise_cr_code || '07637');
+    const activePromiseCrName = isBed ? (defs.bed_promise_cr_name || 'Harvest Festival - Article Auction') : (defs.gold_promise_cr_name || 'Gold not auctioned from Vanchi');
+
+    // Effective active posting heads strictly derived from default settings for selected category
+    const effectiveContribDr = accountsData?.contribution_debit_heads?.find(h => h.head_code === activeContribDrCode) 
+        || { head_code: activeContribDrCode, head_name: activeContribDrName };
+    const effectiveContribCr = accountsData?.contribution_credit_heads?.find(h => h.head_code === activeContribCrCode) 
+        || { head_code: activeContribCrCode, head_name: activeContribCrName };
+    const effectivePromiseDr = accountsData?.promise_debit_heads?.find(h => h.head_code === activePromiseDrCode) 
+        || { head_code: activePromiseDrCode, head_name: activePromiseDrName };
+    const effectivePromiseCr = accountsData?.promise_credit_heads?.find(h => h.head_code === activePromiseCrCode) 
+        || { head_code: activePromiseCrCode, head_name: activePromiseCrName };
+
+    const fetchOfferingsData = async () => {
+        setLoading(true);
+        try {
+            const [transRes, accRes] = await Promise.all([
+                api.get(`/api/auctions?year=${year}&offering_type=Offerings`),
+                api.get('/api/accounts/heads')
+            ]);
+            if (transRes.success) {
+                if (transRes.server_time) {
+                    setServerBahrainTime(transRes.server_time);
+                }
+                setTransactions(transRes.transactions || []);
+            }
+            if (accRes && accRes.success) {
+                setAccountsData(accRes);
+                const defs = accRes.default_heads || {};
+
+                // Default Event
+                let defEvt = null;
+                if (defs.event_id) {
+                    defEvt = accRes.events.find(e => String(e.event_id) === String(defs.event_id));
+                }
+                if (!defEvt) {
+                    defEvt = accRes.events.find(e => e.default_status === 'Yes') || accRes.events[0];
+                }
+                if (defEvt && !selectedEventId) {
+                    setSelectedEventId(defEvt.event_id);
+                }
+            }
+        } catch (err) {
+            showToast('error', err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchOfferingsData();
+    }, [year, refreshTrigger]);
+
+    useEffect(() => {
+        if (memberSearch.trim().length > 1) {
+            api.get(`/api/members/search?q=${encodeURIComponent(memberSearch)}`)
+                .then(res => setMemberResults(res.members || []))
+                .catch(() => {});
+        } else {
+            setMemberResults([]);
+        }
+    }, [memberSearch]);
+
+    const handleSelectMember = (m) => {
+        setSelectedMember({ ...m, outstanding_balance: null });
+        setMemberSearch('');
+        setMemberResults([]);
+        setMemberBalanceLoading(true);
+
+        api.get(`/api/members/${m.primary_member_id}/outstanding`)
+            .then(res => {
+                if (res.success) {
+                    setSelectedMember(prev => {
+                        if (!prev || prev.primary_member_id !== m.primary_member_id) return prev;
+                        return {
+                            ...prev,
+                            outstanding_balance: Number(res.outstanding_balance || 0)
+                        };
+                    });
+                }
+            })
+            .catch(err => {
+                console.error("Failed to load member outstanding balance:", err);
+            })
+            .finally(() => {
+                setMemberBalanceLoading(false);
+            });
+    };
+
+    // Live calculations
+    const bidNum = Number(bidAmount) || 0;
+    const paidNum = Number(paidAmount) || 0;
+    const currentBalance = Math.max(0, bidNum - paidNum);
+    const isPayingNow = paidNum > 0;
+    const isPaidExceedingBid = Boolean(bidAmount !== '' && paidAmount !== '' && paidNum > bidNum);
+
+    // Stats calculations
+    const statsSummary = useMemo(() => {
+        const goldList = transactions.filter(t => t.offering_type === 'Gold');
+        const bedList = transactions.filter(t => t.offering_type === 'BedSheet');
+        const totalSales = transactions.reduce((sum, t) => sum + (Number(t.winning_bid_amount) || 0), 0);
+        const totalPaid = transactions.reduce((sum, t) => sum + (Number(t.paid_amount) || 0), 0);
+        const totalBalance = transactions.reduce((sum, t) => sum + (Number(t.balance_amount) || 0), 0);
+        return {
+            goldCount: goldList.length,
+            goldAmount: goldList.reduce((sum, t) => sum + (Number(t.winning_bid_amount) || 0), 0),
+            bedCount: bedList.length,
+            bedAmount: bedList.reduce((sum, t) => sum + (Number(t.winning_bid_amount) || 0), 0),
+            totalSales,
+            totalPaid,
+            totalBalance
+        };
+    }, [transactions]);
+
+    // Handle Form Submit
+    const handleRecordOffering = async (e) => {
+        e.preventDefault();
+        if (!itemDescription.trim()) {
+            showToast('error', `Please provide the Item Description for the ${offeringSubTab === 'Gold' ? 'Gold' : 'Bed Sheet'} Offering.`);
+            return;
+        }
+
+        const buyerName = selectedMember ? selectedMember.primary_member_name : memberSearch.trim();
+        if (!buyerName) {
+            showToast('error', 'Please search and select a Parish Member or enter the Devotee name.');
+            return;
+        }
+
+        if (bidNum <= 0) {
+            showToast('error', 'Offering / Promise amount must be greater than zero.');
+            return;
+        }
+
+        if (paidNum < 0) {
+            showToast('error', 'Amount paid now cannot be negative.');
+            return;
+        }
+        if (paidNum > bidNum) {
+            showToast('error', `Amount paid now (BHD ${paidNum.toFixed(3)}) cannot exceed the offering amount (BHD ${bidNum.toFixed(3)}).`);
+            return;
+        }
+
+        // Validate posting heads
+        if (paidNum > 0) {
+            if (!effectiveContribDr) {
+                showToast('error', 'Contribution Entry Debit Head is missing.');
+                return;
+            }
+            if (!effectiveContribCr) {
+                showToast('error', 'Contribution Entry Credit Head is missing.');
+                return;
+            }
+        }
+        if (!effectivePromiseDr) {
+            showToast('error', 'Promise Posting Debit Head is missing.');
+            return;
+        }
+        if (!effectivePromiseCr) {
+            showToast('error', 'Promise Posting Credit Head is missing.');
+            return;
+        }
+
+        setRecording(true);
+        try {
+            const currentEvent = accountsData?.events?.find(ev => String(ev.event_id) === String(selectedEventId));
+            const payload = {
+                offering_type: offeringSubTab,
+                applicable_year: Number(year),
+                item_description: itemDescription.trim(),
+                winning_bid_amount: bidNum,
+                paid_amount: paidNum,
+                buyer_member_id: selectedMember ? selectedMember.primary_member_id : null,
+                buyer_name: buyerName,
+                buyer_code_c: selectedMember ? selectedMember.code_c : null,
+                buyer_phone: selectedMember ? (selectedMember.bahrain_contact_no || selectedMember.primary_contact_no) : null,
+                auction_date: auctionDate || new Date().toISOString().split('T')[0],
+                notes: notes.trim() || null,
+                receipt_book_no: receiptBookNo.trim() || null,
+                receipt_no: receiptNo.trim() || null,
+                event_id: selectedEventId || (currentEvent ? currentEvent.event_id : 10),
+                event_name: currentEvent ? currentEvent.event_name : ('Budget ' + year),
+                contrib_dr_code: isPayingNow && effectiveContribDr ? effectiveContribDr.head_code : null,
+                contrib_dr_name: isPayingNow && effectiveContribDr ? effectiveContribDr.head_name : null,
+                contrib_cr_code: isPayingNow && effectiveContribCr ? effectiveContribCr.head_code : null,
+                contrib_cr_name: isPayingNow && effectiveContribCr ? effectiveContribCr.head_name : null,
+                promise_dr_code: effectivePromiseDr ? effectivePromiseDr.head_code : null,
+                promise_dr_name: effectivePromiseDr ? effectivePromiseDr.head_name : null,
+                promise_cr_code: effectivePromiseCr ? effectivePromiseCr.head_code : null,
+                promise_cr_name: effectivePromiseCr ? effectivePromiseCr.head_name : null
+            };
+
+            const res = await api.post('/api/auctions', payload);
+            if (res.success) {
+                let successMsg = `${offeringSubTab === 'Gold' ? 'Gold' : 'Bed Sheet'} Offering recorded! Ref: ${res.data.auction_ref_no}`;
+                if (res.data.acc_contribution_id) {
+                    successMsg += ` | Contrib ID: #${res.data.acc_contribution_id} (Receipt #${res.data.contrib_voucher_no})`;
+                }
+                if (res.data.acc_promise_id) {
+                    successMsg += ` | Promise ID: #${res.data.acc_promise_id} (MP #${res.data.promise_voucher_no})`;
+                }
+                if (res.data.receipt_no) {
+                    successMsg += ` | Receipt: #${res.data.receipt_no}`;
+                }
+                showToast('success', successMsg);
+
+                // Reset form
+                setItemDescription('');
+                setBidAmount('');
+                setPaidAmount('');
+                setSelectedMember(null);
+                setMemberBalanceLoading(false);
+                setMemberSearch('');
+                setNotes('');
+                setReceiptBookNo('');
+                setReceiptNo('');
+
+                fetchOfferingsData();
+                if (typeof onDataChanged === 'function') {
+                    onDataChanged();
+                }
+
+                if (res.data.receipt_no) {
+                    onOpenReceipt(res.data.receipt_no);
+                }
+            }
+        } catch (err) {
+            showToast('error', err.message);
+        } finally {
+            setRecording(false);
+        }
+    };
+
+    // Filtered lists for separate Gold and Bed Sheet DataTables
+    const goldOfferings = useMemo(() => {
+        return transactions.filter(t => {
+            if (t.offering_type !== 'Gold') return false;
+            if (statusFilter !== 'All' && t.payment_status !== statusFilter) return false;
+            return true;
+        });
+    }, [transactions, statusFilter]);
+
+    const bedOfferings = useMemo(() => {
+        return transactions.filter(t => {
+            if (t.offering_type !== 'BedSheet') return false;
+            if (statusFilter !== 'All' && t.payment_status !== statusFilter) return false;
+            return true;
+        });
+    }, [transactions, statusFilter]);
+
+    // DataTable column definitions for Gold vs Bed Sheet Offerings
+    const getOfferingColumns = (category) => {
+        const isCatGold = category === 'Gold';
+        const catLabel = isCatGold ? 'Gold' : 'Bed Sheet';
+        const catRefColor = isCatGold ? '#d97706' : '#2563eb';
+
+        return [
+            {
+                header: 'SL No',
+                id: 'sl_no',
+                searchable: false,
+                sortable: false,
+                headerStyle: { width: '50px', textAlign: 'center' },
+                style: { textAlign: 'center', width: '50px', fontWeight: 600, color: 'var(--text-muted)' },
+                footer: () => <span style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)' }}>Total</span>,
+                render: (t, idx) => idx + 1
+            },
+            {
+                header: 'Offering Ref',
+                accessor: 'auction_ref_no',
+                sortable: true,
+                footer: (rows) => <span style={{ fontSize: '12px', fontWeight: 700 }}>{rows.length} {catLabel}</span>,
+                render: (t) => (
+                    <div>
+                        <strong style={{ color: catRefColor, fontSize: '13px' }}>
+                            {t.auction_ref_no}
+                        </strong>
+                        {t.receipt_no && (
+                            <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '1px' }}>
+                                Rcpt: {t.receipt_no}
+                            </div>
+                        )}
+                    </div>
+                )
+            },
+            {
+                header: 'Date',
+                accessor: 'auction_date',
+                sortable: true,
+                footer: () => null,
+                render: (t) => formatDateDMY(t.auction_date)
+            },
+            {
+                header: 'Member Details',
+                accessor: 'buyer_name',
+                sortable: true,
+                searchValue: (t) => `${t.buyer_name || ''} ${t.buyer_code_c || ''} ${t.buyer_phone || ''} ${t.buyer_cpr || ''}`,
+                footer: () => null,
+                render: (t) => (
+                    <div>
+                        <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{t.buyer_name}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                            {t.buyer_code_c && <span>Roll: <strong style={{ color: 'var(--primary)' }}>{t.buyer_code_c}</strong> &nbsp;|&nbsp; </span>}
+                            {t.buyer_phone && <span>{t.buyer_phone}</span>}
+                            {t.buyer_cpr && <span> &nbsp;|&nbsp; CPR: {t.buyer_cpr}</span>}
+                        </div>
+                    </div>
+                )
+            },
+            {
+                header: isCatGold ? 'Gold Item Description' : 'Bed Sheet Description',
+                accessor: 'item_description',
+                sortable: true,
+                searchValue: (t) => `${t.offering_type || ''} ${t.item_description || ''}`,
+                footer: () => null,
+                render: (t) => (
+                    <div>
+                        {t.article_number && (
+                            <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'monospace', marginBottom: '2px' }}>
+                                {t.article_number}
+                            </div>
+                        )}
+                        <strong style={{ fontSize: '13px', color: 'var(--text-primary)' }}>
+                            {t.item_description || t.article_name}
+                        </strong>
+                    </div>
+                )
+            },
+            {
+                header: 'Offering Amount',
+                accessor: 'winning_bid_amount',
+                sortable: true,
+                sortValue: (t) => Number(t.winning_bid_amount) || 0,
+                footer: (rows) => {
+                    const total = rows.reduce((sum, t) => sum + (Number(t.winning_bid_amount) || 0), 0);
+                    return (
+                        <div className="dt-footer-amount-box">
+                            <span className="dt-footer-amount-label">{catLabel} Total</span>
+                            <span className="dt-footer-amount-val" style={{ color: 'var(--primary)' }}>
+                                BHD {total.toFixed(3)}
+                            </span>
+                        </div>
+                    );
+                },
+                render: (t) => <strong>BHD {Number(t.winning_bid_amount).toFixed(3)}</strong>
+            },
+            {
+                header: 'Paid So Far',
+                accessor: 'paid_amount',
+                sortable: true,
+                sortValue: (t) => Number(t.paid_amount) || 0,
+                footer: (rows) => {
+                    const total = rows.reduce((sum, t) => sum + (Number(t.paid_amount) || 0), 0);
+                    return (
+                        <div className="dt-footer-amount-box">
+                            <span className="dt-footer-amount-label">Paid Total</span>
+                            <span className="dt-footer-amount-val" style={{ color: 'var(--success)' }}>
+                                BHD {total.toFixed(3)}
+                            </span>
+                        </div>
+                    );
+                },
+                render: (t) => (
+                    <span style={{ color: Number(t.paid_amount) > 0 ? 'var(--success)' : 'var(--text-muted)', fontWeight: 600 }}>
+                        BHD {Number(t.paid_amount).toFixed(3)}
+                    </span>
+                )
+            },
+            {
+                header: 'Balance Due',
+                accessor: 'balance_amount',
+                sortable: true,
+                sortValue: (t) => Number(t.balance_amount) || 0,
+                footer: (rows) => {
+                    const total = rows.reduce((sum, t) => sum + (Number(t.balance_amount) || 0), 0);
+                    return (
+                        <div className="dt-footer-amount-box">
+                            <span className="dt-footer-amount-label">Due Total</span>
+                            <span className="dt-footer-amount-val" style={{ color: total > 0.0001 ? 'var(--danger)' : 'var(--text-muted)' }}>
+                                BHD {total.toFixed(3)}
+                            </span>
+                        </div>
+                    );
+                },
+                render: (t) => {
+                    const bal = Number(t.balance_amount) || 0;
+                    return bal > 0.0001 
+                        ? <strong style={{ color: 'var(--danger)' }}>BHD {bal.toFixed(3)}</strong>
+                        : <span style={{ color: 'var(--text-muted)' }}>BHD 0.000</span>;
+                }
+            },
+            {
+                header: 'Account Posting',
+                id: 'account_posting',
+                sortable: false,
+                footer: () => null,
+                searchValue: (t) => {
+                    const cvs = (t.contributions || []).map(c => `Receipt HRCPT ${c.voucher_no || ''} ${c.contribution_amount || ''} ${c.receipt_no || ''}`).join(' ');
+                    const pvs = (t.promises || []).map(p => `MP ${p.voucher_no || ''} ${p.promise_amount || ''}`).join(' ');
+                    return `${cvs} ${pvs} ${t.contrib_voucher_no || ''} ${t.promise_voucher_no || ''} ${t.manual_receipt_no || ''} ${t.receipt_book_no || ''}`;
+                },
+                render: (t) => {
+                    const contribs = (t.contributions && t.contributions.length > 0) 
+                        ? t.contributions 
+                        : (t.contrib_voucher_no ? [{
+                            voucher_no: t.contrib_voucher_no,
+                            contribution_amount: t.paid_amount,
+                            contribution_date: t.auction_date,
+                            receipt_no: t.receipt_no || t.manual_receipt_no
+                        }] : []);
+
+                    const promises = (t.promises && t.promises.length > 0) 
+                        ? t.promises 
+                        : (t.promise_voucher_no ? [{
+                            voucher_no: t.promise_voucher_no,
+                            promise_amount: t.balance_amount,
+                            balance_amount: t.balance_amount
+                        }] : []);
+
+                    const hasContribs = contribs.length > 0;
+                    const hasPromises = promises.length > 0;
+
+                    return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minWidth: '160px' }}>
+                            {/* Contribution Voucher Badges from acc_contribution (Clickable to view/print receipt) */}
+                            {contribs.map((c, cIdx) => (
+                                <button
+                                    type="button"
+                                    key={c.contribution_id ? `cid_${c.contribution_id}` : `c_${cIdx}_${c.voucher_no}`}
+                                    className="badge badge-success voucher-clickable-badge"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onOpenReceipt(c.receipt_no || c.voucher_no || c.contribution_id);
+                                    }}
+                                    style={{
+                                        fontSize: '11px',
+                                        padding: '3px 7px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        cursor: 'pointer',
+                                        border: '1px solid rgba(16, 185, 129, 0.4)',
+                                        background: 'rgba(16, 185, 129, 0.12)',
+                                        color: '#10b981',
+                                        borderRadius: '6px',
+                                        fontWeight: 600,
+                                        textAlign: 'left',
+                                        width: 'fit-content'
+                                    }}
+                                    title={`Click to view & print official receipt #${c.voucher_no}`}
+                                >
+                                    <i className="material-icons" style={{ fontSize: '13px' }}>receipt</i>
+                                    <span>Receipt #{c.voucher_no}</span>
+                                    {Number(c.contribution_amount) > 0 && (
+                                        <span>• BHD {Number(c.contribution_amount).toFixed(3)}</span>
+                                    )}
+                                    {c.contribution_date && (
+                                        <span style={{ fontSize: '10px', opacity: 0.85 }}>• {formatDateDMY(c.contribution_date)}</span>
+                                    )}
+                                </button>
+                            ))}
+
+                            {/* Promise Voucher Badges from acc_promises */}
+                            {promises.map((p, pIdx) => (
+                                <span
+                                    key={p.promise_id ? `pid_${p.promise_id}` : `p_${pIdx}_${p.voucher_no}`}
+                                    className="badge badge-warning"
+                                    style={{
+                                        fontSize: '11px',
+                                        padding: '3px 7px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        borderRadius: '6px',
+                                        fontWeight: 600,
+                                        border: '1px solid rgba(245, 158, 11, 0.4)',
+                                        background: 'rgba(245, 158, 11, 0.12)',
+                                        color: '#f59e0b',
+                                        width: 'fit-content'
+                                    }}
+                                    title={`Cathedral Promise Receivable Voucher #${p.voucher_no} | Original: BHD ${Number(p.promise_amount || 0).toFixed(3)} | Due: BHD ${Number(p.balance_amount || 0).toFixed(3)}`}
+                                >
+                                    <i className="material-icons" style={{ fontSize: '13px' }}>history_edu</i>
+                                    <span>MP #{p.voucher_no}</span>
+                                    {Number(p.promise_amount) > 0 && (
+                                        <span>• BHD {Number(p.promise_amount).toFixed(3)}</span>
+                                    )}
+                                </span>
+                            ))}
+
+                            {/* Optional Manual Receipt Reference */}
+                            {(t.manual_receipt_no || t.receipt_book_no) && (
+                                <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
+                                    Rcpt: {t.receipt_book_no ? `Bk ${t.receipt_book_no} ` : ''}#{t.manual_receipt_no}
+                                </span>
+                            )}
+
+                            {!hasContribs && !hasPromises && (
+                                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>—</span>
+                            )}
+                        </div>
+                    );
+                }
+            },
+            {
+                header: 'Status',
+                accessor: 'payment_status',
+                sortable: true,
+                footer: (rows) => {
+                    const paidCount = rows.filter(t => t.payment_status === 'Paid').length;
+                    const dueCount = rows.length - paidCount;
+                    return (
+                        <div style={{ fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <span style={{ color: 'var(--success)', fontWeight: 700 }}>{paidCount} Settled</span>
+                            {dueCount > 0 && <span style={{ color: 'var(--warning)', fontWeight: 600 }}>{dueCount} Due</span>}
+                        </div>
+                    );
+                },
+                render: (t) => {
+                    const status = t.payment_status;
+                    const badgeClass = status === 'Paid' ? 'badge-success' : (status === 'Partial' ? 'badge-warning' : 'badge-danger');
+                    return <span className={`badge ${badgeClass}`}>{status}</span>;
+                }
+            },
+            {
+                header: 'Actions',
+                id: 'actions',
+                sortable: false,
+                headerStyle: { textAlign: 'right' },
+                style: { textAlign: 'right', whiteSpace: 'nowrap' },
+                footer: () => null,
+                render: (t) => {
+                    const bal = Number(t.balance_amount) || 0;
+
+                    if (bal <= 0.0001) {
+                        return <span className="badge badge-success" style={{ fontSize: '11px' }}>Settled</span>;
+                    }
+
+                    const ageInfo = getEntryAgeInfo(t);
+
+                    if (ageInfo.isWithin24h) {
+                        return (
+                            <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                                <button 
+                                    type="button"
+                                    className="btn gradient-45deg-purple-deep-orange gradient-shadow white-text btn-sm" 
+                                    style={{ 
+                                        fontSize: '12px', 
+                                        padding: '4px 10px', 
+                                        height: '30px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '5px',
+                                        boxShadow: '0 2px 6px rgba(123, 31, 162, 0.28)',
+                                        cursor: 'pointer'
+                                    }}
+                                    onClick={() => setPaymentModalData(t)}
+                                    title={`Pay Balance Active: ${ageInfo.timeLeftText} remaining of 24h window (Entry: ${ageInfo.entryDisplay} Asia/Bahrain)`}
+                                >
+                                    <i className="material-icons" style={{ fontSize: '15px' }}>payments</i> Pay Balance
+                                </button>
+                                <span style={{ fontSize: '10px', color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: '3px', fontWeight: 600 }}>
+                                    <i className="material-icons" style={{ fontSize: '12px' }}>schedule</i>
+                                    {ageInfo.timeLeftText}
+                                </span>
+                            </div>
+                        );
+                    }
+
+                    // Expired (> 24h)
+                    return (
+                        <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                            <button 
+                                type="button"
+                                className="btn btn-secondary btn-sm" 
+                                disabled
+                                style={{ 
+                                    fontSize: '11px', 
+                                    padding: '3px 8px', 
+                                    height: '28px',
+                                    opacity: 0.5,
+                                    cursor: 'not-allowed',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                }}
+                                title={`Pay Balance window has expired (Entry: ${ageInfo.entryDisplay} Asia/Bahrain). Settle dues through Cathedral Promises.`}
+                            >
+                                <i className="material-icons" style={{ fontSize: '13px' }}>lock_clock</i> Pay Balance
+                            </button>
+                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                                <i className="material-icons" style={{ fontSize: '11px' }}>history</i>
+                                24h Expired
+                            </span>
+                        </div>
+                    );
+                }
+            }
+        ];
+    };
+
+    return (
+        <div>
+            {/* Top Offering Switcher Card & Statistics */}
+            <div style={{ marginBottom: '24px' }}>
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '16px',
+                    marginBottom: '16px'
+                }}>
+                    <div>
+                        <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <i className="material-icons" style={{ fontSize: '28px', color: isGold ? '#f59e0b' : '#3b82f6' }}>
+                                {isGold ? 'stars' : 'layers'}
+                            </i>
+                            Special Offerings Desk ({year})
+                        </h2>
+                        <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>
+                            Record and manage Gold Offerings & Bed Sheet Offerings with automated Cathedral promise and contribution receipts
+                        </p>
+                    </div>
+
+                    {/* Segmented Switcher for Gold and Bed Sheet */}
+                    <div style={{
+                        display: 'inline-flex',
+                        background: 'rgba(255, 255, 255, 0.06)',
+                        padding: '4px',
+                        borderRadius: '12px',
+                        border: '1px solid var(--border-color)',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                    }}>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setOfferingSubTab('Gold');
+                                setTableTab('Gold');
+                            }}
+                            style={{
+                                padding: '8px 20px',
+                                borderRadius: '9px',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontSize: '13px',
+                                fontWeight: 700,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                transition: 'all 0.2s ease',
+                                background: isGold ? 'linear-gradient(45deg, #f59e0b, #d97706)' : 'transparent',
+                                color: isGold ? '#ffffff' : 'var(--text-secondary)',
+                                boxShadow: isGold ? '0 3px 10px rgba(245, 158, 11, 0.35)' : 'none'
+                            }}
+                        >
+                            <i className="material-icons" style={{ fontSize: '18px' }}>stars</i>
+                            Gold Offerings (GLD)
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setOfferingSubTab('BedSheet');
+                                setTableTab('BedSheet');
+                            }}
+                            style={{
+                                padding: '8px 20px',
+                                borderRadius: '9px',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontSize: '13px',
+                                fontWeight: 700,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                transition: 'all 0.2s ease',
+                                background: !isGold ? 'linear-gradient(45deg, #3b82f6, #1d4ed8)' : 'transparent',
+                                color: !isGold ? '#ffffff' : 'var(--text-secondary)',
+                                boxShadow: !isGold ? '0 3px 10px rgba(59, 130, 246, 0.35)' : 'none'
+                            }}
+                        >
+                            <i className="material-icons" style={{ fontSize: '18px' }}>layers</i>
+                            Bed Sheet Offerings (BED)
+                        </button>
+                    </div>
+                </div>
+
+                {/* Offerings Summary Statistics Pills */}
+                <div className="stats-grid-4 stats-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '20px' }}>
+                    <div className="stat-card" style={{ padding: '14px 18px', borderLeft: '4px solid #f59e0b' }}>
+                        <div className="stat-info-col">
+                            <span className="stat-title" style={{ color: '#d97706' }}>Gold Offerings Total</span>
+                            <div className="stat-value" style={{ fontSize: '20px', color: '#d97706' }}>
+                                BHD {statsSummary.goldAmount.toFixed(3)}
+                            </div>
+                            <div className="stat-sub">{statsSummary.goldCount} Gold Offerings Recorded</div>
+                        </div>
+                        <i className="material-icons background-round" style={{ background: 'linear-gradient(45deg, #f59e0b, #d97706)', color: '#ffffff' }}>stars</i>
+                    </div>
+
+                    <div className="stat-card" style={{ padding: '14px 18px', borderLeft: '4px solid #3b82f6' }}>
+                        <div className="stat-info-col">
+                            <span className="stat-title" style={{ color: '#2563eb' }}>Bed Sheet Total</span>
+                            <div className="stat-value" style={{ fontSize: '20px', color: '#2563eb' }}>
+                                BHD {statsSummary.bedAmount.toFixed(3)}
+                            </div>
+                            <div className="stat-sub">{statsSummary.bedCount} Bed Sheet Offerings Recorded</div>
+                        </div>
+                        <i className="material-icons background-round" style={{ background: 'linear-gradient(45deg, #3b82f6, #1d4ed8)', color: '#ffffff' }}>layers</i>
+                    </div>
+
+                    <div className="stat-card" style={{ padding: '14px 18px', borderLeft: '4px solid #10b981' }}>
+                        <div className="stat-info-col">
+                            <span className="stat-title" style={{ color: '#059669' }}>Total Collected</span>
+                            <div className="stat-value" style={{ fontSize: '20px', color: '#059669' }}>
+                                BHD {statsSummary.totalPaid.toFixed(3)}
+                            </div>
+                            <div className="stat-sub">Gold & Bed Sheet</div>
+                        </div>
+                        <i className="material-icons background-round" style={{ background: 'linear-gradient(45deg, #10b981, #059669)', color: '#ffffff' }}>payments</i>
+                    </div>
+
+                    <div className="stat-card" style={{ padding: '14px 18px', borderLeft: '4px solid #ef4444' }}>
+                        <div className="stat-info-col">
+                            <span className="stat-title" style={{ color: '#dc2626' }}>Outstanding Balance</span>
+                            <div className="stat-value" style={{ fontSize: '20px', color: statsSummary.totalBalance > 0.0001 ? '#dc2626' : 'var(--text-muted)' }}>
+                                BHD {statsSummary.totalBalance.toFixed(3)}
+                            </div>
+                            <div className="stat-sub">Gold & Bed Sheet</div>
+                        </div>
+                        <i className="material-icons background-round" style={{ background: 'linear-gradient(45deg, #ef4444, #b91c1c)', color: '#ffffff' }}>account_balance_wallet</i>
+                    </div>
+                </div>
+            </div>
+
+            {/* Offering Recording Desk Card */}
+            <div className="card" style={{ marginBottom: '28px', borderTop: `4px solid ${isGold ? '#f59e0b' : '#3b82f6'}` }}>
+                <div className="card-header" style={{
+                    background: isGold 
+                        ? 'linear-gradient(90deg, rgba(245, 158, 11, 0.12), transparent)' 
+                        : 'linear-gradient(90deg, rgba(59, 130, 246, 0.12), transparent)',
+                    flexWrap: 'wrap',
+                    gap: '10px'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <i className="material-icons" style={{ fontSize: '26px', color: isGold ? '#f59e0b' : '#3b82f6' }}>
+                            {isGold ? 'stars' : 'layers'}
+                        </i>
+                        <div>
+                            <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 700 }}>
+                                Record New {isGold ? 'Gold' : 'Bed Sheet'} Offering
+                            </h3>
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span className={`badge ${isGold ? 'badge-warning' : 'badge-info'}`} style={{ fontSize: '12px', padding: '5px 10px', fontWeight: 700 }}>
+                            Default Tag: {isGold ? 'GOLD' : 'BEDSHEET'}
+                        </span>
+                        <span className="badge badge-secondary" style={{ fontSize: '12px', padding: '5px 10px', fontFamily: 'monospace' }}>
+                            Prefix: {isGold ? `GLD-${year}-XXXX` : `BED-${year}-XXXX`}
+                        </span>
+                    </div>
+                </div>
+
+                <div className="card-body" style={{ padding: '18px 22px' }}>
+                    <form onSubmit={handleRecordOffering}>
+                        
+                        {/* 1. Item Description (Mandatory) */}
+                        <div className="form-group" style={{ marginBottom: '14px' }}>
+                            <label className="form-label" style={{ fontWeight: 700, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <i className="material-icons" style={{ fontSize: '16px', color: isGold ? '#f59e0b' : '#3b82f6' }}>description</i>
+                                {isGold ? 'Gold Item Description *' : 'Bed Sheet Item Description *'}
+                            </label>
+                            <input 
+                                type="text"
+                                className="form-control"
+                                style={{
+                                    fontSize: '14px',
+                                    padding: '10px 14px',
+                                    border: isGold ? '1px solid rgba(245, 158, 11, 0.5)' : '1px solid rgba(59, 130, 246, 0.5)',
+                                    background: isGold ? 'rgba(245, 158, 11, 0.03)' : 'rgba(59, 130, 246, 0.03)'
+                                }}
+                                placeholder="Item Description"
+                                value={itemDescription}
+                                onChange={e => setItemDescription(e.target.value)}
+                                required
+                            />
+                        </div>
+
+                        {/* 2. Devotee / Member Picker */}
+                        <div className="form-group" style={{ marginBottom: '14px' }}>
+                            <label className="form-label" style={{ fontWeight: 700, fontSize: '13px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <i className="material-icons" style={{ fontSize: '16px', color: 'var(--primary)' }}>person</i>
+                                    Select Member *
+                                </span>
+                                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                    Search by Name, Roll No, CPR or type Devotee Name
+                                </span>
+                            </label>
+
+                            {selectedMember ? (
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    background: 'rgba(59, 130, 246, 0.08)',
+                                    border: '1px solid rgba(59, 130, 246, 0.35)',
+                                    padding: '10px 16px',
+                                    borderRadius: '8px',
+                                    gap: '12px'
+                                }}>
+                                    <div>
+                                        <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '15px' }}>{selectedMember.primary_member_name}</div>
+                                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                            Roll No: <strong style={{ color: 'var(--primary)' }}>{selectedMember.code_c}</strong> &nbsp;|&nbsp;
+                                            CPR: {selectedMember.cpr_no || 'NA'} &nbsp;|&nbsp;
+                                            Phone: {selectedMember.bahrain_contact_no || 'NA'} &nbsp;|&nbsp;
+                                            {selectedMember.prayer_group_name || ''}
+                                        </div>
+                                    </div>
+
+                                    {/* Member Balance */}
+                                    <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '10px',
+                                        background: Number(selectedMember.outstanding_balance || 0) > 0 ? 'rgba(239, 68, 68, 0.12)' : 'rgba(16, 185, 129, 0.12)',
+                                        border: `1px solid ${Number(selectedMember.outstanding_balance || 0) > 0 ? 'rgba(239, 68, 68, 0.4)' : 'rgba(16, 185, 129, 0.4)'}`,
+                                        padding: '6px 12px',
+                                        borderRadius: '8px',
+                                        minWidth: '160px'
+                                    }}>
+                                        <i className="material-icons" style={{ fontSize: '20px', color: Number(selectedMember.outstanding_balance || 0) > 0 ? 'var(--danger)' : 'var(--success)' }}>
+                                            account_balance_wallet
+                                        </i>
+                                        <div>
+                                            <div style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)' }}>Outstanding</div>
+                                            <div style={{ fontSize: '14px', fontWeight: 800, color: Number(selectedMember.outstanding_balance || 0) > 0 ? 'var(--danger)' : 'var(--success)' }}>
+                                                {memberBalanceLoading ? 'Loading...' : `BHD ${Number(selectedMember.outstanding_balance || 0).toFixed(3)}`}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <button 
+                                        type="button" 
+                                        className="btn btn-secondary btn-sm" 
+                                        onClick={() => {
+                                            setSelectedMember(null);
+                                            setMemberBalanceLoading(false);
+                                        }}
+                                        style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                                    >
+                                        <i className="material-icons" style={{ fontSize: '15px' }}>swap_horiz</i>
+                                        Change Member
+                                    </button>
+                                </div>
+                            ) : (
+                                <div style={{ position: 'relative' }}>
+                                    <input 
+                                        type="text" 
+                                        className="form-control" 
+                                        placeholder="Select member by name or roll number"
+                                        value={memberSearch}
+                                        onChange={e => setMemberSearch(e.target.value)}
+                                    />
+                                    {memberResults.length > 0 && (
+                                        <div className="member-search-dropdown" style={{
+                                            position: 'absolute',
+                                            top: 'calc(100% + 4px)',
+                                            left: 0,
+                                            right: 0,
+                                            zIndex: 150,
+                                            maxHeight: '220px',
+                                            overflowY: 'auto'
+                                        }}>
+                                            {memberResults.map(m => (
+                                                <div 
+                                                    key={m.primary_member_id}
+                                                    className="member-search-item"
+                                                    onClick={() => handleSelectMember(m)}
+                                                >
+                                                    <div className="member-search-item-title">{m.primary_member_name}</div>
+                                                    <div className="member-search-item-subtitle">
+                                                        Roll No: <span style={{ color: 'var(--primary)', fontWeight: 600 }}>{m.code_c}</span> | CPR: {m.cpr_no} | Phone: {m.bahrain_contact_no}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* 3. Amounts & Settlement Row */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginBottom: '14px' }}>
+                            <div>
+                                <label className="form-label" style={{ fontWeight: 700, fontSize: '13px' }}>
+                                    Offering / Promise Amount *
+                                </label>
+                                <input 
+                                    type="number" 
+                                    step="0.001" 
+                                    min="0.001"
+                                    className="form-control" 
+                                    style={{ fontWeight: 700, fontSize: '15px' }}
+                                    placeholder="0.000"
+                                    value={bidAmount}
+                                    onChange={e => setBidAmount(e.target.value)}
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label className="form-label" style={{ fontWeight: 700, fontSize: '13px' }}>
+                                    Paid Now
+                                </label>
+                                <input 
+                                    type="number" 
+                                    step="0.001" 
+                                    min="0"
+                                    max={bidNum > 0 ? bidNum : undefined}
+                                    className="form-control" 
+                                    style={{ fontWeight: 700, fontSize: '15px', color: isPayingNow ? 'var(--success)' : 'inherit' }}
+                                    placeholder="0.000"
+                                    value={paidAmount}
+                                    onChange={e => setPaidAmount(e.target.value)}
+                                />
+                                {isPaidExceedingBid ? (
+                                    <div style={{ color: 'var(--danger)', fontSize: '12px', marginTop: '4px', fontWeight: 600 }}>
+                                        Paid amount cannot exceed offering amount
+                                    </div>
+                                ) : (
+                                    <div style={{ fontSize: '12px', marginTop: '6px', color: currentBalance > 0.0001 ? '#dc2626' : '#059669', fontWeight: 600 }}>
+                                        <i className="material-icons" style={{ fontSize: '14px', verticalAlign: '-2px', marginRight: '3px' }}>info</i>
+                                        Note: Balance Due: BHD {currentBalance.toFixed(3)} {bidNum > 0 && currentBalance <= 0.0001 ? '(Fully Paid)' : ''}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="form-label" style={{ fontWeight: 700, fontSize: '13px' }}>
+                                    Offering Date
+                                </label>
+                                <input 
+                                    type="date"
+                                    className="form-control"
+                                    value={auctionDate}
+                                    onChange={e => setAuctionDate(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Offering Notes / Remarks */}
+                        <div className="form-group" style={{ marginBottom: '14px' }}>
+                            <label className="form-label" style={{ fontSize: '12px', fontWeight: 600 }}>Offering Notes / Remarks (Optional)</label>
+                            <input 
+                                type="text"
+                                className="form-control"
+                                placeholder="Devotee remarks or special notes"
+                                value={notes}
+                                onChange={e => setNotes(e.target.value)}
+                            />
+                        </div>
+
+                        {/* ========================================================================= */}
+                        {/* ACCOUNTING POSTING HEADS SECTION (Contribution & Promise)                 */}
+                        {/* ========================================================================= */}
+                        <div style={{
+                            marginTop: '8px',
+                            marginBottom: '18px',
+                            background: 'rgba(255, 255, 255, 0.02)',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '10px',
+                            padding: '14px 16px'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <i className="material-icons" style={{ color: 'var(--primary)', fontSize: '22px' }}>account_balance</i>
+                                    <div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                            <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700 }}>Accounts Ledger Posting Heads</h4>
+                                            {isAdmin ? (
+                                                <span className="badge badge-primary" style={{ fontSize: '10px', padding: '2px 6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                    <i className="material-icons" style={{ fontSize: '12px' }}>admin_panel_settings</i>
+                                                    Admin Access • Editable
+                                                </span>
+                                            ) : (
+                                                <span className="badge badge-secondary" style={{ fontSize: '10px', padding: '2px 6px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                    <i className="material-icons" style={{ fontSize: '12px' }}>lock</i>
+                                                    Preset by Administrator
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                            {isAdmin 
+                                                ? 'Posting heads for automated Contribution (Receipt) & Promise (Receivable) entries to church accounts' 
+                                                : 'Default posting heads configured by Administrator. Transactions are automatically posted to these accounts.'}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                    {isAdmin ? (
+                                        <button
+                                            type="button"
+                                            className="btn btn-info btn-sm"
+                                            onClick={() => setLedgerSettingsOpen(true)}
+                                            style={{ fontSize: '11px', padding: '5px 12px', display: 'inline-flex', alignItems: 'center', gap: '5px', textTransform: 'uppercase', fontWeight: 700 }}
+                                            title="Open settings modal to view and configure separate default ledgers for Gold and Bed Sheet offerings"
+                                        >
+                                            <i className="material-icons" style={{ fontSize: '15px' }}>settings</i>
+                                            Configure Defaults
+                                        </button>
+                                    ) : (
+                                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.04)', padding: '5px 10px', borderRadius: '5px', border: '1px solid var(--border-color)', fontWeight: 600 }}>
+                                            <i className="material-icons" style={{ fontSize: '14px', color: '#64748b' }}>lock</i>
+                                            Fixed Default Ledgers (Locked)
+                                        </span>
+                                    )}
+
+                                    {/* Budget Head / Event */}
+                                    {accountsData?.events?.length > 0 && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '200px' }}>
+                                            <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Budget Head:</label>
+                                            <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)', background: 'rgba(0,0,0,0.04)', padding: '5px 10px', borderRadius: '6px', border: '1px solid var(--border-color)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                                <i className="material-icons" style={{ fontSize: '14px', color: 'var(--text-muted)' }}>event</i>
+                                                {accountsData.events.find(e => String(e.event_id) === String(selectedEventId))?.event_name || 'Default Budget Event'}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Section 1: Contribution Posting Heads (Receipt) - ONLY DISPLAYED IF isPayingNow (paid amount > 0) */}
+                            {isPayingNow && (
+                                <div className="accounting-section-box active-posting" style={{
+                                    opacity: 1,
+                                    background: 'rgba(16, 185, 129, 0.04)',
+                                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                                    borderLeft: '4px solid #10b981',
+                                    borderRadius: '8px',
+                                    padding: '12px 14px',
+                                    marginBottom: '14px'
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '6px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <span className="badge badge-success" style={{ fontSize: '11px', padding: '3px 8px' }}>
+                                                <i className="material-icons" style={{ fontSize: '13px', verticalAlign: 'middle', marginRight: '4px' }}>receipt</i>
+                                                Contribution Entry (Receipt Posting)
+                                            </span>
+                                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                <i className="material-icons" style={{ fontSize: '13px' }}>lock</i>
+                                                Fixed Default • Cannot be changed by user
+                                            </span>
+                                        </div>
+                                        <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--success)' }}>
+                                            Posting Amount: BHD {paidNum.toFixed(3)}
+                                        </span>
+                                    </div>
+
+                                    {/* Read-Only Locked Ledger Cards */}
+                                    <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '14px' }}>
+                                        <div style={{ background: 'rgba(2, 132, 199, 0.05)', border: '1px solid rgba(2, 132, 199, 0.25)', padding: '10px 14px', borderRadius: '8px' }}>
+                                            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                <span>Debit Head (Receiving Cash/Bank) *</span>
+                                                <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                    <i className="material-icons" style={{ fontSize: '12px' }}>lock</i> Locked
+                                                </span>
+                                            </div>
+                                            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <span className="badge" style={{ background: '#0284c7', color: '#fff', fontSize: '11px', padding: '3px 8px' }}>
+                                                    {effectiveContribDr.head_code}
+                                                </span>
+                                                <span>{effectiveContribDr.head_name}</span>
+                                            </div>
+                                        </div>
+                                        <div style={{ background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.25)', padding: '10px 14px', borderRadius: '8px' }}>
+                                            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                <span>Credit Head ({isGold ? 'Gold Offering Income' : 'Bed Sheet Income'}) *</span>
+                                                <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                    <i className="material-icons" style={{ fontSize: '12px' }}>lock</i> Locked
+                                                </span>
+                                            </div>
+                                            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <span className="badge" style={{ background: '#10b981', color: '#fff', fontSize: '11px', padding: '3px 8px' }}>
+                                                    {effectiveContribCr.head_code}
+                                                </span>
+                                                <span>{effectiveContribCr.head_name}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="form-row" style={{ gridTemplateColumns: '1fr 1fr', gap: '14px', marginTop: '10px' }}>
+                                        <div className="form-group" style={{ margin: 0 }}>
+                                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 600 }}>Manual Receipt Book No (Optional)</label>
+                                            <input 
+                                                type="text" 
+                                                className="form-control" 
+                                                style={{ height: '36px', fontSize: '13px' }}
+                                                placeholder="e.g. 14" 
+                                                value={receiptBookNo} 
+                                                onChange={e => setReceiptBookNo(e.target.value)} 
+                                            />
+                                        </div>
+                                        <div className="form-group" style={{ margin: 0 }}>
+                                            <label className="form-label" style={{ fontSize: '11px', fontWeight: 600 }}>Manual Receipt No (Optional)</label>
+                                            <input 
+                                                type="text" 
+                                                className="form-control" 
+                                                style={{ height: '36px', fontSize: '13px' }}
+                                                placeholder="e.g. 250" 
+                                                value={receiptNo} 
+                                                onChange={e => setReceiptNo(e.target.value)} 
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Section 2: Promise Posting Heads (Receivable) */}
+                            <div className="accounting-section-box active-promise" style={{
+                                opacity: 1,
+                                background: 'rgba(245, 158, 11, 0.03)',
+                                border: '1px solid rgba(245, 158, 11, 0.3)',
+                                borderLeft: '4px solid #f59e0b',
+                                borderRadius: '8px',
+                                padding: '12px 14px',
+                                marginBottom: 0
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '6px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <span className="badge badge-warning" style={{ fontSize: '11px', padding: '3px 8px' }}>
+                                            <i className="material-icons" style={{ fontSize: '13px', verticalAlign: 'middle', marginRight: '4px' }}>history_edu</i>
+                                            Promise Posting (Member Receivable Entry)
+                                        </span>
+                                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                            <i className="material-icons" style={{ fontSize: '13px' }}>lock</i>
+                                            Fixed Default • Cannot be changed by user
+                                        </span>
+                                    </div>
+                                    {bidNum > 0 && (
+                                        <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--warning)' }}>
+                                            Promise Amount: BHD {bidNum.toFixed(3)} | Balance Due: BHD {currentBalance.toFixed(3)}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {/* Read-Only Locked Ledger Cards */}
+                                <div className="form-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '14px' }}>
+                                    <div style={{ background: 'rgba(245, 158, 11, 0.05)', border: '1px solid rgba(245, 158, 11, 0.25)', padding: '10px 14px', borderRadius: '8px' }}>
+                                        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                            <span>Debit Head (A/R Member Receivable) *</span>
+                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                <i className="material-icons" style={{ fontSize: '12px' }}>lock</i> Locked
+                                            </span>
+                                        </div>
+                                        <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <span className="badge" style={{ background: '#f59e0b', color: '#fff', fontSize: '11px', padding: '3px 8px' }}>
+                                                {effectivePromiseDr.head_code}
+                                            </span>
+                                            <span>{effectivePromiseDr.head_name}</span>
+                                        </div>
+                                    </div>
+                                    <div style={{ background: 'rgba(139, 92, 246, 0.05)', border: '1px solid rgba(139, 92, 246, 0.25)', padding: '10px 14px', borderRadius: '8px' }}>
+                                        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                            <span>Credit Head ({isGold ? 'Gold Offering Income' : 'Bed Sheet Income'}) *</span>
+                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                <i className="material-icons" style={{ fontSize: '12px' }}>lock</i> Locked
+                                            </span>
+                                        </div>
+                                        <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <span className="badge" style={{ background: '#8b5cf6', color: '#fff', fontSize: '11px', padding: '3px 8px' }}>
+                                                {effectivePromiseCr.head_code}
+                                            </span>
+                                            <span>{effectivePromiseCr.head_name}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Submit Row */}
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+                            {isPaidExceedingBid && (
+                                <span style={{ color: 'var(--danger)', fontSize: '12px', fontWeight: 600 }}>
+                                    Paid amount exceeds total offering amount.
+                                </span>
+                            )}
+                            <button
+                                type="submit"
+                                className="btn btn-lg"
+                                style={{
+                                    background: isGold 
+                                        ? 'linear-gradient(45deg, #d97706, #b45309)' 
+                                        : 'linear-gradient(45deg, #2563eb, #1d4ed8)',
+                                    color: '#ffffff',
+                                    minWidth: '280px',
+                                    fontWeight: 700,
+                                    boxShadow: isGold
+                                        ? '0 4px 14px rgba(217, 119, 6, 0.4)'
+                                        : '0 4px 14px rgba(37, 99, 235, 0.4)'
+                                }}
+                                disabled={recording || !itemDescription.trim() || bidNum <= 0 || (!selectedMember && !memberSearch.trim()) || isPaidExceedingBid}
+                            >
+                                <i className="material-icons" style={{ fontSize: '20px' }}>
+                                    {isGold ? 'stars' : 'layers'}
+                                </i>
+                                {recording 
+                                    ? `Recording ${offeringSubTab} Offering...` 
+                                    : `Record ${isGold ? 'Gold' : 'Bed Sheet'} Offering (${isGold ? 'GLD' : 'BED'})`}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            {/* Separate DataTables Section for Gold & Bed Sheet Offerings */}
+            <div style={{ marginTop: '24px' }}>
+                {/* Segmented Table Switcher Bar */}
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '12px',
+                    marginBottom: '16px'
+                }}>
+                    <div style={{
+                        display: 'inline-flex',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        padding: '4px',
+                        borderRadius: '12px',
+                        border: '1px solid var(--border-color)',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+                    }}>
+                        <button
+                            type="button"
+                            onClick={() => setTableTab('Gold')}
+                            style={{
+                                padding: '8px 18px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontSize: '13px',
+                                fontWeight: 700,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                transition: 'all 0.2s ease',
+                                background: tableTab === 'Gold' ? 'linear-gradient(45deg, #f59e0b, #d97706)' : 'transparent',
+                                color: tableTab === 'Gold' ? '#ffffff' : 'var(--text-secondary)',
+                                boxShadow: tableTab === 'Gold' ? '0 3px 10px rgba(245, 158, 11, 0.35)' : 'none'
+                            }}
+                        >
+                            <i className="material-icons" style={{ fontSize: '18px' }}>stars</i>
+                            Gold Offerings DataTable ({statsSummary.goldCount})
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setTableTab('BedSheet')}
+                            style={{
+                                padding: '8px 18px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontSize: '13px',
+                                fontWeight: 700,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                transition: 'all 0.2s ease',
+                                background: tableTab === 'BedSheet' ? 'linear-gradient(45deg, #3b82f6, #1d4ed8)' : 'transparent',
+                                color: tableTab === 'BedSheet' ? '#ffffff' : 'var(--text-secondary)',
+                                boxShadow: tableTab === 'BedSheet' ? '0 3px 10px rgba(59, 130, 246, 0.35)' : 'none'
+                            }}
+                        >
+                            <i className="material-icons" style={{ fontSize: '18px' }}>layers</i>
+                            Bed Sheet Offerings DataTable ({statsSummary.bedCount})
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setTableTab('Both')}
+                            style={{
+                                padding: '8px 16px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontSize: '13px',
+                                fontWeight: 700,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                transition: 'all 0.2s ease',
+                                background: tableTab === 'Both' ? 'linear-gradient(45deg, #7c3aed, #6d28d9)' : 'transparent',
+                                color: tableTab === 'Both' ? '#ffffff' : 'var(--text-secondary)',
+                                boxShadow: tableTab === 'Both' ? '0 3px 10px rgba(124, 58, 237, 0.35)' : 'none'
+                            }}
+                        >
+                            <i className="material-icons" style={{ fontSize: '18px' }}>view_agenda</i>
+                            View Both Tables
+                        </button>
+                    </div>
+
+                    {/* Status Filter & Reload */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>Status:</label>
+                            <select 
+                                className="form-control" 
+                                style={{ width: '120px', height: '32px', fontSize: '12px', padding: '2px 8px' }}
+                                value={statusFilter} 
+                                onChange={e => setStatusFilter(e.target.value)}
+                            >
+                                <option value="All">All Statuses</option>
+                                <option value="Paid">Paid Only</option>
+                                <option value="Partial">Partial Only</option>
+                                <option value="Pending">Pending Only</option>
+                            </select>
+                        </div>
+
+                        <button 
+                            type="button" 
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => {
+                                fetchOfferingsData();
+                                if (typeof onDataChanged === 'function') onDataChanged();
+                            }}
+                            title="Reload offerings table"
+                            style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                        >
+                            <i className="material-icons" style={{ fontSize: '16px' }}>refresh</i> Reload
+                        </button>
+                    </div>
+                </div>
+
+                {/* Gold Offerings DataTable Card */}
+                {(tableTab === 'Gold' || tableTab === 'Both') && (
+                    <div className="card" style={{ marginBottom: tableTab === 'Both' ? '24px' : '0' }}>
+                        <div className="card-header" style={{ flexWrap: 'wrap', gap: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <i className="material-icons" style={{ fontSize: '26px', color: '#f59e0b' }}>stars</i>
+                                <div>
+                                    <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: '#d97706', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        Gold Offerings DataTable ({goldOfferings.length})
+                                    </h3>
+                                    <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
+                                        Track Gold offerings (GLD) with automated Cathedral promise and contribution receipts
+                                    </p>
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span className="badge badge-warning" style={{ fontSize: '12px', padding: '4px 10px', fontWeight: 700 }}>
+                                    Gold Total: BHD {statsSummary.goldAmount.toFixed(3)}
+                                </span>
+                            </div>
+                        </div>
+
+                        <DataTable 
+                            columns={getOfferingColumns('Gold')}
+                            data={goldOfferings}
+                            loading={loading}
+                            keyField="transaction_id"
+                            initialPageSize={10}
+                            searchPlaceholder="Search Gold Ref (GLD), Member Name, Roll No, Phone, Gold Item Description..."
+                            emptyMessage="No Gold Offerings recorded yet for this year."
+                        />
+                    </div>
+                )}
+
+                {/* Bed Sheet Offerings DataTable Card */}
+                {(tableTab === 'BedSheet' || tableTab === 'Both') && (
+                    <div className="card">
+                        <div className="card-header" style={{ flexWrap: 'wrap', gap: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <i className="material-icons" style={{ fontSize: '26px', color: '#3b82f6' }}>layers</i>
+                                <div>
+                                    <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: '#2563eb', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        Bed Sheet Offerings DataTable ({bedOfferings.length})
+                                    </h3>
+                                    <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
+                                        Track Bed Sheet offerings (BED) with automated Cathedral promise and contribution receipts
+                                    </p>
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span className="badge badge-info" style={{ fontSize: '12px', padding: '4px 10px', fontWeight: 700, background: 'rgba(59, 130, 246, 0.15)', color: '#2563eb', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
+                                    Bed Sheet Total: BHD {statsSummary.bedAmount.toFixed(3)}
+                                </span>
+                            </div>
+                        </div>
+
+                        <DataTable 
+                            columns={getOfferingColumns('BedSheet')}
+                            data={bedOfferings}
+                            loading={loading}
+                            keyField="transaction_id"
+                            initialPageSize={10}
+                            searchPlaceholder="Search Bed Sheet Ref (BED), Member Name, Roll No, Phone, Bed Sheet Description..."
+                            emptyMessage="No Bed Sheet Offerings recorded yet for this year."
+                        />
+                    </div>
+                )}
+            </div>
+
+            {/* Payment Modal */}
+            {paymentModalData && (
+                <RecordPaymentModal 
+                    transaction={paymentModalData}
+                    isOpen={!!paymentModalData}
+                    onClose={() => setPaymentModalData(null)}
+                    onSuccess={() => {
+                        fetchOfferingsData();
+                        if (typeof onDataChanged === 'function') {
+                            onDataChanged();
+                        }
+                        showToast('success', 'Offering balance payment recorded!');
+                    }}
+                    onOpenReceipt={onOpenReceipt}
+                    showToast={showToast}
+                    accountsData={accountsData}
+                />
+            )}
+
+            {/* Default Ledger Settings Modal for Admins */}
+            {ledgerSettingsOpen && (
+                <DefaultLedgerSettingsModal 
+                    isOpen={ledgerSettingsOpen}
+                    onClose={() => setLedgerSettingsOpen(false)}
+                    showToast={showToast}
+                    initialTab={isGold ? 'gold' : 'bed'}
+                    onSaved={(newDefs) => {
+                        if (newDefs) {
+                            setAccountsData(prev => ({
+                                ...prev,
+                                default_heads: newDefs
+                            }));
+                        }
+                        fetchOfferingsData();
+                        if (typeof onDataChanged === 'function') {
+                            onDataChanged();
+                        }
+                    }}
+                />
+            )}
+        </div>
+    );
+}
+
 // --- Redesigned Spacious Pay Balance / Settlement Modal (Matching Live Auction Entry Details) ---
 function RecordPaymentModal({ transaction, isOpen, onClose, onSuccess, onOpenReceipt, showToast, accountsData }) {
     if (!isOpen || !transaction) return null;
@@ -4301,7 +6275,7 @@ function RecordPaymentModal({ transaction, isOpen, onClose, onSuccess, onOpenRec
         <div className="modal-overlay">
             <div className="modal-content pay-balance-modal-content">
                 <ModalHeader 
-                    title="Settle Auction Balance" 
+                    title={transaction.offering_type && transaction.offering_type !== 'Auction' ? `Settle ${transaction.offering_type} Offering Balance` : "Settle Auction Balance"} 
                     icon="payments" 
                     onClose={onClose} 
                     badge={transaction.auction_ref_no}
@@ -4309,25 +6283,49 @@ function RecordPaymentModal({ transaction, isOpen, onClose, onSuccess, onOpenRec
                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
                     <div className="modal-body" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px 24px' }}>
                         
-                        {/* 1. Article Details Card (Live Auction Style) */}
+                        {/* 1. Article / Offering Details Card (Live Auction / Offering Style) */}
                         <div style={{ background: 'rgba(0,0,0,0.03)', padding: '14px 18px', borderRadius: '10px', border: '1px solid var(--border-color)', marginBottom: '14px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                                    <span className="badge badge-warning" style={{ fontSize: '12px', padding: '3px 8px', fontWeight: 700 }}>
-                                        {transaction.tag_number ? `Tag #${transaction.tag_number}` : `#${transaction.article_id}`}
-                                    </span>
-                                    {transaction.article_number && (
-                                        <span className="badge badge-secondary" style={{ fontSize: '11px', padding: '3px 8px', fontFamily: 'monospace' }}>
-                                            {transaction.article_number}
-                                        </span>
-                                    )}
-                                    <strong style={{ fontSize: '16px', color: 'var(--text-primary)' }}>{transaction.article_name}</strong>
-                                    {transaction.category && (
-                                        <span className="badge badge-info" style={{ fontSize: '11px' }}>{transaction.category}</span>
+                                    {transaction.offering_type && transaction.offering_type !== 'Auction' ? (
+                                        <>
+                                            <span className="badge" style={{ 
+                                                background: transaction.offering_type === 'Gold' ? '#d97706' : '#2563eb', 
+                                                color: '#ffffff', 
+                                                fontSize: '12px', 
+                                                padding: '3px 8px', 
+                                                fontWeight: 700 
+                                            }}>
+                                                {transaction.offering_type} Offering
+                                            </span>
+                                            {transaction.tag_number && (
+                                                <span className="badge badge-secondary" style={{ fontSize: '11px', padding: '3px 8px' }}>
+                                                    {transaction.tag_number}
+                                                </span>
+                                            )}
+                                            <strong style={{ fontSize: '16px', color: 'var(--text-primary)' }}>
+                                                {transaction.item_description || transaction.article_name}
+                                            </strong>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="badge badge-warning" style={{ fontSize: '12px', padding: '3px 8px', fontWeight: 700 }}>
+                                                {transaction.tag_number ? `Tag #${transaction.tag_number}` : `#${transaction.article_id}`}
+                                            </span>
+                                            {transaction.article_number && (
+                                                <span className="badge badge-secondary" style={{ fontSize: '11px', padding: '3px 8px', fontFamily: 'monospace' }}>
+                                                    {transaction.article_number}
+                                                </span>
+                                            )}
+                                            <strong style={{ fontSize: '16px', color: 'var(--text-primary)' }}>{transaction.article_name}</strong>
+                                            {transaction.category && (
+                                                <span className="badge badge-info" style={{ fontSize: '11px' }}>{transaction.category}</span>
+                                            )}
+                                        </>
                                     )}
                                 </div>
                                 <div style={{ textAlign: 'right' }}>
-                                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Auction Ref: </span>
+                                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Ref: </span>
                                     <strong style={{ fontSize: '14px', color: 'var(--primary)' }}>{transaction.auction_ref_no}</strong>
                                 </div>
                             </div>
@@ -6850,6 +8848,20 @@ function App() {
                             )}
                         </div>
 
+                        <div 
+                            className={`top-nav-item ${currentTab === 'offerings' ? 'active' : ''}`}
+                            onClick={() => setCurrentTab('offerings')}
+                            title="Gold & Bed Sheet Special Offerings Desk"
+                        >
+                            <i className="material-icons">volunteer_activism</i>
+                            <span>Special Offerings</span>
+                            {stats?.total_offerings > 0 && (
+                                <span className="nav-badge" style={{ background: '#f59e0b', color: '#1e293b' }}>
+                                    {stats.total_offerings}
+                                </span>
+                            )}
+                        </div>
+
                         {/* Sub Menu: More Dropdown (Promises & Dues, Sales Reports, User Management) */}
                         <div className="top-nav-dropdown-container" ref={reportsDropdownRef}>
                             <div 
@@ -6997,6 +9009,13 @@ function App() {
                         <i className="material-icons">gavel</i>
                         <span>Live Auction Desk ({stats?.available_articles || 0})</span>
                     </div>
+                    <div 
+                        className={`top-nav-item ${currentTab === 'offerings' ? 'active' : ''}`}
+                        onClick={() => { setCurrentTab('offerings'); setSidebarOpen(false); }}
+                    >
+                        <i className="material-icons">volunteer_activism</i>
+                        <span>Special Offerings ({stats?.total_offerings || 0})</span>
+                    </div>
 
                     <div className="mobile-nav-section-title">
                         <span>More Modules & Reports</span>
@@ -7072,6 +9091,18 @@ function App() {
 
                 {currentTab === 'auction' && (
                     <AuctionDeskView 
+                        key={year}
+                        year={year} 
+                        refreshTrigger={dataRevision}
+                        onDataChanged={refreshData}
+                        showToast={showToast}
+                        onOpenReceipt={rno => setReceiptModalNo(rno)}
+                        isAdmin={isAdmin}
+                    />
+                )}
+
+                {currentTab === 'offerings' && (
+                    <OfferingsDeskView 
                         key={year}
                         year={year} 
                         refreshTrigger={dataRevision}

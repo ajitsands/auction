@@ -81,6 +81,8 @@ abstract class Model {
         $this->ensureColumn('acc_contribution', 'article_id', 'int(11) DEFAULT 0');
         $this->ensureColumn('acc_ledger_entries', 'article_id', 'int(11) DEFAULT 0');
         $this->ensureColumn('hf_auction_transactions', 'created_at', 'DATETIME DEFAULT CURRENT_TIMESTAMP');
+        $this->ensureColumn('hf_auction_transactions', 'offering_type', "VARCHAR(50) DEFAULT 'Auction'");
+        $this->ensureColumn('hf_auction_transactions', 'item_description', 'TEXT DEFAULT NULL');
         $this->ensureSettingsTable();
     }
 

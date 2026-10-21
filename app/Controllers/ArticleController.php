@@ -18,8 +18,9 @@ class ArticleController extends Controller {
         $search = $_GET['search'] ?? null;
         $category = $_GET['category'] ?? null;
         $order = $_GET['order'] ?? 'ASC';
+        $excludeOfferings = !empty($_GET['exclude_offerings']);
 
-        $articles = $this->articleModel->getAll($year, $status, $search, $category, $order);
+        $articles = $this->articleModel->getAll($year, $status, $search, $category, $order, $excludeOfferings);
         $this->jsonResponse([
             'success'  => true,
             'year'     => $year,

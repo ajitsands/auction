@@ -115,6 +115,25 @@ class AccountHead extends Model {
             if ($val) {
                 $decoded = json_decode($val, true);
                 if (is_array($decoded)) {
+                    // Populate default heads for gold and bed sheet if not set
+                    $decoded['gold_contrib_dr_code'] = !empty($decoded['gold_contrib_dr_code']) ? $decoded['gold_contrib_dr_code'] : '02123';
+                    $decoded['gold_contrib_dr_name'] = !empty($decoded['gold_contrib_dr_name']) ? $decoded['gold_contrib_dr_name'] : 'Cash on Hand-Harvest Festival';
+                    $decoded['gold_contrib_cr_code'] = !empty($decoded['gold_contrib_cr_code']) ? $decoded['gold_contrib_cr_code'] : '07613';
+                    $decoded['gold_contrib_cr_name'] = !empty($decoded['gold_contrib_cr_name']) ? $decoded['gold_contrib_cr_name'] : 'Harvest Festival - Gold';
+                    $decoded['gold_promise_dr_code'] = !empty($decoded['gold_promise_dr_code']) ? $decoded['gold_promise_dr_code'] : '07743';
+                    $decoded['gold_promise_dr_name'] = !empty($decoded['gold_promise_dr_name']) ? $decoded['gold_promise_dr_name'] : 'A/R Harvest Festival 2011 - Gold Offer';
+                    $decoded['gold_promise_cr_code'] = !empty($decoded['gold_promise_cr_code']) ? $decoded['gold_promise_cr_code'] : '07637';
+                    $decoded['gold_promise_cr_name'] = !empty($decoded['gold_promise_cr_name']) ? $decoded['gold_promise_cr_name'] : 'Gold not auctioned from Vanchi';
+
+                    $decoded['bed_contrib_dr_code']  = !empty($decoded['bed_contrib_dr_code']) ? $decoded['bed_contrib_dr_code'] : '02123';
+                    $decoded['bed_contrib_dr_name']  = !empty($decoded['bed_contrib_dr_name']) ? $decoded['bed_contrib_dr_name'] : 'Cash on Hand-Harvest Festival';
+                    $decoded['bed_contrib_cr_code']  = !empty($decoded['bed_contrib_cr_code']) ? $decoded['bed_contrib_cr_code'] : '07502';
+                    $decoded['bed_contrib_cr_name']  = !empty($decoded['bed_contrib_cr_name']) ? $decoded['bed_contrib_cr_name'] : 'Harvest Festival - Bed Sheet';
+                    $decoded['bed_promise_dr_code']  = !empty($decoded['bed_promise_dr_code']) ? $decoded['bed_promise_dr_code'] : '07744';
+                    $decoded['bed_promise_dr_name']  = !empty($decoded['bed_promise_dr_name']) ? $decoded['bed_promise_dr_name'] : 'A/R Harvest Festival 2011 - Bedsheet Offer';
+                    $decoded['bed_promise_cr_code']  = !empty($decoded['bed_promise_cr_code']) ? $decoded['bed_promise_cr_code'] : '07503';
+                    $decoded['bed_promise_cr_name']  = !empty($decoded['bed_promise_cr_name']) ? $decoded['bed_promise_cr_name'] : 'Harvest Festival - Article Auction';
+
                     return $decoded;
                 }
             }
@@ -122,16 +141,34 @@ class AccountHead extends Model {
 
         // Fallback standard default heads if none configured yet
         return [
-            'event_id'         => null,
-            'event_name'       => null,
-            'contrib_dr_code'  => '02123',
-            'contrib_dr_name'  => 'Cash on Hand-Harvest Festival',
-            'contrib_cr_code'  => '02206',
-            'contrib_cr_name'  => 'Church Building Fund - Harvest Festival',
-            'promise_dr_code'  => '08583',
-            'promise_dr_name'  => 'Harvest Festival Auction Receivable',
-            'promise_cr_code'  => '07503',
-            'promise_cr_name'  => 'Harvest Festival - Article Auction'
+            'event_id'               => null,
+            'event_name'             => null,
+            'contrib_dr_code'        => '02123',
+            'contrib_dr_name'        => 'Cash on Hand-Harvest Festival',
+            'contrib_cr_code'        => '02206',
+            'contrib_cr_name'        => 'Church Building Fund - Harvest Festival',
+            'promise_dr_code'        => '08583',
+            'promise_dr_name'        => 'Harvest Festival Auction Receivable',
+            'promise_cr_code'        => '07503',
+            'promise_cr_name'        => 'Harvest Festival - Article Auction',
+
+            'gold_contrib_dr_code'   => '02123',
+            'gold_contrib_dr_name'   => 'Cash on Hand-Harvest Festival',
+            'gold_contrib_cr_code'   => '07613',
+            'gold_contrib_cr_name'   => 'Harvest Festival - Gold',
+            'gold_promise_dr_code'   => '07743',
+            'gold_promise_dr_name'   => 'A/R Harvest Festival 2011 - Gold Offer',
+            'gold_promise_cr_code'   => '07637',
+            'gold_promise_cr_name'   => 'Gold not auctioned from Vanchi',
+
+            'bed_contrib_dr_code'    => '02123',
+            'bed_contrib_dr_name'    => 'Cash on Hand-Harvest Festival',
+            'bed_contrib_cr_code'    => '07502',
+            'bed_contrib_cr_name'    => 'Harvest Festival - Bed Sheet',
+            'bed_promise_dr_code'    => '07744',
+            'bed_promise_dr_name'    => 'A/R Harvest Festival 2011 - Bedsheet Offer',
+            'bed_promise_cr_code'    => '07503',
+            'bed_promise_cr_name'    => 'Harvest Festival - Article Auction'
         ];
     }
 
@@ -140,18 +177,40 @@ class AccountHead extends Model {
      */
     public function saveDefaultHeads(array $settings): bool {
         $this->ensureSettingsTable();
+        $existing = $this->getDefaultHeads();
         $payload = [
-            'event_id'         => !empty($settings['event_id']) ? (int)$settings['event_id'] : null,
-            'event_name'       => !empty($settings['event_name']) ? trim($settings['event_name']) : null,
-            'contrib_dr_code'  => !empty($settings['contrib_dr_code']) ? trim($settings['contrib_dr_code']) : '02123',
-            'contrib_dr_name'  => !empty($settings['contrib_dr_name']) ? trim($settings['contrib_dr_name']) : 'Cash on Hand-Harvest Festival',
-            'contrib_cr_code'  => !empty($settings['contrib_cr_code']) ? trim($settings['contrib_cr_code']) : '02206',
-            'contrib_cr_name'  => !empty($settings['contrib_cr_name']) ? trim($settings['contrib_cr_name']) : 'Church Building Fund - Harvest Festival',
-            'promise_dr_code'  => !empty($settings['promise_dr_code']) ? trim($settings['promise_dr_code']) : '08583',
-            'promise_dr_name'  => !empty($settings['promise_dr_name']) ? trim($settings['promise_dr_name']) : 'Harvest Festival Auction Receivable',
-            'promise_cr_code'  => !empty($settings['promise_cr_code']) ? trim($settings['promise_cr_code']) : '07503',
-            'promise_cr_name'  => !empty($settings['promise_cr_name']) ? trim($settings['promise_cr_name']) : 'Harvest Festival - Article Auction',
-            'updated_at'       => date('Y-m-d H:i:s')
+            'event_id'             => !empty($settings['event_id']) ? (int)$settings['event_id'] : ($existing['event_id'] ?? null),
+            'event_name'           => !empty($settings['event_name']) ? trim($settings['event_name']) : ($existing['event_name'] ?? null),
+            'contrib_dr_code'      => !empty($settings['contrib_dr_code']) ? trim($settings['contrib_dr_code']) : ($existing['contrib_dr_code'] ?? '02123'),
+            'contrib_dr_name'      => !empty($settings['contrib_dr_name']) ? trim($settings['contrib_dr_name']) : ($existing['contrib_dr_name'] ?? 'Cash on Hand-Harvest Festival'),
+            'contrib_cr_code'      => !empty($settings['contrib_cr_code']) ? trim($settings['contrib_cr_code']) : ($existing['contrib_cr_code'] ?? '02206'),
+            'contrib_cr_name'      => !empty($settings['contrib_cr_name']) ? trim($settings['contrib_cr_name']) : ($existing['contrib_cr_name'] ?? 'Church Building Fund - Harvest Festival'),
+            'promise_dr_code'      => !empty($settings['promise_dr_code']) ? trim($settings['promise_dr_code']) : ($existing['promise_dr_code'] ?? '08583'),
+            'promise_dr_name'      => !empty($settings['promise_dr_name']) ? trim($settings['promise_dr_name']) : ($existing['promise_dr_name'] ?? 'Harvest Festival Auction Receivable'),
+            'promise_cr_code'      => !empty($settings['promise_cr_code']) ? trim($settings['promise_cr_code']) : ($existing['promise_cr_code'] ?? '07503'),
+            'promise_cr_name'      => !empty($settings['promise_cr_name']) ? trim($settings['promise_cr_name']) : ($existing['promise_cr_name'] ?? 'Harvest Festival - Article Auction'),
+
+            // Gold Offerings
+            'gold_contrib_dr_code' => !empty($settings['gold_contrib_dr_code']) ? trim($settings['gold_contrib_dr_code']) : ($existing['gold_contrib_dr_code'] ?? '02123'),
+            'gold_contrib_dr_name' => !empty($settings['gold_contrib_dr_name']) ? trim($settings['gold_contrib_dr_name']) : ($existing['gold_contrib_dr_name'] ?? 'Cash on Hand-Harvest Festival'),
+            'gold_contrib_cr_code' => !empty($settings['gold_contrib_cr_code']) ? trim($settings['gold_contrib_cr_code']) : ($existing['gold_contrib_cr_code'] ?? '07613'),
+            'gold_contrib_cr_name' => !empty($settings['gold_contrib_cr_name']) ? trim($settings['gold_contrib_cr_name']) : ($existing['gold_contrib_cr_name'] ?? 'Harvest Festival - Gold'),
+            'gold_promise_dr_code' => !empty($settings['gold_promise_dr_code']) ? trim($settings['gold_promise_dr_code']) : ($existing['gold_promise_dr_code'] ?? '07743'),
+            'gold_promise_dr_name' => !empty($settings['gold_promise_dr_name']) ? trim($settings['gold_promise_dr_name']) : ($existing['gold_promise_dr_name'] ?? 'A/R Harvest Festival 2011 - Gold Offer'),
+            'gold_promise_cr_code' => !empty($settings['gold_promise_cr_code']) ? trim($settings['gold_promise_cr_code']) : ($existing['gold_promise_cr_code'] ?? '07637'),
+            'gold_promise_cr_name' => !empty($settings['gold_promise_cr_name']) ? trim($settings['gold_promise_cr_name']) : ($existing['gold_promise_cr_name'] ?? 'Gold not auctioned from Vanchi'),
+
+            // Bed Sheet Offerings
+            'bed_contrib_dr_code'  => !empty($settings['bed_contrib_dr_code']) ? trim($settings['bed_contrib_dr_code']) : ($existing['bed_contrib_dr_code'] ?? '02123'),
+            'bed_contrib_dr_name'  => !empty($settings['bed_contrib_dr_name']) ? trim($settings['bed_contrib_dr_name']) : ($existing['bed_contrib_dr_name'] ?? 'Cash on Hand-Harvest Festival'),
+            'bed_contrib_cr_code'  => !empty($settings['bed_contrib_cr_code']) ? trim($settings['bed_contrib_cr_code']) : ($existing['bed_contrib_cr_code'] ?? '07502'),
+            'bed_contrib_cr_name'  => !empty($settings['bed_contrib_cr_name']) ? trim($settings['bed_contrib_cr_name']) : ($existing['bed_contrib_cr_name'] ?? 'Harvest Festival - Bed Sheet'),
+            'bed_promise_dr_code'  => !empty($settings['bed_promise_dr_code']) ? trim($settings['bed_promise_dr_code']) : ($existing['bed_promise_dr_code'] ?? '07744'),
+            'bed_promise_dr_name'  => !empty($settings['bed_promise_dr_name']) ? trim($settings['bed_promise_dr_name']) : ($existing['bed_promise_dr_name'] ?? 'A/R Harvest Festival 2011 - Bedsheet Offer'),
+            'bed_promise_cr_code'  => !empty($settings['bed_promise_cr_code']) ? trim($settings['bed_promise_cr_code']) : ($existing['bed_promise_cr_code'] ?? '07503'),
+            'bed_promise_cr_name'  => !empty($settings['bed_promise_cr_name']) ? trim($settings['bed_promise_cr_name']) : ($existing['bed_promise_cr_name'] ?? 'Harvest Festival - Article Auction'),
+
+            'updated_at'           => date('Y-m-d H:i:s')
         ];
 
         $json = json_encode($payload);

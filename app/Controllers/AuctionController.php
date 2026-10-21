@@ -16,8 +16,9 @@ class AuctionController extends Controller {
         $year = isset($_GET['year']) ? (int)$_GET['year'] : (int)date('Y');
         $status = $_GET['status'] ?? null;
         $search = $_GET['search'] ?? null;
+        $offeringType = $_GET['offering_type'] ?? null;
 
-        $transactions = $this->auctionModel->getAll($year, $status, $search);
+        $transactions = $this->auctionModel->getAll($year, $status, $search, $offeringType);
         $this->jsonResponse([
             'success'         => true,
             'year'            => $year,
@@ -32,8 +33,17 @@ class AuctionController extends Controller {
         $user = $this->requireAuth();
         $data = $this->getJsonInput();
 
-        if (empty($data['article_id']) || empty($data['winning_bid_amount']) || empty($data['buyer_name'])) {
-            $this->jsonResponse(['success' => false, 'error' => 'Article, Winning Bid Amount, and Buyer Name are required.'], 400);
+        $offeringType = in_array($data['offering_type'] ?? '', ['Gold', 'BedSheet']) ? $data['offering_type'] : 'Auction';
+        $isOffering = ($offeringType !== 'Auction');
+
+        if ($isOffering) {
+            if (empty($data['item_description']) || empty($data['winning_bid_amount']) || empty($data['buyer_name'])) {
+                $this->jsonResponse(['success' => false, 'error' => 'Item Description, Offering Amount, and Devotee Name are required.'], 400);
+            }
+        } else {
+            if (empty($data['article_id']) || empty($data['winning_bid_amount']) || empty($data['buyer_name'])) {
+                $this->jsonResponse(['success' => false, 'error' => 'Article, Winning Bid Amount, and Buyer Name are required.'], 400);
+            }
         }
 
         // Non-administrators must use administrator-configured default posting heads

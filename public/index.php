@@ -99,6 +99,8 @@ $router->get('/api/members/{id}/outstanding', [MemberController::class, 'outstan
 // Reports Endpoints
 $router->get('/api/reports/summary', [ReportController::class, 'summary']);
 $router->get('/api/reports/buyers', [ReportController::class, 'buyers']);
+$router->get('/api/reports/offerings-summary', [ReportController::class, 'offeringsSummary']);
+$router->get('/api/reports/offerings-devotees', [ReportController::class, 'offeringsDevotees']);
 
 // User Administration Endpoints (tbl_users)
 $router->get('/api/users', [UserController::class, 'index']);

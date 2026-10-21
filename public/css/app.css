@@ -734,6 +734,29 @@ h1, h2, h3, h4, h5, h6 {
     width: 100%;
 }
 
+.stats-grid-4,
+.stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+    width: 100%;
+}
+
+@media (max-width: 1024px) {
+    .stats-grid-4,
+    .stats-row {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}
+
+@media (max-width: 600px) {
+    .stats-grid-4,
+    .stats-row {
+        grid-template-columns: 1fr !important;
+    }
+}
+
 .stat-card {
     background: var(--bg-card);
     border: 1px solid var(--border-color);

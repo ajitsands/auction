@@ -52,6 +52,8 @@ CREATE TABLE IF NOT EXISTS `hf_auction_transactions` (
   `balance_amount` decimal(18,3) DEFAULT '0.000',
   `payment_status` enum('Paid','Partial','Pending') DEFAULT 'Pending',
   `auction_date` date NOT NULL,
+  `offering_type` varchar(50) DEFAULT 'Auction',
+  `item_description` text DEFAULT NULL,
   `notes` text DEFAULT NULL,
   `created_by` int(11) DEFAULT NULL,
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
@@ -176,6 +178,9 @@ ALTER TABLE `acc_promises` ADD INDEX `idx_article_id` (`article_id`);
 
 ALTER TABLE `acc_ledger_entries` ADD COLUMN `article_id` int(11) DEFAULT 0;
 ALTER TABLE `acc_ledger_entries` ADD INDEX `idx_article_id` (`article_id`);
+
+ALTER TABLE `hf_auction_transactions` ADD COLUMN `offering_type` varchar(50) DEFAULT 'Auction';
+ALTER TABLE `hf_auction_transactions` ADD COLUMN `item_description` text DEFAULT NULL;
 
 -- ------------------------------------------------------------------------------
 -- 8. Seed Default Categories

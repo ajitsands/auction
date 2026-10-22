@@ -227,6 +227,32 @@ CREATE TABLE IF NOT EXISTS `hf_offering_items` (
   KEY `idx_offering_type` (`offering_type`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ------------------------------------------------------------------------------
+-- 11. Seed Initial Default Offering Items (Gold & Bed Sheet)
+-- ------------------------------------------------------------------------------
+INSERT INTO `hf_offering_items` (`offering_type`, `item_description`) VALUES
+('Gold', '1 Sovereign Gold Coin'),
+('Gold', '1/2 Sovereign Gold Coin'),
+('Gold', '1/4 Sovereign Gold Coin'),
+('Gold', '8 Gram Gold Coin (1 Pavan)'),
+('Gold', '5 Gram Gold Coin'),
+('Gold', '2 Gram Gold Coin'),
+('Gold', '1 Gram Gold Coin'),
+('Gold', 'Gold Ring'),
+('Gold', 'Gold Chain'),
+('Gold', 'Gold Cross / Locket'),
+('Gold', 'Gold Bangle'),
+('Gold', 'Gold Earring'),
+('BedSheet', 'King Size Double Bed Sheet Set'),
+('BedSheet', 'Queen Size Bed Sheet Set'),
+('BedSheet', 'Single Bed Sheet Set'),
+('BedSheet', 'Cotton Double Bed Sheet with 2 Pillow Covers'),
+('BedSheet', 'Embroidered Double Bed Sheet Set'),
+('BedSheet', 'Fitted Double Bed Sheet Set'),
+('BedSheet', 'Floral Print Double Bed Sheet Set'),
+('BedSheet', 'Satin Stripe Bed Sheet Set')
+ON DUPLICATE KEY UPDATE `item_description` = VALUES(`item_description`);
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ==============================================================================

@@ -5209,20 +5209,21 @@ function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items 
         }
     };
 
-    // Delete item handler (Strictly Delete Option)
-    const handleDelete = async (item) => {
-        const desc = getOfferingItemDesc(item);
-        const id = getOfferingItemId(item);
-        if (!id) return;
-
-        if (!window.confirm(`Delete "${desc}" from ${activeType} Master?`)) {
-            return;
-        }
-
+    // Delete item handler (Strictly Delete Option with SweetAlert)
+    const performDelete = async (id, desc) => {
         setDeletingId(id);
         try {
             const res = await api.delete(`/api/offerings/items/${id}`);
             if (res.success) {
+                if (typeof window.swal === 'function') {
+                    window.swal({
+                        title: "Deleted!",
+                        text: `"${desc}" has been removed from ${activeType} Master.`,
+                        icon: "success",
+                        timer: 1800,
+                        buttons: false
+                    });
+                }
                 if (typeof showToast === 'function') showToast('success', `Deleted "${desc}" from master.`);
                 if (res.items && Array.isArray(res.items)) {
                     setLocalItems(res.items);
@@ -5237,12 +5238,57 @@ function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items 
                     }
                 }
             } else {
-                if (typeof showToast === 'function') showToast('error', res.error || 'Failed to delete item');
+                if (typeof window.swal === 'function') {
+                    window.swal("Error", res.error || 'Failed to delete item', "error");
+                } else if (typeof showToast === 'function') {
+                    showToast('error', res.error || 'Failed to delete item');
+                }
             }
         } catch (err) {
-            if (typeof showToast === 'function') showToast('error', err.message);
+            if (typeof window.swal === 'function') {
+                window.swal("Error", err.message, "error");
+            } else if (typeof showToast === 'function') {
+                showToast('error', err.message);
+            }
         } finally {
             setDeletingId(null);
+        }
+    };
+
+    const handleDelete = (item) => {
+        const desc = getOfferingItemDesc(item);
+        const id = getOfferingItemId(item);
+        if (!id) return;
+
+        if (typeof window.swal === 'function') {
+            window.swal({
+                title: "Delete Item Description?",
+                text: `Are you sure you want to delete "${desc}" from ${activeType} Master?`,
+                icon: "warning",
+                buttons: {
+                    cancel: {
+                        text: "Cancel",
+                        visible: true,
+                        className: "swal-button--cancel",
+                        closeModal: true
+                    },
+                    confirm: {
+                        text: "Yes, Delete It",
+                        visible: true,
+                        className: "swal-button--danger",
+                        closeModal: true
+                    }
+                },
+                dangerMode: true
+            }).then((willDelete) => {
+                if (willDelete) {
+                    performDelete(id, desc);
+                }
+            });
+        } else {
+            if (window.confirm(`Delete "${desc}" from ${activeType} Master?`)) {
+                performDelete(id, desc);
+            }
         }
     };
 

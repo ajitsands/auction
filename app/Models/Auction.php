@@ -588,15 +588,26 @@ class Auction extends Model {
 
             if ($isOffering) {
                 $articleDetails = sprintf("[%s] %s", $artTag, $itemDescription);
-                $pNarration = sprintf("%s Offering: [%s] %s * %s * %s", $offeringType, $artTag, $itemDescription, $auctionRefNo, trim($data['buyer_name']));
+                $pRemarks = $itemDescription;
+                $pNarration = $itemDescription;
                 $cNarration = sprintf("%s Offering Payment: [%s] %s * %s * %s", $offeringType, $artTag, $itemDescription, $auctionRefNo, trim($data['buyer_name']));
+                if (!empty($data['buyer_code_c'])) {
+                    $cNarration .= " (Roll: " . $data['buyer_code_c'] . ")";
+                }
             } else {
                 $artCategory = !empty($art['category']) ? $art['category'] : 'General';
                 $artDonor = !empty($art['donor_name']) ? $art['donor_name'] : 'Well-Wisher';
                 $artEst = number_format((float)($art['estimated_value'] ?? 0), 3);
                 $articleDetails = sprintf("Tag: %s | Art No: %s | %s | Cat: %s | Donor: %s | Est: %s BHD", $artTag, $artNo, $artName, $artCategory, $artDonor, $artEst);
                 $pNarration = sprintf("Auction Promise: [%s / %s] %s (Art ID: %d) * %s * %s", $artTag, $artNo, $artName, $articleId, $auctionRefNo, trim($data['buyer_name']));
+                if (!empty($data['buyer_code_c'])) {
+                    $pNarration .= " (Roll: " . $data['buyer_code_c'] . ")";
+                }
+                $pRemarks = $pNarration;
                 $cNarration = sprintf("Auction Floor Payment: [%s / %s] %s (Art ID: %d) * %s * %s", $artTag, $artNo, $artName, $articleId, $auctionRefNo, trim($data['buyer_name']));
+                if (!empty($data['buyer_code_c'])) {
+                    $cNarration .= " (Roll: " . $data['buyer_code_c'] . ")";
+                }
             }
 
             $receiptBookNo = !empty($data['receipt_book_no']) ? trim($data['receipt_book_no']) : '0';
@@ -617,11 +628,6 @@ class Auction extends Model {
             $promiseDrName = !empty($data['promise_dr_name']) ? trim($data['promise_dr_name']) : 'A/R Harvest Festival 2025 - Auction';
             $promiseCrCode = !empty($data['promise_cr_code']) ? trim($data['promise_cr_code']) : '07503';
             $promiseCrName = !empty($data['promise_cr_name']) ? trim($data['promise_cr_name']) : 'Harvest Festival - Article Auction';
-
-            $pNarration = sprintf("Auction Promise: [%s / %s] %s (Art ID: %d) * %s * %s", $artTag, $artNo, $artName, $articleId, $auctionRefNo, trim($data['buyer_name']));
-            if (!empty($data['buyer_code_c'])) {
-                $pNarration .= " (Roll: " . $data['buyer_code_c'] . ")";
-            }
 
             // Execute stored procedure with Winning Bid Amount ($bidAmount) so promise_amount and acc_ledger_entries reflect the winning bid
             $pProc = $this->db->prepare('CALL acc_proc_add_member_receivables_v1(
@@ -664,9 +670,12 @@ class Auction extends Model {
                 $promiseStatus = ($balanceAmount <= 0.0001) ? 'Received' : 'Active';
                 $lastPaymentDate = ($paidAmount > 0) ? $auctionDate : null;
 
-                // Update acc_promises: winning amount as promise_amount, balance as (winning - paid), last payment date, article link
+                // Update acc_promises: winning amount as promise_amount, balance as (winning - paid), last payment date, article link, remarks
                 $hasPromiseArt = $this->hasColumn('acc_promises', 'article_id');
                 $pArtClause = $hasPromiseArt ? "article_id = :art_id," : "";
+
+                $hasPromiseRemarks = $this->hasColumn('acc_promises', 'remarks');
+                $pRemClause = $hasPromiseRemarks ? "remarks = :remarks," : "";
 
                 $updP = $this->db->prepare("
                     UPDATE acc_promises 
@@ -675,6 +684,7 @@ class Auction extends Model {
                         last_payment_date = :last_payment_date,
                         promise_status    = :promise_status,
                         {$pArtClause}
+                        {$pRemClause}
                         item_description  = :art_details,
                         narration         = :narration
                     WHERE promise_id = :pid
@@ -690,6 +700,9 @@ class Auction extends Model {
                 ];
                 if ($hasPromiseArt) {
                     $pParams['art_id'] = $articleId;
+                }
+                if ($hasPromiseRemarks) {
+                    $pParams['remarks'] = $pRemarks;
                 }
                 $updP->execute($pParams);
 
@@ -726,9 +739,11 @@ class Auction extends Model {
             $contribCrName = !empty($data['contrib_cr_name']) ? trim($data['contrib_cr_name']) : 'Church Building Fund - Harvest Festival';
 
             if ($paidAmount > 0) {
-                $cNarration = sprintf("Auction Sale: [%s / %s] %s (Art ID: %d) * %s * %s", $artTag, $artNo, $artName, $articleId, $auctionRefNo, trim($data['buyer_name']));
-                if (!empty($data['buyer_code_c'])) {
-                    $cNarration .= " (Roll: " . $data['buyer_code_c'] . ")";
+                if (!$isOffering) {
+                    $cNarration = sprintf("Auction Sale: [%s / %s] %s (Art ID: %d) * %s * %s", $artTag, $artNo, $artName, $articleId, $auctionRefNo, trim($data['buyer_name']));
+                    if (!empty($data['buyer_code_c'])) {
+                        $cNarration .= " (Roll: " . $data['buyer_code_c'] . ")";
+                    }
                 }
 
                 $cProc = $this->db->prepare('CALL hf_acc_proc_add_member_contributions_batch_new_v1(
@@ -919,7 +934,9 @@ class Auction extends Model {
                     'amount_paid'         => $paidAmount,
                     'payment_mode'        => $data['payment_mode'] ?? 'Cash',
                     'reference_no'        => $data['reference_no'] ?? null,
-                    'remarks'             => sprintf('Initial payment for Auction %s [%s / %s]', $auctionRefNo, $artTag, $artNo),
+                    'remarks'             => $isOffering
+                        ? sprintf('Payment for %s Offering [%s]: %s', $offeringType, $auctionRefNo, $itemDescription)
+                        : sprintf('Initial payment for Auction %s [%s / %s]', $auctionRefNo, $artTag, $artNo),
                     'created_by'          => $userId,
                     'dr_code'             => $contribDrCode,
                     'dr_name'             => $contribDrName,
@@ -933,22 +950,26 @@ class Auction extends Model {
             }
 
             // --- 5. Always record promise in hf_promises (mirrors acc_promises for festival ledger) ---
+            $hasHfPromRemarks = $this->hasColumn('hf_promises', 'remarks');
+            $remCol = $hasHfPromRemarks ? ", remarks" : "";
+            $remVal = $hasHfPromRemarks ? ", :remarks" : "";
+
             $promStmt = $this->db->prepare("
                 INSERT INTO hf_promises (
                     transaction_id, article_id, applicable_year, member_id,
                     member_name, member_code_c, member_phone,
                     total_promise_amount, paid_amount, balance_amount, due_date, promise_status,
                     acc_promise_id, dr_code, dr_name, cr_code, cr_name, voucher_no,
-                    event_id, event_name
+                    event_id, event_name{$remCol}
                 ) VALUES (
                     :transaction_id, :article_id, :applicable_year, :member_id,
                     :member_name, :member_code_c, :member_phone,
                     :total_promise_amount, :paid_amount, :balance_amount, :due_date, :promise_status,
                     :acc_promise_id, :dr_code, :dr_name, :cr_code, :cr_name, :voucher_no,
-                    :event_id, :event_name
+                    :event_id, :event_name{$remVal}
                 )
             ");
-            $promStmt->execute([
+            $promParams = [
                 'transaction_id'       => $transactionId,
                 'article_id'           => $articleId,
                 'applicable_year'      => $year,
@@ -969,7 +990,11 @@ class Auction extends Model {
                 'voucher_no'           => $promiseVoucherNo,
                 'event_id'             => $eventId,
                 'event_name'           => $eventName
-            ]);
+            ];
+            if ($hasHfPromRemarks) {
+                $promParams['remarks'] = $pRemarks;
+            }
+            $promStmt->execute($promParams);
 
             return [
                 'success'             => true,

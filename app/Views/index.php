@@ -11,6 +11,25 @@
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/app.css?v=<?= time() ?>">
     <link rel="stylesheet" href="/css/vendor/sweetalert.css">
+    <!-- Console filter for non-fatal in-browser Babel transformer styling notice -->
+    <script>
+    (function() {
+        const origError = console.error;
+        const origWarn = console.warn;
+        console.error = function(...args) {
+            if (typeof args[0] === 'string' && args[0].includes('[BABEL] Note: The code generator has deoptimised')) {
+                return;
+            }
+            origError.apply(console, args);
+        };
+        console.warn = function(...args) {
+            if (typeof args[0] === 'string' && args[0].includes('You are using the in-browser Babel transformer')) {
+                return;
+            }
+            origWarn.apply(console, args);
+        };
+    })();
+    </script>
 </head>
 <body>
     <div id="root">
@@ -23,7 +42,7 @@
     <!-- Vendor Libraries -->
     <script src="/js/vendor/react.production.min.js"></script>
     <script src="/js/vendor/react-dom.production.min.js"></script>
-    <script src="/js/vendor/babel.min.js"></script>
+    <script src="/js/vendor/babel.min.js?v=<?= filemtime(__DIR__ . '/../../public/js/vendor/babel.min.js') ?>"></script>
     <script src="/js/vendor/xlsx.full.min.js"></script>
     <script src="/js/vendor/sweetalert.min.js"></script>
 

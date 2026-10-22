@@ -122,7 +122,7 @@ class AuctionController extends Controller {
         try {
             $itemModel = new \App\Models\OfferingItem();
             $item = $itemModel->add($type, $desc);
-            $items = $itemModel->getAll($type);
+            $items = $itemModel->getAll();
             $this->jsonResponse([
                 'success' => true,
                 'message' => "Item '{$item['item_description']}' added to {$type} master.",
@@ -137,7 +137,6 @@ class AuctionController extends Controller {
     public function deleteOfferingItem(array $params): void {
         $this->requireAuth();
         $id = (int)($params['id'] ?? 0);
-        $type = $_GET['offering_type'] ?? null;
 
         if ($id <= 0) {
             $this->jsonResponse(['success' => false, 'error' => 'Invalid item ID.'], 400);
@@ -146,7 +145,7 @@ class AuctionController extends Controller {
         try {
             $itemModel = new \App\Models\OfferingItem();
             $itemModel->delete($id);
-            $items = $itemModel->getAll($type);
+            $items = $itemModel->getAll();
             $this->jsonResponse([
                 'success' => true,
                 'message' => 'Item description deleted successfully.',

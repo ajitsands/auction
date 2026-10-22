@@ -76,14 +76,63 @@ abstract class Model {
         }
         self::$schemaEnsured = true;
 
+        $this->ensureSettingsTable();
+
+        // Fast path: avoid running heavy ALTER checks and table scans on every HTTP request
+        try {
+            $stmt = $this->db->prepare("SELECT setting_value FROM hf_settings WHERE setting_key = 'schema_migrated_v2' LIMIT 1");
+            $stmt->execute();
+            if ($stmt->fetchColumn() === '1') {
+                return;
+            }
+        } catch (\Throwable $e) {}
+
         // Auto-heal base tables if database user has ALTER privileges
         $this->ensureColumn('acc_promises', 'article_id', 'int(11) DEFAULT 0');
+        $this->ensureColumn('acc_promises', 'remarks', 'VARCHAR(2000) DEFAULT NULL');
         $this->ensureColumn('acc_contribution', 'article_id', 'int(11) DEFAULT 0');
         $this->ensureColumn('acc_ledger_entries', 'article_id', 'int(11) DEFAULT 0');
+        $this->ensureColumn('hf_promises', 'remarks', 'VARCHAR(2000) DEFAULT NULL');
         $this->ensureColumn('hf_auction_transactions', 'created_at', 'DATETIME DEFAULT CURRENT_TIMESTAMP');
         $this->ensureColumn('hf_auction_transactions', 'offering_type', "VARCHAR(50) DEFAULT 'Auction'");
         $this->ensureColumn('hf_auction_transactions', 'item_description', 'TEXT DEFAULT NULL');
-        $this->ensureSettingsTable();
+        $this->backfillSpecialOfferingRemarks();
+
+        try {
+            $stmt = $this->db->prepare("INSERT INTO hf_settings (setting_key, setting_value) VALUES ('schema_migrated_v2', '1') ON DUPLICATE KEY UPDATE setting_value = '1'");
+            $stmt->execute();
+        } catch (\Throwable $e) {}
+    }
+
+    /**
+     * Backfill remarks and narration for existing special offerings in acc_promises
+     */
+    protected function backfillSpecialOfferingRemarks(): void {
+        try {
+            $hasRemarks = $this->hasColumn('acc_promises', 'remarks');
+            $remSet = $hasRemarks ? ", p.remarks = t.item_description" : "";
+
+            $this->db->exec("
+                UPDATE acc_promises p
+                JOIN hf_auction_transactions t ON p.promise_id = t.acc_promise_id
+                SET p.narration = t.item_description {$remSet}
+                WHERE t.offering_type IN ('Gold', 'BedSheet')
+                  AND t.item_description IS NOT NULL
+                  AND t.item_description != ''
+                  AND (p.narration LIKE 'Auction Promise:%' OR p.narration = '' OR p.narration IS NULL)
+            ");
+
+            $this->db->exec("
+                UPDATE acc_ledger_entries le
+                JOIN hf_auction_transactions t ON le.promise_id = t.acc_promise_id
+                SET le.narration = t.item_description
+                WHERE le.entry_type = 'MP'
+                  AND t.offering_type IN ('Gold', 'BedSheet')
+                  AND t.item_description IS NOT NULL
+                  AND t.item_description != ''
+                  AND (le.narration LIKE 'Auction Promise:%' OR le.narration = '' OR le.narration IS NULL)
+            ");
+        } catch (\Throwable $e) {}
     }
 
     /**

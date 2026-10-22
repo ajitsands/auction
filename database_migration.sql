@@ -176,10 +176,13 @@ ALTER TABLE `acc_contribution` ADD COLUMN `article_id` int(11) DEFAULT 0;
 ALTER TABLE `acc_contribution` ADD INDEX `idx_article_id` (`article_id`);
 
 ALTER TABLE `acc_promises` ADD COLUMN `article_id` int(11) DEFAULT 0;
+ALTER TABLE `acc_promises` ADD COLUMN `remarks` varchar(2000) DEFAULT NULL;
 ALTER TABLE `acc_promises` ADD INDEX `idx_article_id` (`article_id`);
 
 ALTER TABLE `acc_ledger_entries` ADD COLUMN `article_id` int(11) DEFAULT 0;
 ALTER TABLE `acc_ledger_entries` ADD INDEX `idx_article_id` (`article_id`);
+
+ALTER TABLE `hf_promises` ADD COLUMN `remarks` varchar(2000) DEFAULT NULL;
 
 -- ------------------------------------------------------------------------------
 -- 7.1 Special Offerings (Gold & Bed Sheet) Schema Extension

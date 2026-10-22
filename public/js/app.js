@@ -5105,20 +5105,24 @@ function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items 
     const [newDescription, setNewDescription] = useState('');
     const [searchFilter, setSearchFilter] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
     const [deletingId, setDeletingId] = useState(null);
-    const [localItems, setLocalItems] = useState(items || []);
+    const [localItems, setLocalItems] = useState(Array.isArray(items) ? items : []);
 
     const isGold = activeType === 'Gold';
     const accentColor = isGold ? '#d97706' : '#2563eb';
     const activeBadge = isGold ? 'Gold Master' : 'Bed Sheet Master';
 
-    // Synchronize local items when props update
+    // Synchronize local items when props update with non-empty list
     useEffect(() => {
-        setLocalItems(items || []);
+        if (Array.isArray(items) && items.length > 0) {
+            setLocalItems(items);
+        }
     }, [items]);
 
-    // Fetch fresh items if needed
+    // Fetch fresh items whenever the modal opens or mounts
     const reloadItems = async () => {
+        setRefreshing(true);
         try {
             const res = await api.get('/api/offerings/items');
             if (res.success && Array.isArray(res.items)) {
@@ -5128,13 +5132,23 @@ function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items 
                 }
             }
         } catch (err) {
-            showToast('error', 'Failed to refresh master items: ' + err.message);
+            if (typeof showToast === 'function') {
+                showToast('error', 'Failed to refresh master items: ' + err.message);
+            }
+        } finally {
+            setRefreshing(false);
         }
     };
 
+    useEffect(() => {
+        if (isOpen) {
+            reloadItems();
+        }
+    }, [isOpen]);
+
     // Filter current category items
     const categoryItems = useMemo(() => {
-        return localItems.filter(it => it.offering_type === activeType);
+        return (localItems || []).filter(it => it.offering_type === activeType);
     }, [localItems, activeType]);
 
     // Search filter within modal
@@ -5146,17 +5160,17 @@ function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items 
 
     // Add item handler (Strictly Add Option)
     const handleAdd = async (e) => {
-        e.preventDefault();
+        if (e && e.preventDefault) e.preventDefault();
         const trimmed = newDescription.trim();
         if (!trimmed) {
-            showToast('error', 'Please enter an item description.');
+            if (typeof showToast === 'function') showToast('error', 'Please enter an item description.');
             return;
         }
 
         // Check if description already exists in this category
         const exists = categoryItems.some(it => getOfferingItemDesc(it).trim().toLowerCase() === trimmed.toLowerCase());
         if (exists) {
-            showToast('error', `"${trimmed}" already exists in the ${activeType} Master.`);
+            if (typeof showToast === 'function') showToast('error', `"${trimmed}" already exists in the ${activeType} Master.`);
             return;
         }
 
@@ -5167,7 +5181,9 @@ function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items 
                 description: trimmed
             });
             if (res.success) {
-                showToast('success', `Added "${trimmed}" to ${activeType} Master.`);
+                if (typeof showToast === 'function') {
+                    showToast('success', `Added "${trimmed}" to ${activeType} Master.`);
+                }
                 setNewDescription('');
                 if (res.items && Array.isArray(res.items)) {
                     setLocalItems(res.items);
@@ -5175,19 +5191,19 @@ function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items 
                         onItemsUpdated(res.items);
                     }
                 } else if (res.item) {
-                    const next = [...localItems, res.item];
+                    const next = [...localItems.filter(it => getOfferingItemId(it) !== getOfferingItemId(res.item)), res.item];
                     setLocalItems(next);
                     if (typeof onItemsUpdated === 'function') {
                         onItemsUpdated(next);
                     }
                 } else {
-                    reloadItems();
+                    await reloadItems();
                 }
             } else {
-                showToast('error', res.error || 'Failed to add item');
+                if (typeof showToast === 'function') showToast('error', res.error || 'Failed to add item');
             }
         } catch (err) {
-            showToast('error', err.message);
+            if (typeof showToast === 'function') showToast('error', err.message);
         } finally {
             setSubmitting(false);
         }
@@ -5207,7 +5223,7 @@ function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items 
         try {
             const res = await api.delete(`/api/offerings/items/${id}`);
             if (res.success) {
-                showToast('success', `Deleted "${desc}" from master.`);
+                if (typeof showToast === 'function') showToast('success', `Deleted "${desc}" from master.`);
                 if (res.items && Array.isArray(res.items)) {
                     setLocalItems(res.items);
                     if (typeof onItemsUpdated === 'function') {
@@ -5221,10 +5237,10 @@ function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items 
                     }
                 }
             } else {
-                showToast('error', res.error || 'Failed to delete item');
+                if (typeof showToast === 'function') showToast('error', res.error || 'Failed to delete item');
             }
         } catch (err) {
-            showToast('error', err.message);
+            if (typeof showToast === 'function') showToast('error', err.message);
         } finally {
             setDeletingId(null);
         }
@@ -5335,7 +5351,7 @@ function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items 
                             <i className="material-icons" style={{ fontSize: '16px' }}>add_circle</i>
                             Add New {isGold ? 'Gold' : 'Bed Sheet'} Item Description
                         </div>
-                        <form onSubmit={handleAdd} style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <form onSubmit={handleAdd} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                             <input
                                 type="text"
                                 className="form-control"
@@ -5343,9 +5359,11 @@ function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items 
                                 value={newDescription}
                                 onChange={e => setNewDescription(e.target.value)}
                                 style={{
-                                    flex: '1 1 260px',
+                                    flex: '1 1 auto',
+                                    minWidth: '0',
+                                    height: '40px',
                                     fontSize: '14px',
-                                    padding: '9px 12px',
+                                    padding: '8px 12px',
                                     borderRadius: '6px'
                                 }}
                                 disabled={submitting}
@@ -5356,11 +5374,14 @@ function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items 
                                 className="btn"
                                 disabled={submitting || !newDescription.trim()}
                                 style={{
+                                    height: '40px',
+                                    whiteSpace: 'nowrap',
+                                    flexShrink: 0,
                                     background: isGold ? 'linear-gradient(45deg, #d97706, #b45309)' : 'linear-gradient(45deg, #2563eb, #1d4ed8)',
                                     color: '#ffffff',
                                     fontWeight: 700,
                                     fontSize: '13px',
-                                    padding: '9px 18px',
+                                    padding: '0 18px',
                                     borderRadius: '6px',
                                     display: 'inline-flex',
                                     alignItems: 'center',
@@ -5368,7 +5389,7 @@ function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items 
                                     cursor: submitting || !newDescription.trim() ? 'not-allowed' : 'pointer'
                                 }}
                             >
-                                <i className="material-icons" style={{ fontSize: '18px' }}>
+                                <i className="material-icons" style={{ fontSize: '18px', animation: submitting ? 'spin 1s linear infinite' : 'none' }}>
                                     {submitting ? 'sync' : 'add'}
                                 </i>
                                 <span>{submitting ? 'Adding...' : 'Add Item'}</span>
@@ -5536,10 +5557,11 @@ function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items 
                         type="button"
                         className="btn btn-sm btn-outline-secondary"
                         onClick={reloadItems}
+                        disabled={refreshing}
                         style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                     >
-                        <i className="material-icons" style={{ fontSize: '15px' }}>refresh</i>
-                        Refresh Master
+                        <i className="material-icons" style={{ fontSize: '15px', animation: refreshing ? 'spin 1s linear infinite' : 'none' }}>refresh</i>
+                        <span>{refreshing ? 'Refreshing...' : 'Refresh Master'}</span>
                     </button>
                     <button
                         type="button"

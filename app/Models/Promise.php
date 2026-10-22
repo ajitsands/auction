@@ -83,6 +83,11 @@ class Promise extends Model {
                 t.auction_ref_no, t.auction_date, t.manual_receipt_no as receipt_no, t.receipt_book_no,
                 COALESCE(t.offering_type, 'Auction') as offering_type,
                 t.item_description,
+                COALESCE(
+                    (SELECT p_acc.remarks FROM acc_promises p_acc WHERE p.acc_promise_id IS NOT NULL AND p_acc.promise_id = p.acc_promise_id LIMIT 1),
+                    (SELECT p_acc.narration FROM acc_promises p_acc WHERE p.acc_promise_id IS NOT NULL AND p_acc.promise_id = p.acc_promise_id LIMIT 1),
+                    t.item_description
+                ) as remarks,
                 a.article_number, a.tag_number, a.article_name, a.category,
                 m.cpr_no as member_cpr, m.prayer_group_name as member_prayer_group
             FROM hf_promises p
@@ -213,6 +218,11 @@ class Promise extends Model {
                 t.auction_ref_no, t.auction_date, t.manual_receipt_no as receipt_no, t.receipt_book_no,
                 COALESCE(t.offering_type, 'Auction') as offering_type,
                 t.item_description,
+                COALESCE(
+                    (SELECT p_acc.remarks FROM acc_promises p_acc WHERE p.acc_promise_id IS NOT NULL AND p_acc.promise_id = p.acc_promise_id LIMIT 1),
+                    (SELECT p_acc.narration FROM acc_promises p_acc WHERE p.acc_promise_id IS NOT NULL AND p_acc.promise_id = p.acc_promise_id LIMIT 1),
+                    t.item_description
+                ) as remarks,
                 a.article_number, a.tag_number, a.article_name, a.category,
                 m.cpr_no as member_cpr, m.prayer_group_name as member_prayer_group
             FROM hf_promises p

@@ -96,4 +96,64 @@ class AuctionController extends Controller {
             'stats'   => $stats
         ]);
     }
+
+    public function getOfferingItems(): void {
+        $this->requireAuth();
+        $type = $_GET['offering_type'] ?? null;
+        $itemModel = new \App\Models\OfferingItem();
+        $items = $itemModel->getAll($type);
+        $this->jsonResponse([
+            'success' => true,
+            'count'   => count($items),
+            'items'   => $items
+        ]);
+    }
+
+    public function addOfferingItem(): void {
+        $this->requireAuth();
+        $data = $this->getJsonInput();
+        $type = trim($data['offering_type'] ?? 'Gold');
+        $desc = trim($data['item_description'] ?? $data['description'] ?? '');
+
+        if ($desc === '') {
+            $this->jsonResponse(['success' => false, 'error' => 'Item description is required.'], 400);
+        }
+
+        try {
+            $itemModel = new \App\Models\OfferingItem();
+            $item = $itemModel->add($type, $desc);
+            $items = $itemModel->getAll($type);
+            $this->jsonResponse([
+                'success' => true,
+                'message' => "Item '{$item['item_description']}' added to {$type} master.",
+                'item'    => $item,
+                'items'   => $items
+            ], 201);
+        } catch (\Exception $e) {
+            $this->jsonResponse(['success' => false, 'error' => $e->getMessage()], 400);
+        }
+    }
+
+    public function deleteOfferingItem(array $params): void {
+        $this->requireAuth();
+        $id = (int)($params['id'] ?? 0);
+        $type = $_GET['offering_type'] ?? null;
+
+        if ($id <= 0) {
+            $this->jsonResponse(['success' => false, 'error' => 'Invalid item ID.'], 400);
+        }
+
+        try {
+            $itemModel = new \App\Models\OfferingItem();
+            $itemModel->delete($id);
+            $items = $itemModel->getAll($type);
+            $this->jsonResponse([
+                'success' => true,
+                'message' => 'Item description deleted successfully.',
+                'items'   => $items
+            ]);
+        } catch (\Exception $e) {
+            $this->jsonResponse(['success' => false, 'error' => $e->getMessage()], 400);
+        }
+    }
 }

@@ -4800,6 +4800,762 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
 }
 
 // =========================================================================
+// --- Offering Item Helper Functions                                    ---
+// =========================================================================
+function getOfferingItemDesc(item) {
+    if (!item) return '';
+    if (typeof item === 'string') return item;
+    return item.item_description || item.description || '';
+}
+
+function getOfferingItemId(item) {
+    if (!item) return null;
+    return item.item_id || item.id || null;
+}
+
+// =========================================================================
+// --- Searchable Dropdown for Offering Item Descriptions                 ---
+// =========================================================================
+function SearchableOfferingItemSelect({
+    value,
+    onChange,
+    items = [],
+    offeringType = 'Gold',
+    placeholder = 'Search or enter item description...',
+    onOpenMaster,
+    required = false,
+    disabled = false
+}) {
+    const [isOpen, setIsOpen] = useState(false);
+    const [highlightedIndex, setHighlightedIndex] = useState(-1);
+    const containerRef = useRef(null);
+    const inputRef = useRef(null);
+
+    const isGold = offeringType === 'Gold';
+    const accentColor = isGold ? '#d97706' : '#2563eb';
+    const bgSubtle = isGold ? 'rgba(245, 158, 11, 0.05)' : 'rgba(59, 130, 246, 0.05)';
+
+    // Filter items based on current value typed
+    const searchVal = (value || '').trim().toLowerCase();
+    const filteredItems = useMemo(() => {
+        if (!searchVal) return items;
+        return items.filter(it => getOfferingItemDesc(it).toLowerCase().includes(searchVal));
+    }, [items, searchVal]);
+
+    // Handle outside clicks to close the dropdown
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (containerRef.current && !containerRef.current.contains(e.target)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Handle keyboard navigation
+    const handleKeyDown = (e) => {
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (!isOpen) {
+                setIsOpen(true);
+            } else {
+                setHighlightedIndex(prev => (prev < filteredItems.length - 1 ? prev + 1 : 0));
+            }
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (isOpen) {
+                setHighlightedIndex(prev => (prev > 0 ? prev - 1 : filteredItems.length - 1));
+            }
+        } else if (e.key === 'Enter') {
+            if (isOpen && highlightedIndex >= 0 && highlightedIndex < filteredItems.length) {
+                e.preventDefault();
+                onChange(getOfferingItemDesc(filteredItems[highlightedIndex]));
+                setIsOpen(false);
+            }
+        } else if (e.key === 'Escape') {
+            setIsOpen(false);
+        }
+    };
+
+    return (
+        <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <input
+                    ref={inputRef}
+                    type="text"
+                    className="form-control"
+                    style={{
+                        fontSize: '14px',
+                        padding: '10px 75px 10px 14px',
+                        border: isGold ? '1px solid rgba(245, 158, 11, 0.5)' : '1px solid rgba(59, 130, 246, 0.5)',
+                        background: bgSubtle,
+                        width: '100%'
+                    }}
+                    placeholder={placeholder}
+                    value={value}
+                    onChange={(e) => {
+                        onChange(e.target.value);
+                        if (!isOpen) setIsOpen(true);
+                        setHighlightedIndex(-1);
+                    }}
+                    onFocus={() => setIsOpen(true)}
+                    onKeyDown={handleKeyDown}
+                    required={required}
+                    disabled={disabled}
+                    autoComplete="off"
+                />
+
+                {/* Clear & Dropdown Toggle Buttons */}
+                <div style={{
+                    position: 'absolute',
+                    right: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '2px'
+                }}>
+                    {value && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                onChange('');
+                                inputRef.current?.focus();
+                            }}
+                            style={{
+                                background: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: 'var(--text-muted)',
+                                padding: '4px',
+                                display: 'flex',
+                                alignItems: 'center'
+                            }}
+                            title="Clear"
+                        >
+                            <i className="material-icons" style={{ fontSize: '16px' }}>close</i>
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => setIsOpen(prev => !prev)}
+                        style={{
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: accentColor,
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center'
+                        }}
+                        title="Toggle descriptions"
+                    >
+                        <i className="material-icons" style={{ fontSize: '20px' }}>
+                            {isOpen ? 'arrow_drop_up' : 'arrow_drop_down'}
+                        </i>
+                    </button>
+                </div>
+            </div>
+
+            {/* Dropdown Menu */}
+            {isOpen && (
+                <div style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 4px)',
+                    left: 0,
+                    right: 0,
+                    zIndex: 1050,
+                    background: '#ffffff',
+                    border: '1px solid rgba(0, 0, 0, 0.15)',
+                    borderRadius: '8px',
+                    boxShadow: '0 12px 28px rgba(0, 0, 0, 0.18)',
+                    overflow: 'hidden'
+                }}>
+                    {/* Fixed Top Bar (Doesn't scroll) */}
+                    <div style={{
+                        padding: '8px 12px',
+                        background: '#f8fafc',
+                        borderBottom: '1px solid #e2e8f0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        color: '#64748b',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <i className="material-icons" style={{ fontSize: '14px', color: accentColor }}>
+                                {isGold ? 'stars' : 'layers'}
+                            </i>
+                            <span>{isGold ? 'Gold Master Presets' : 'Bed Sheet Master Presets'} ({filteredItems.length})</span>
+                        </div>
+                        {onOpenMaster && (
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsOpen(false);
+                                    onOpenMaster();
+                                }}
+                                style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: accentColor,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    textTransform: 'none'
+                                }}
+                            >
+                                <i className="material-icons" style={{ fontSize: '13px' }}>settings</i>
+                                <span>Manage Master</span>
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Scrollable Items Container */}
+                    <div style={{ maxHeight: '240px', overflowY: 'auto' }}>
+                        {filteredItems.length === 0 ? (
+                            <div style={{ padding: '16px 14px', textAlign: 'center', color: '#64748b', fontSize: '12px', background: '#ffffff' }}>
+                                <div style={{ fontWeight: 600, color: '#334155' }}>No preset matches "{value}"</div>
+                                <div style={{ marginTop: '4px', fontSize: '11px', color: '#64748b' }}>
+                                    You can keep typing a custom description or add it to the master.
+                                </div>
+                            </div>
+                        ) : (
+                            filteredItems.map((item, idx) => {
+                                const desc = getOfferingItemDesc(item);
+                                const id = getOfferingItemId(item) || idx;
+                                const isSelected = (value || '').trim().toLowerCase() === desc.trim().toLowerCase();
+                                const isHighlighted = idx === highlightedIndex;
+                                return (
+                                    <div
+                                        key={id}
+                                        onClick={() => {
+                                            onChange(desc);
+                                            setIsOpen(false);
+                                        }}
+                                        onMouseEnter={() => setHighlightedIndex(idx)}
+                                        style={{
+                                            padding: '10px 14px',
+                                            fontSize: '13.5px',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            gap: '10px',
+                                            background: isHighlighted 
+                                                ? (isGold ? 'rgba(245, 158, 11, 0.12)' : 'rgba(59, 130, 246, 0.12)') 
+                                                : (isSelected ? (isGold ? 'rgba(245, 158, 11, 0.06)' : 'rgba(59, 130, 246, 0.06)') : '#ffffff'),
+                                            borderBottom: idx < filteredItems.length - 1 ? '1px solid #f1f5f9' : 'none',
+                                            transition: 'background 0.1s ease'
+                                        }}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                                            <i className="material-icons" style={{ fontSize: '18px', color: accentColor, flexShrink: 0 }}>
+                                                {isGold ? 'stars' : 'layers'}
+                                            </i>
+                                            <span style={{
+                                                color: '#1e293b',
+                                                fontSize: '13.5px',
+                                                fontWeight: isSelected ? 700 : 500,
+                                                lineHeight: 1.4,
+                                                wordBreak: 'break-word'
+                                            }}>
+                                                {desc}
+                                            </span>
+                                        </div>
+                                        {isSelected && (
+                                            <span style={{
+                                                color: accentColor,
+                                                fontSize: '11px',
+                                                fontWeight: 700,
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '2px',
+                                                flexShrink: 0
+                                            }}>
+                                                <i className="material-icons" style={{ fontSize: '16px' }}>check_circle</i>
+                                            </span>
+                                        )}
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// =========================================================================
+// --- Offering Item Description Master Modal (Add & Delete Only)        ---
+// =========================================================================
+function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items = [], onItemsUpdated, showToast }) {
+    if (!isOpen) return null;
+
+    const [activeType, setActiveType] = useState(initialType || 'Gold');
+    const [newDescription, setNewDescription] = useState('');
+    const [searchFilter, setSearchFilter] = useState('');
+    const [submitting, setSubmitting] = useState(false);
+    const [deletingId, setDeletingId] = useState(null);
+    const [localItems, setLocalItems] = useState(items || []);
+
+    const isGold = activeType === 'Gold';
+    const accentColor = isGold ? '#d97706' : '#2563eb';
+    const activeBadge = isGold ? 'Gold Master' : 'Bed Sheet Master';
+
+    // Synchronize local items when props update
+    useEffect(() => {
+        setLocalItems(items || []);
+    }, [items]);
+
+    // Fetch fresh items if needed
+    const reloadItems = async () => {
+        try {
+            const res = await api.get('/api/offerings/items');
+            if (res.success && Array.isArray(res.items)) {
+                setLocalItems(res.items);
+                if (typeof onItemsUpdated === 'function') {
+                    onItemsUpdated(res.items);
+                }
+            }
+        } catch (err) {
+            showToast('error', 'Failed to refresh master items: ' + err.message);
+        }
+    };
+
+    // Filter current category items
+    const categoryItems = useMemo(() => {
+        return localItems.filter(it => it.offering_type === activeType);
+    }, [localItems, activeType]);
+
+    // Search filter within modal
+    const displayedItems = useMemo(() => {
+        const q = searchFilter.trim().toLowerCase();
+        if (!q) return categoryItems;
+        return categoryItems.filter(it => getOfferingItemDesc(it).toLowerCase().includes(q));
+    }, [categoryItems, searchFilter]);
+
+    // Add item handler (Strictly Add Option)
+    const handleAdd = async (e) => {
+        e.preventDefault();
+        const trimmed = newDescription.trim();
+        if (!trimmed) {
+            showToast('error', 'Please enter an item description.');
+            return;
+        }
+
+        // Check if description already exists in this category
+        const exists = categoryItems.some(it => getOfferingItemDesc(it).trim().toLowerCase() === trimmed.toLowerCase());
+        if (exists) {
+            showToast('error', `"${trimmed}" already exists in the ${activeType} Master.`);
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            const res = await api.post('/api/offerings/items', {
+                offering_type: activeType,
+                description: trimmed
+            });
+            if (res.success) {
+                showToast('success', `Added "${trimmed}" to ${activeType} Master.`);
+                setNewDescription('');
+                if (res.items && Array.isArray(res.items)) {
+                    setLocalItems(res.items);
+                    if (typeof onItemsUpdated === 'function') {
+                        onItemsUpdated(res.items);
+                    }
+                } else if (res.item) {
+                    const next = [...localItems, res.item];
+                    setLocalItems(next);
+                    if (typeof onItemsUpdated === 'function') {
+                        onItemsUpdated(next);
+                    }
+                } else {
+                    reloadItems();
+                }
+            } else {
+                showToast('error', res.error || 'Failed to add item');
+            }
+        } catch (err) {
+            showToast('error', err.message);
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    // Delete item handler (Strictly Delete Option)
+    const handleDelete = async (item) => {
+        const desc = getOfferingItemDesc(item);
+        const id = getOfferingItemId(item);
+        if (!id) return;
+
+        if (!window.confirm(`Delete "${desc}" from ${activeType} Master?`)) {
+            return;
+        }
+
+        setDeletingId(id);
+        try {
+            const res = await api.delete(`/api/offerings/items/${id}`);
+            if (res.success) {
+                showToast('success', `Deleted "${desc}" from master.`);
+                if (res.items && Array.isArray(res.items)) {
+                    setLocalItems(res.items);
+                    if (typeof onItemsUpdated === 'function') {
+                        onItemsUpdated(res.items);
+                    }
+                } else {
+                    const next = localItems.filter(it => getOfferingItemId(it) !== id);
+                    setLocalItems(next);
+                    if (typeof onItemsUpdated === 'function') {
+                        onItemsUpdated(next);
+                    }
+                }
+            } else {
+                showToast('error', res.error || 'Failed to delete item');
+            }
+        } catch (err) {
+            showToast('error', err.message);
+        } finally {
+            setDeletingId(null);
+        }
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div
+                className="modal-content"
+                style={{
+                    width: '95%',
+                    maxWidth: '680px',
+                    margin: 'auto',
+                    maxHeight: '90vh',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    borderRadius: '12px',
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)'
+                }}
+                onClick={e => e.stopPropagation()}
+            >
+                <ModalHeader
+                    title="Item Description Master"
+                    icon="category"
+                    onClose={onClose}
+                    badge={activeBadge}
+                />
+
+                {/* Offering Type Switcher Tabs */}
+                <div style={{
+                    padding: '12px 20px',
+                    borderBottom: '1px solid var(--border-color)',
+                    background: 'var(--bg-surface)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '10px'
+                }}>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                            type="button"
+                            onClick={() => { setActiveType('Gold'); setSearchFilter(''); }}
+                            className={`btn btn-sm ${activeType === 'Gold' ? 'btn-warning' : 'btn-outline-secondary'}`}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                fontWeight: 700,
+                                padding: '6px 14px',
+                                borderRadius: '8px',
+                                background: activeType === 'Gold' ? 'linear-gradient(45deg, #d97706, #f59e0b)' : undefined,
+                                color: activeType === 'Gold' ? '#fff' : undefined,
+                                border: activeType === 'Gold' ? 'none' : undefined
+                            }}
+                        >
+                            <i className="material-icons" style={{ fontSize: '16px' }}>stars</i>
+                            Gold Master ({localItems.filter(i => i.offering_type === 'Gold').length})
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => { setActiveType('BedSheet'); setSearchFilter(''); }}
+                            className={`btn btn-sm ${activeType === 'BedSheet' ? 'btn-primary' : 'btn-outline-secondary'}`}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                fontWeight: 700,
+                                padding: '6px 14px',
+                                borderRadius: '8px',
+                                background: activeType === 'BedSheet' ? 'linear-gradient(45deg, #2563eb, #3b82f6)' : undefined,
+                                color: activeType === 'BedSheet' ? '#fff' : undefined,
+                                border: activeType === 'BedSheet' ? 'none' : undefined
+                            }}
+                        >
+                            <i className="material-icons" style={{ fontSize: '16px' }}>layers</i>
+                            Bed Sheet Master ({localItems.filter(i => i.offering_type === 'BedSheet').length})
+                        </button>
+                    </div>
+
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                        <i className="material-icons" style={{ fontSize: '13px', verticalAlign: 'middle', marginRight: '3px' }}>info</i>
+                        Only Add & Delete Allowed
+                    </span>
+                </div>
+
+                <div className="modal-body" style={{ padding: '18px 20px', flex: 1, overflowY: 'auto' }}>
+                    
+                    {/* 1. ADD OPTION: Add New Preset Description */}
+                    <div style={{
+                        background: isGold ? 'rgba(245, 158, 11, 0.05)' : 'rgba(59, 130, 246, 0.05)',
+                        border: isGold ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid rgba(59, 130, 246, 0.3)',
+                        borderRadius: '10px',
+                        padding: '14px 16px',
+                        marginBottom: '18px'
+                    }}>
+                        <div style={{
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            color: accentColor,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            marginBottom: '8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                        }}>
+                            <i className="material-icons" style={{ fontSize: '16px' }}>add_circle</i>
+                            Add New {isGold ? 'Gold' : 'Bed Sheet'} Item Description
+                        </div>
+                        <form onSubmit={handleAdd} style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                            <input
+                                type="text"
+                                className="form-control"
+                                placeholder={isGold ? "e.g., Gold Coin 8g, Sovereign Ring, Gold Bar 10g..." : "e.g., Double Bed Sheet, Cotton King Sheet..."}
+                                value={newDescription}
+                                onChange={e => setNewDescription(e.target.value)}
+                                style={{
+                                    flex: '1 1 260px',
+                                    fontSize: '14px',
+                                    padding: '9px 12px',
+                                    borderRadius: '6px'
+                                }}
+                                disabled={submitting}
+                                autoFocus
+                            />
+                            <button
+                                type="submit"
+                                className="btn"
+                                disabled={submitting || !newDescription.trim()}
+                                style={{
+                                    background: isGold ? 'linear-gradient(45deg, #d97706, #b45309)' : 'linear-gradient(45deg, #2563eb, #1d4ed8)',
+                                    color: '#ffffff',
+                                    fontWeight: 700,
+                                    fontSize: '13px',
+                                    padding: '9px 18px',
+                                    borderRadius: '6px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    cursor: submitting || !newDescription.trim() ? 'not-allowed' : 'pointer'
+                                }}
+                            >
+                                <i className="material-icons" style={{ fontSize: '18px' }}>
+                                    {submitting ? 'sync' : 'add'}
+                                </i>
+                                <span>{submitting ? 'Adding...' : 'Add Item'}</span>
+                            </button>
+                        </form>
+                    </div>
+
+                    {/* 2. DELETE OPTION: List of Items with Delete Action */}
+                    <div>
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            marginBottom: '10px',
+                            flexWrap: 'wrap',
+                            gap: '8px'
+                        }}>
+                            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <i className="material-icons" style={{ fontSize: '16px', color: 'var(--text-muted)' }}>list</i>
+                                <span>Existing {isGold ? 'Gold' : 'Bed Sheet'} Presets ({categoryItems.length})</span>
+                            </div>
+
+                            {/* Search filter input inside modal */}
+                            <div style={{ position: 'relative', width: '220px' }}>
+                                <input
+                                    type="text"
+                                    className="form-control form-control-sm"
+                                    placeholder="Filter items..."
+                                    value={searchFilter}
+                                    onChange={e => setSearchFilter(e.target.value)}
+                                    style={{ paddingLeft: '28px', fontSize: '12px', borderRadius: '6px' }}
+                                />
+                                <i className="material-icons" style={{
+                                    position: 'absolute',
+                                    left: '8px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    fontSize: '15px',
+                                    color: 'var(--text-muted)'
+                                }}>search</i>
+                                {searchFilter && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSearchFilter('')}
+                                        style={{
+                                            position: 'absolute',
+                                            right: '6px',
+                                            top: '50%',
+                                            transform: 'translateY(-50%)',
+                                            background: 'transparent',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            color: 'var(--text-muted)',
+                                            padding: 0
+                                        }}
+                                    >
+                                        <i className="material-icons" style={{ fontSize: '14px' }}>close</i>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Items List */}
+                        <div style={{
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '8px',
+                            maxHeight: '340px',
+                            overflowY: 'auto',
+                            background: 'var(--bg-surface)'
+                        }}>
+                            {displayedItems.length === 0 ? (
+                                <div style={{ padding: '30px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                                    <i className="material-icons" style={{ fontSize: '32px', opacity: 0.5, marginBottom: '6px' }}>inventory_2</i>
+                                    <p style={{ margin: 0, fontSize: '13px' }}>
+                                        {searchFilter ? `No items match "${searchFilter}".` : `No ${activeType} items in master.`}
+                                    </p>
+                                </div>
+                            ) : (
+                                displayedItems.map((item, idx) => {
+                                    const desc = getOfferingItemDesc(item);
+                                    const id = getOfferingItemId(item) || idx;
+                                    return (
+                                        <div
+                                            key={id}
+                                            style={{
+                                                padding: '10px 14px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                gap: '12px',
+                                                borderBottom: idx < displayedItems.length - 1 ? '1px solid var(--border-color)' : 'none',
+                                                background: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.015)'
+                                            }}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                                                <span style={{
+                                                    width: '26px',
+                                                    height: '26px',
+                                                    borderRadius: '50%',
+                                                    background: isGold ? 'rgba(245, 158, 11, 0.12)' : 'rgba(59, 130, 246, 0.12)',
+                                                    color: accentColor,
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    fontSize: '11px',
+                                                    fontWeight: 700,
+                                                    flexShrink: 0
+                                                }}>
+                                                    {idx + 1}
+                                                </span>
+                                                <div style={{ minWidth: 0 }}>
+                                                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', wordBreak: 'break-word' }}>
+                                                        {desc}
+                                                    </div>
+                                                    {item.created_at && (
+                                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                                            Added: {formatDateDMY(item.created_at)}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* STRICTLY DELETE OPTION */}
+                                            <button
+                                                type="button"
+                                                className="btn btn-sm btn-outline-danger"
+                                                onClick={() => handleDelete(item)}
+                                                disabled={deletingId === id}
+                                                style={{
+                                                    padding: '4px 8px',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '4px',
+                                                    fontSize: '12px',
+                                                    color: '#ef4444',
+                                                    borderColor: 'rgba(239, 68, 68, 0.3)',
+                                                    borderRadius: '6px',
+                                                    flexShrink: 0,
+                                                    cursor: deletingId === id ? 'not-allowed' : 'pointer'
+                                                }}
+                                                title="Delete this item description"
+                                            >
+                                                <i className="material-icons" style={{ fontSize: '16px' }}>
+                                                    {deletingId === id ? 'sync' : 'delete'}
+                                                </i>
+                                                <span>{deletingId === id ? 'Deleting...' : 'Delete'}</span>
+                                            </button>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="modal-footer" style={{
+                    padding: '12px 20px',
+                    borderTop: '1px solid var(--border-color)',
+                    background: 'var(--bg-surface)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                }}>
+                    <button
+                        type="button"
+                        className="btn btn-sm btn-outline-secondary"
+                        onClick={reloadItems}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                    >
+                        <i className="material-icons" style={{ fontSize: '15px' }}>refresh</i>
+                        Refresh Master
+                    </button>
+                    <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={onClose}
+                        style={{ padding: '6px 18px', fontWeight: 600 }}
+                    >
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// =========================================================================
 // --- Special Offerings Desk View (Gold & Bed Sheet Offerings)            ---
 // =========================================================================
 function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDataChanged, isAdmin }) {
@@ -4811,7 +5567,6 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
 
     // Offering Category Tab: 'Gold' or 'BedSheet'
     const [offeringSubTab, setOfferingSubTab] = useState('Gold');
-    const [tableTab, setTableTab] = useState('Gold'); // 'Gold', 'BedSheet', 'Both'
 
     // Table Filters
     const [statusFilter, setStatusFilter] = useState('All');
@@ -4832,6 +5587,10 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
         events: []
     });
     const [selectedEventId, setSelectedEventId] = useState('');
+
+    // Offering Item Description Master states
+    const [masterItems, setMasterItems] = useState([]);
+    const [itemMasterModalOpen, setItemMasterModalOpen] = useState(false);
 
     // Offering Form states
     const [itemDescription, setItemDescription] = useState('');
@@ -4875,15 +5634,19 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
     const fetchOfferingsData = async () => {
         setLoading(true);
         try {
-            const [transRes, accRes] = await Promise.all([
+            const [transRes, accRes, itemsRes] = await Promise.all([
                 api.get(`/api/auctions?year=${year}&offering_type=Offerings`),
-                api.get('/api/accounts/heads')
+                api.get('/api/accounts/heads'),
+                api.get('/api/offerings/items')
             ]);
             if (transRes.success) {
                 if (transRes.server_time) {
                     setServerBahrainTime(transRes.server_time);
                 }
                 setTransactions(transRes.transactions || []);
+            }
+            if (itemsRes && itemsRes.success && Array.isArray(itemsRes.items)) {
+                setMasterItems(itemsRes.items);
             }
             if (accRes && accRes.success) {
                 setAccountsData(accRes);
@@ -4955,18 +5718,42 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
     const isPayingNow = paidNum > 0;
     const isPaidExceedingBid = Boolean(bidAmount !== '' && paidAmount !== '' && paidNum > bidNum);
 
-    // Stats calculations
+    // Stats calculations for Gold and Bed Sheet offering categories
     const statsSummary = useMemo(() => {
         const goldList = transactions.filter(t => t.offering_type === 'Gold');
         const bedList = transactions.filter(t => t.offering_type === 'BedSheet');
+
+        const goldAmount = goldList.reduce((sum, t) => sum + (Number(t.winning_bid_amount) || 0), 0);
+        const goldPaid = goldList.reduce((sum, t) => sum + (Number(t.paid_amount) || 0), 0);
+        const goldBalance = goldList.reduce((sum, t) => sum + (Number(t.balance_amount) || 0), 0);
+        const goldPaidCount = goldList.filter(t => t.payment_status === 'Paid').length;
+        const goldDueCount = goldList.length - goldPaidCount;
+
+        const bedAmount = bedList.reduce((sum, t) => sum + (Number(t.winning_bid_amount) || 0), 0);
+        const bedPaid = bedList.reduce((sum, t) => sum + (Number(t.paid_amount) || 0), 0);
+        const bedBalance = bedList.reduce((sum, t) => sum + (Number(t.balance_amount) || 0), 0);
+        const bedPaidCount = bedList.filter(t => t.payment_status === 'Paid').length;
+        const bedDueCount = bedList.length - bedPaidCount;
+
         const totalSales = transactions.reduce((sum, t) => sum + (Number(t.winning_bid_amount) || 0), 0);
         const totalPaid = transactions.reduce((sum, t) => sum + (Number(t.paid_amount) || 0), 0);
         const totalBalance = transactions.reduce((sum, t) => sum + (Number(t.balance_amount) || 0), 0);
+
         return {
             goldCount: goldList.length,
-            goldAmount: goldList.reduce((sum, t) => sum + (Number(t.winning_bid_amount) || 0), 0),
+            goldAmount,
+            goldPaid,
+            goldBalance,
+            goldPaidCount,
+            goldDueCount,
+
             bedCount: bedList.length,
-            bedAmount: bedList.reduce((sum, t) => sum + (Number(t.winning_bid_amount) || 0), 0),
+            bedAmount,
+            bedPaid,
+            bedBalance,
+            bedPaidCount,
+            bedDueCount,
+
             totalSales,
             totalPaid,
             totalBalance
@@ -5479,7 +6266,7 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
                             Special Offerings Desk ({year})
                         </h2>
                         <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>
-                            Record and manage Gold Offerings & Bed Sheet Offerings with automated Cathedral promise and contribution receipts
+                            Record and manage {isGold ? 'Gold Offerings (GLD)' : 'Bed Sheet Offerings (BED)'} with automated Cathedral promise and contribution receipts
                         </p>
                     </div>
 
@@ -5494,10 +6281,7 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
                     }}>
                         <button
                             type="button"
-                            onClick={() => {
-                                setOfferingSubTab('Gold');
-                                setTableTab('Gold');
-                            }}
+                            onClick={() => setOfferingSubTab('Gold')}
                             style={{
                                 padding: '8px 20px',
                                 borderRadius: '9px',
@@ -5519,10 +6303,7 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
                         </button>
                         <button
                             type="button"
-                            onClick={() => {
-                                setOfferingSubTab('BedSheet');
-                                setTableTab('BedSheet');
-                            }}
+                            onClick={() => setOfferingSubTab('BedSheet')}
                             style={{
                                 padding: '8px 20px',
                                 borderRadius: '9px',
@@ -5545,37 +6326,37 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
                     </div>
                 </div>
 
-                {/* Offerings Summary Statistics Pills */}
-                <div className="stats-grid-4 stats-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '20px' }}>
-                    <div className="stat-card" style={{ padding: '14px 18px', borderLeft: '4px solid #f59e0b' }}>
+                {/* Offerings Summary Statistics Pills (Filtered strictly for active tab: Gold or Bed Sheet) */}
+                <div className="stats-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '20px' }}>
+                    <div className="stat-card" style={{ padding: '14px 18px', borderLeft: `4px solid ${isGold ? '#f59e0b' : '#3b82f6'}` }}>
                         <div className="stat-info-col">
-                            <span className="stat-title" style={{ color: '#d97706' }}>Gold Offerings Total</span>
-                            <div className="stat-value" style={{ fontSize: '20px', color: '#d97706' }}>
-                                BHD {statsSummary.goldAmount.toFixed(3)}
+                            <span className="stat-title" style={{ color: isGold ? '#d97706' : '#2563eb' }}>
+                                {isGold ? 'Gold Offerings Total' : 'Bed Sheet Total'}
+                            </span>
+                            <div className="stat-value" style={{ fontSize: '20px', color: isGold ? '#d97706' : '#2563eb' }}>
+                                BHD {(isGold ? statsSummary.goldAmount : statsSummary.bedAmount).toFixed(3)}
                             </div>
-                            <div className="stat-sub">{statsSummary.goldCount} Gold Offerings Recorded</div>
-                        </div>
-                        <i className="material-icons background-round" style={{ background: 'linear-gradient(45deg, #f59e0b, #d97706)', color: '#ffffff' }}>stars</i>
-                    </div>
-
-                    <div className="stat-card" style={{ padding: '14px 18px', borderLeft: '4px solid #3b82f6' }}>
-                        <div className="stat-info-col">
-                            <span className="stat-title" style={{ color: '#2563eb' }}>Bed Sheet Total</span>
-                            <div className="stat-value" style={{ fontSize: '20px', color: '#2563eb' }}>
-                                BHD {statsSummary.bedAmount.toFixed(3)}
+                            <div className="stat-sub">
+                                {isGold ? `${statsSummary.goldCount} Gold Offerings Recorded` : `${statsSummary.bedCount} Bed Sheet Offerings Recorded`}
                             </div>
-                            <div className="stat-sub">{statsSummary.bedCount} Bed Sheet Offerings Recorded</div>
                         </div>
-                        <i className="material-icons background-round" style={{ background: 'linear-gradient(45deg, #3b82f6, #1d4ed8)', color: '#ffffff' }}>layers</i>
+                        <i className="material-icons background-round" style={{ 
+                            background: isGold ? 'linear-gradient(45deg, #f59e0b, #d97706)' : 'linear-gradient(45deg, #3b82f6, #1d4ed8)', 
+                            color: '#ffffff' 
+                        }}>
+                            {isGold ? 'stars' : 'layers'}
+                        </i>
                     </div>
 
                     <div className="stat-card" style={{ padding: '14px 18px', borderLeft: '4px solid #10b981' }}>
                         <div className="stat-info-col">
                             <span className="stat-title" style={{ color: '#059669' }}>Total Collected</span>
                             <div className="stat-value" style={{ fontSize: '20px', color: '#059669' }}>
-                                BHD {statsSummary.totalPaid.toFixed(3)}
+                                BHD {(isGold ? statsSummary.goldPaid : statsSummary.bedPaid).toFixed(3)}
                             </div>
-                            <div className="stat-sub">Gold & Bed Sheet</div>
+                            <div className="stat-sub">
+                                {isGold ? 'Gold Offerings Collected' : 'Bed Sheet Offerings Collected'}
+                            </div>
                         </div>
                         <i className="material-icons background-round" style={{ background: 'linear-gradient(45deg, #10b981, #059669)', color: '#ffffff' }}>payments</i>
                     </div>
@@ -5583,10 +6364,15 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
                     <div className="stat-card" style={{ padding: '14px 18px', borderLeft: '4px solid #ef4444' }}>
                         <div className="stat-info-col">
                             <span className="stat-title" style={{ color: '#dc2626' }}>Outstanding Balance</span>
-                            <div className="stat-value" style={{ fontSize: '20px', color: statsSummary.totalBalance > 0.0001 ? '#dc2626' : 'var(--text-muted)' }}>
-                                BHD {statsSummary.totalBalance.toFixed(3)}
+                            <div className="stat-value" style={{ 
+                                fontSize: '20px', 
+                                color: (isGold ? statsSummary.goldBalance : statsSummary.bedBalance) > 0.0001 ? '#dc2626' : 'var(--text-muted)' 
+                            }}>
+                                BHD {(isGold ? statsSummary.goldBalance : statsSummary.bedBalance).toFixed(3)}
                             </div>
-                            <div className="stat-sub">Gold & Bed Sheet</div>
+                            <div className="stat-sub">
+                                {isGold ? 'Gold Offerings Balance' : 'Bed Sheet Offerings Balance'}
+                            </div>
                         </div>
                         <i className="material-icons background-round" style={{ background: 'linear-gradient(45deg, #ef4444, #b91c1c)', color: '#ffffff' }}>account_balance_wallet</i>
                     </div>
@@ -5625,24 +6411,43 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
                 <div className="card-body" style={{ padding: '18px 22px' }}>
                     <form onSubmit={handleRecordOffering}>
                         
-                        {/* 1. Item Description (Mandatory) */}
+                        {/* 1. Item Description (Searchable Dropdown with Master presets) */}
                         <div className="form-group" style={{ marginBottom: '14px' }}>
-                            <label className="form-label" style={{ fontWeight: 700, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <i className="material-icons" style={{ fontSize: '16px', color: isGold ? '#f59e0b' : '#3b82f6' }}>description</i>
-                                {isGold ? 'Gold Item Description *' : 'Bed Sheet Item Description *'}
-                            </label>
-                            <input 
-                                type="text"
-                                className="form-control"
-                                style={{
-                                    fontSize: '14px',
-                                    padding: '10px 14px',
-                                    border: isGold ? '1px solid rgba(245, 158, 11, 0.5)' : '1px solid rgba(59, 130, 246, 0.5)',
-                                    background: isGold ? 'rgba(245, 158, 11, 0.03)' : 'rgba(59, 130, 246, 0.03)'
-                                }}
-                                placeholder="Item Description"
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px', flexWrap: 'wrap', gap: '6px' }}>
+                                <label className="form-label" style={{ fontWeight: 700, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                                    <i className="material-icons" style={{ fontSize: '16px', color: isGold ? '#f59e0b' : '#3b82f6' }}>
+                                        {isGold ? 'stars' : 'layers'}
+                                    </i>
+                                    <span>{isGold ? 'Gold Item Description *' : 'Bed Sheet Item Description *'}</span>
+                                </label>
+                                <button
+                                    type="button"
+                                    className="btn btn-sm btn-outline-secondary"
+                                    onClick={() => setItemMasterModalOpen(true)}
+                                    style={{
+                                        fontSize: '11px',
+                                        padding: '2px 8px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        borderRadius: '6px',
+                                        fontWeight: 600,
+                                        borderColor: isGold ? 'rgba(245, 158, 11, 0.4)' : 'rgba(59, 130, 246, 0.4)',
+                                        color: isGold ? '#d97706' : '#2563eb'
+                                    }}
+                                    title="Open Master to Add or Delete Item Descriptions"
+                                >
+                                    <i className="material-icons" style={{ fontSize: '14px' }}>settings</i>
+                                    <span>Manage Master ({isGold ? 'Gold' : 'Bed Sheet'})</span>
+                                </button>
+                            </div>
+                            <SearchableOfferingItemSelect
                                 value={itemDescription}
-                                onChange={e => setItemDescription(e.target.value)}
+                                onChange={setItemDescription}
+                                items={masterItems.filter(i => i.offering_type === offeringSubTab)}
+                                offeringType={offeringSubTab}
+                                placeholder={isGold ? "Search or enter Gold item description (e.g., Gold Coin 8g)..." : "Search or enter Bed Sheet description (e.g., Double Bed Sheet)..."}
+                                onOpenMaster={() => setItemMasterModalOpen(true)}
                                 required
                             />
                         </div>
@@ -6070,192 +6875,85 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
                 </div>
             </div>
 
-            {/* Separate DataTables Section for Gold & Bed Sheet Offerings */}
+            {/* Offerings DataTable Section (Filtered strictly for active tab: Gold or Bed Sheet) */}
             <div style={{ marginTop: '24px' }}>
-                {/* Segmented Table Switcher Bar */}
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    flexWrap: 'wrap',
-                    gap: '12px',
-                    marginBottom: '16px'
-                }}>
-                    <div style={{
-                        display: 'inline-flex',
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        padding: '4px',
-                        borderRadius: '12px',
-                        border: '1px solid var(--border-color)',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
-                    }}>
-                        <button
-                            type="button"
-                            onClick={() => setTableTab('Gold')}
-                            style={{
-                                padding: '8px 18px',
-                                borderRadius: '8px',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontSize: '13px',
-                                fontWeight: 700,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                transition: 'all 0.2s ease',
-                                background: tableTab === 'Gold' ? 'linear-gradient(45deg, #f59e0b, #d97706)' : 'transparent',
-                                color: tableTab === 'Gold' ? '#ffffff' : 'var(--text-secondary)',
-                                boxShadow: tableTab === 'Gold' ? '0 3px 10px rgba(245, 158, 11, 0.35)' : 'none'
-                            }}
-                        >
-                            <i className="material-icons" style={{ fontSize: '18px' }}>stars</i>
-                            Gold Offerings DataTable ({statsSummary.goldCount})
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setTableTab('BedSheet')}
-                            style={{
-                                padding: '8px 18px',
-                                borderRadius: '8px',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontSize: '13px',
-                                fontWeight: 700,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                transition: 'all 0.2s ease',
-                                background: tableTab === 'BedSheet' ? 'linear-gradient(45deg, #3b82f6, #1d4ed8)' : 'transparent',
-                                color: tableTab === 'BedSheet' ? '#ffffff' : 'var(--text-secondary)',
-                                boxShadow: tableTab === 'BedSheet' ? '0 3px 10px rgba(59, 130, 246, 0.35)' : 'none'
-                            }}
-                        >
-                            <i className="material-icons" style={{ fontSize: '18px' }}>layers</i>
-                            Bed Sheet Offerings DataTable ({statsSummary.bedCount})
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setTableTab('Both')}
-                            style={{
-                                padding: '8px 16px',
-                                borderRadius: '8px',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontSize: '13px',
-                                fontWeight: 700,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                transition: 'all 0.2s ease',
-                                background: tableTab === 'Both' ? 'linear-gradient(45deg, #7c3aed, #6d28d9)' : 'transparent',
-                                color: tableTab === 'Both' ? '#ffffff' : 'var(--text-secondary)',
-                                boxShadow: tableTab === 'Both' ? '0 3px 10px rgba(124, 58, 237, 0.35)' : 'none'
-                            }}
-                        >
-                            <i className="material-icons" style={{ fontSize: '18px' }}>view_agenda</i>
-                            View Both Tables
-                        </button>
-                    </div>
+                <div className="card">
+                    <div className="card-header" style={{ flexWrap: 'wrap', gap: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <i className="material-icons" style={{ fontSize: '26px', color: isGold ? '#f59e0b' : '#3b82f6' }}>
+                                {isGold ? 'stars' : 'layers'}
+                            </i>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: isGold ? '#d97706' : '#2563eb', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    {isGold ? 'Gold Offerings DataTable' : 'Bed Sheet Offerings DataTable'} ({isGold ? goldOfferings.length : bedOfferings.length})
+                                </h3>
+                                <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
+                                    {isGold 
+                                        ? 'Track Gold offerings (GLD) with automated Cathedral promise and contribution receipts'
+                                        : 'Track Bed Sheet offerings (BED) with automated Cathedral promise and contribution receipts'}
+                                </p>
+                            </div>
+                        </div>
 
-                    {/* Status Filter & Reload */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>Status:</label>
-                            <select 
-                                className="form-control" 
-                                style={{ width: '120px', height: '32px', fontSize: '12px', padding: '2px 8px' }}
-                                value={statusFilter} 
-                                onChange={e => setStatusFilter(e.target.value)}
+                        {/* Status Filter & Reload Actions */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                            <span className={`badge ${isGold ? 'badge-warning' : 'badge-info'}`} style={{ 
+                                fontSize: '12px', 
+                                padding: '5px 12px', 
+                                fontWeight: 700,
+                                background: isGold ? undefined : 'rgba(59, 130, 246, 0.15)',
+                                color: isGold ? undefined : '#2563eb',
+                                border: isGold ? undefined : '1px solid rgba(59, 130, 246, 0.3)'
+                            }}>
+                                {isGold 
+                                    ? `Gold Total: BHD ${statsSummary.goldAmount.toFixed(3)}` 
+                                    : `Bed Sheet Total: BHD ${statsSummary.bedAmount.toFixed(3)}`}
+                            </span>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>Status:</label>
+                                <select 
+                                    className="form-control" 
+                                    style={{ width: '120px', height: '32px', fontSize: '12px', padding: '2px 8px' }}
+                                    value={statusFilter} 
+                                    onChange={e => setStatusFilter(e.target.value)}
+                                >
+                                    <option value="All">All Statuses</option>
+                                    <option value="Paid">Paid Only</option>
+                                    <option value="Partial">Partial Only</option>
+                                    <option value="Pending">Pending Only</option>
+                                </select>
+                            </div>
+
+                            <button 
+                                type="button" 
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => {
+                                    fetchOfferingsData();
+                                    if (typeof onDataChanged === 'function') onDataChanged();
+                                }}
+                                title="Reload offerings table"
+                                style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
                             >
-                                <option value="All">All Statuses</option>
-                                <option value="Paid">Paid Only</option>
-                                <option value="Partial">Partial Only</option>
-                                <option value="Pending">Pending Only</option>
-                            </select>
+                                <i className="material-icons" style={{ fontSize: '16px' }}>refresh</i> Reload
+                            </button>
                         </div>
-
-                        <button 
-                            type="button" 
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => {
-                                fetchOfferingsData();
-                                if (typeof onDataChanged === 'function') onDataChanged();
-                            }}
-                            title="Reload offerings table"
-                            style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
-                        >
-                            <i className="material-icons" style={{ fontSize: '16px' }}>refresh</i> Reload
-                        </button>
                     </div>
+
+                    <DataTable 
+                        columns={getOfferingColumns(isGold ? 'Gold' : 'BedSheet')}
+                        data={isGold ? goldOfferings : bedOfferings}
+                        loading={loading}
+                        keyField="transaction_id"
+                        initialPageSize={10}
+                        searchPlaceholder={isGold 
+                            ? "Search Gold Ref (GLD), Member Name, Roll No, Phone, Gold Item Description..." 
+                            : "Search Bed Sheet Ref (BED), Member Name, Roll No, Phone, Bed Sheet Description..."}
+                        emptyMessage={isGold 
+                            ? "No Gold Offerings recorded yet for this year." 
+                            : "No Bed Sheet Offerings recorded yet for this year."}
+                    />
                 </div>
-
-                {/* Gold Offerings DataTable Card */}
-                {(tableTab === 'Gold' || tableTab === 'Both') && (
-                    <div className="card" style={{ marginBottom: tableTab === 'Both' ? '24px' : '0' }}>
-                        <div className="card-header" style={{ flexWrap: 'wrap', gap: '12px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <i className="material-icons" style={{ fontSize: '26px', color: '#f59e0b' }}>stars</i>
-                                <div>
-                                    <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: '#d97706', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        Gold Offerings DataTable ({goldOfferings.length})
-                                    </h3>
-                                    <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
-                                        Track Gold offerings (GLD) with automated Cathedral promise and contribution receipts
-                                    </p>
-                                </div>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span className="badge badge-warning" style={{ fontSize: '12px', padding: '4px 10px', fontWeight: 700 }}>
-                                    Gold Total: BHD {statsSummary.goldAmount.toFixed(3)}
-                                </span>
-                            </div>
-                        </div>
-
-                        <DataTable 
-                            columns={getOfferingColumns('Gold')}
-                            data={goldOfferings}
-                            loading={loading}
-                            keyField="transaction_id"
-                            initialPageSize={10}
-                            searchPlaceholder="Search Gold Ref (GLD), Member Name, Roll No, Phone, Gold Item Description..."
-                            emptyMessage="No Gold Offerings recorded yet for this year."
-                        />
-                    </div>
-                )}
-
-                {/* Bed Sheet Offerings DataTable Card */}
-                {(tableTab === 'BedSheet' || tableTab === 'Both') && (
-                    <div className="card">
-                        <div className="card-header" style={{ flexWrap: 'wrap', gap: '12px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <i className="material-icons" style={{ fontSize: '26px', color: '#3b82f6' }}>layers</i>
-                                <div>
-                                    <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: '#2563eb', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        Bed Sheet Offerings DataTable ({bedOfferings.length})
-                                    </h3>
-                                    <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
-                                        Track Bed Sheet offerings (BED) with automated Cathedral promise and contribution receipts
-                                    </p>
-                                </div>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span className="badge badge-info" style={{ fontSize: '12px', padding: '4px 10px', fontWeight: 700, background: 'rgba(59, 130, 246, 0.15)', color: '#2563eb', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
-                                    Bed Sheet Total: BHD {statsSummary.bedAmount.toFixed(3)}
-                                </span>
-                            </div>
-                        </div>
-
-                        <DataTable 
-                            columns={getOfferingColumns('BedSheet')}
-                            data={bedOfferings}
-                            loading={loading}
-                            keyField="transaction_id"
-                            initialPageSize={10}
-                            searchPlaceholder="Search Bed Sheet Ref (BED), Member Name, Roll No, Phone, Bed Sheet Description..."
-                            emptyMessage="No Bed Sheet Offerings recorded yet for this year."
-                        />
-                    </div>
-                )}
             </div>
 
             {/* Payment Modal */}
@@ -6296,6 +6994,17 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
                             onDataChanged();
                         }
                     }}
+                />
+            )}
+            {/* Offering Item Description Master Modal (Add & Delete Only) */}
+            {itemMasterModalOpen && (
+                <OfferingItemMasterModal
+                    isOpen={itemMasterModalOpen}
+                    onClose={() => setItemMasterModalOpen(false)}
+                    initialType={offeringSubTab}
+                    items={masterItems}
+                    onItemsUpdated={(newItems) => setMasterItems(newItems)}
+                    showToast={showToast}
                 />
             )}
         </div>

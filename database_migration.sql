@@ -214,6 +214,19 @@ CREATE TABLE IF NOT EXISTS `hf_settings` (
   PRIMARY KEY (`setting_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ------------------------------------------------------------------------------
+-- 10. Table: `hf_offering_items` (Special Offering Item Description Master)
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `hf_offering_items` (
+  `item_id` int(11) NOT NULL AUTO_INCREMENT,
+  `offering_type` varchar(50) NOT NULL,
+  `item_description` varchar(255) NOT NULL,
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`item_id`),
+  UNIQUE KEY `uq_type_desc` (`offering_type`, `item_description`),
+  KEY `idx_offering_type` (`offering_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ==============================================================================

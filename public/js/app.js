@@ -1404,68 +1404,98 @@ function CategoryManagementModal({ isOpen, onClose, categories, categoryDetails,
 
 // --- Reusable Multi-Sheet Excel Template Generator with Master Categories ---
 function downloadExcelTemplate(targetYear = new Date().getFullYear(), catList = []) {
-    const categoriesToUse = (catList && catList.length > 0) 
+    const rawCategories = (catList && catList.length > 0) 
         ? catList 
         : ['General', 'Traditional & Brass', 'Jewellery', 'Food & Delicacy', 'Handicrafts', 'Electronics', 'Apparel & Silk'];
 
+    const categoriesToUse = rawCategories.map(c => typeof c === 'string' ? c : (c.category_name || c.name || 'General'));
+
     const sampleRows = [
         {
-            'article_number': `ART-${targetYear}-001`,
-            'tag_number': 'TAG-001',
-            'applicable_year': targetYear,
-            'article_name': 'Nilavilakku Traditional Brass Lamp',
-            'category': categoriesToUse[1] || 'Traditional & Brass',
-            'estimated_value': 85.000,
-            'donor_name': 'George Varghese',
-            'description': 'Heavy 5-step prayer lamp'
+            'Tag No': 'TAG-001',
+            'Year': targetYear,
+            'Article Name': 'Nilavilakku Traditional Brass Lamp',
+            'Category': categoriesToUse[1] || 'Traditional & Brass',
+            'Estimated Value (BHD)': 85.000,
+            'Reserve Price (BHD)': 85.000,
+            'Donor Name': 'George Varghese',
+            'Donor Roll No': 1042,
+            'Donor Phone': '39123456',
+            'Donor CPR': '850123456',
+            'Description': 'Heavy 5-step prayer lamp donated for cathedral harvest auction'
         },
         {
-            'article_number': `ART-${targetYear}-002`,
-            'tag_number': 'TAG-002',
-            'applicable_year': targetYear,
-            'article_name': 'Gold Sovereign 22K Coin',
-            'category': categoriesToUse[2] || 'Jewellery',
-            'estimated_value': 220.000,
-            'donor_name': 'Anonymous Donor',
-            'description': 'Donated for cathedral harvest auction'
+            'Tag No': 'TAG-002',
+            'Year': targetYear,
+            'Article Name': 'Gold Sovereign 22K Coin',
+            'Category': categoriesToUse[2] || 'Jewellery',
+            'Estimated Value (BHD)': 220.000,
+            'Reserve Price (BHD)': 220.000,
+            'Donor Name': 'Anonymous Well-Wisher',
+            'Donor Roll No': '',
+            'Donor Phone': '',
+            'Donor CPR': '',
+            'Description': 'Donated for cathedral harvest auction'
         },
         {
-            'article_number': `ART-${targetYear}-003`,
-            'tag_number': 'TAG-003',
-            'applicable_year': targetYear,
-            'article_name': 'Harvest Organic Spices & Honey Box',
-            'category': categoriesToUse[3] || 'Food & Delicacy',
-            'estimated_value': 40.000,
-            'donor_name': 'St. Thomas Prayer Group',
-            'description': 'Cardamom, mountain pepper, forest honey'
+            'Tag No': 'TAG-003',
+            'Year': targetYear,
+            'Article Name': 'Harvest Organic Spices & Forest Honey Box',
+            'Category': categoriesToUse[3] || 'Food & Delicacy',
+            'Estimated Value (BHD)': 40.000,
+            'Reserve Price (BHD)': 35.000,
+            'Donor Name': 'St. Thomas Prayer Group',
+            'Donor Roll No': 2055,
+            'Donor Phone': '36541234',
+            'Donor CPR': '',
+            'Description': 'Cardamom, mountain pepper, forest honey hamper'
         },
         {
-            'article_number': `ART-${targetYear}-004`,
-            'tag_number': 'TAG-004',
-            'applicable_year': targetYear,
-            'article_name': 'Handwoven Kasavu Silk Saree',
-            'category': categoriesToUse[0] || 'General',
-            'estimated_value': 55.000,
-            'donor_name': 'Church Well-Wisher',
-            'description': 'Traditional handloom silk'
+            'Tag No': 'TAG-004',
+            'Year': targetYear,
+            'Article Name': 'Handwoven Kasavu Silk Saree',
+            'Category': categoriesToUse[0] || 'General',
+            'Estimated Value (BHD)': 55.000,
+            'Reserve Price (BHD)': 50.000,
+            'Donor Name': 'Church Well-Wisher',
+            'Donor Roll No': 1180,
+            'Donor Phone': '38876543',
+            'Donor CPR': '780987654',
+            'Description': 'Traditional handloom silk with gold border'
+        },
+        {
+            'Tag No': 'TAG-005',
+            'Year': targetYear,
+            'Article Name': 'Handmade Decorative Wooden Cross',
+            'Category': categoriesToUse[4] || 'Handicrafts',
+            'Estimated Value (BHD)': 30.000,
+            'Reserve Price (BHD)': 25.000,
+            'Donor Name': 'Cathedral Youth Movement',
+            'Donor Roll No': '',
+            'Donor Phone': '',
+            'Donor CPR': '',
+            'Description': 'Carved rosewood cross'
         }
     ];
 
     const wb = XLSX.utils.book_new();
 
-    // Sheet 1: Articles_Template (The data sheet the user edits)
+    // Sheet 1: Article_Master_Template (The data sheet the user edits)
     const wsArticles = XLSX.utils.json_to_sheet(sampleRows);
     wsArticles['!cols'] = [
-        { wch: 18 }, // article_number
-        { wch: 14 }, // tag_number
-        { wch: 16 }, // applicable_year
-        { wch: 38 }, // article_name
-        { wch: 24 }, // category
-        { wch: 22 }, // estimated_value
-        { wch: 26 }, // donor_name
-        { wch: 40 }  // description
+        { wch: 14 }, // Tag No
+        { wch: 10 }, // Year
+        { wch: 42 }, // Article Name
+        { wch: 24 }, // Category
+        { wch: 22 }, // Estimated Value (BHD)
+        { wch: 20 }, // Reserve Price (BHD)
+        { wch: 26 }, // Donor Name
+        { wch: 16 }, // Donor Roll No
+        { wch: 16 }, // Donor Phone
+        { wch: 16 }, // Donor CPR
+        { wch: 45 }  // Description
     ];
-    XLSX.utils.book_append_sheet(wb, wsArticles, 'Articles_Template');
+    XLSX.utils.book_append_sheet(wb, wsArticles, 'Article_Master_Template');
 
     // Sheet 2: Master_Categories (Reference list of valid categories from Master)
     const catReferenceRows = categoriesToUse.map((cat, index) => ({
@@ -1473,19 +1503,98 @@ function downloadExcelTemplate(targetYear = new Date().getFullYear(), catList = 
         'Master Category Name': cat,
         'How to Use in Template': index === 0 
             ? 'Default category (used if category column is left blank)' 
-            : 'Copy exact category name into Articles_Template "category" column'
+            : 'Copy exact category name into the template "Category" column'
     }));
 
     const wsCats = XLSX.utils.json_to_sheet(catReferenceRows);
     wsCats['!cols'] = [
         { wch: 6 },
-        { wch: 28 },
-        { wch: 65 }
+        { wch: 30 },
+        { wch: 70 }
     ];
     XLSX.utils.book_append_sheet(wb, wsCats, 'Master_Categories');
 
+    // Sheet 3: Field_Guide (Detailed column description & guidelines)
+    const guideRows = [
+        {
+            'Column Header': 'Tag No',
+            'Required': 'Recommended',
+            'Accepted Headers': 'Tag No, Tag Number, tag_number, tag',
+            'Description & Guidance': 'Physical barcode or tag attached to the item (e.g. TAG-001). If left blank, system generates matching TAG-XXX.'
+        },
+        {
+            'Column Header': 'Year',
+            'Required': 'Optional',
+            'Accepted Headers': 'Year, Applicable Year, applicable_year',
+            'Description & Guidance': `Festival year (e.g. ${targetYear}). If left blank, defaults to current festival year.`
+        },
+        {
+            'Column Header': 'Article Name',
+            'Required': 'YES',
+            'Accepted Headers': 'Article Name, Name, Title, Item Name, article_name',
+            'Description & Guidance': 'Title or descriptive name of the article / item (e.g. Traditional Brass Lamp).'
+        },
+        {
+            'Column Header': 'Category',
+            'Required': 'Recommended',
+            'Accepted Headers': 'Category, category, Master Category',
+            'Description & Guidance': 'Category from the Master_Categories tab. If a new category is typed, the system auto-creates it in the Master.'
+        },
+        {
+            'Column Header': 'Estimated Value (BHD)',
+            'Required': 'Recommended',
+            'Accepted Headers': 'Estimated Value (BHD), Estimated Value, Value, estimated_value',
+            'Description & Guidance': 'Estimated fair market value in Bahraini Dinars (e.g. 85.000).'
+        },
+        {
+            'Column Header': 'Reserve Price (BHD)',
+            'Required': 'Optional',
+            'Accepted Headers': 'Reserve Price (BHD), Reserve Price, Reserve, reserve_price',
+            'Description & Guidance': 'Minimum bid price accepted at auction. Defaults to Estimated Value if left blank or 0.'
+        },
+        {
+            'Column Header': 'Donor Name',
+            'Required': 'Optional',
+            'Accepted Headers': 'Donor Name, Donor, donor_name, Contributor',
+            'Description & Guidance': 'Name of the donor or contributor (e.g. George Varghese, Well-Wisher).'
+        },
+        {
+            'Column Header': 'Donor Roll No',
+            'Required': 'Optional',
+            'Accepted Headers': 'Donor Roll No, Roll No, donor_code_c, Member Code',
+            'Description & Guidance': 'Parishioner Roll Number. System automatically links to the Parish Member Directory to retrieve phone and CPR!'
+        },
+        {
+            'Column Header': 'Donor Phone',
+            'Required': 'Optional',
+            'Accepted Headers': 'Donor Phone, Phone, Contact, Mobile, donor_phone',
+            'Description & Guidance': 'Bahrain contact telephone number of the donor.'
+        },
+        {
+            'Column Header': 'Donor CPR',
+            'Required': 'Optional',
+            'Accepted Headers': 'Donor CPR, CPR, CPR No, donor_cpr',
+            'Description & Guidance': 'Bahrain CPR identification number of the donor.'
+        },
+        {
+            'Column Header': 'Description',
+            'Required': 'Optional',
+            'Accepted Headers': 'Description, Remarks, Notes, description',
+            'Description & Guidance': 'Condition, size, donor remarks, blessings, or auction notes.'
+        }
+    ];
+    const wsGuide = XLSX.utils.json_to_sheet(guideRows);
+    wsGuide['!cols'] = [
+        { wch: 24 },
+        { wch: 14 },
+        { wch: 38 },
+        { wch: 85 }
+    ];
+    XLSX.utils.book_append_sheet(wb, wsGuide, 'Field_Guide');
+
     XLSX.writeFile(wb, `cathedral_articles_template_${targetYear}.xlsx`);
 }
+
 
 // --- Article Master Management View ---
 function ArticlesView({ year, onOpenNewArticle, onEditArticle, onOpenImport, showToast, refreshTrigger, onDataChanged }) {
@@ -1609,22 +1718,31 @@ function ArticlesView({ year, onOpenNewArticle, onEditArticle, onOpenImport, sho
     };
 
     const exportToCsv = () => {
-        if (!articles.length) return;
+        if (!articles.length) {
+            showToast('info', 'No articles to export.');
+            return;
+        }
         const rows = articles.map(a => ({
             'Article No': a.article_number,
             'Tag No': a.tag_number,
             'Year': a.applicable_year,
-            'Name': a.article_name,
+            'Article Name': a.article_name,
             'Category': a.category,
-            'Estimated Value (BHD)': a.estimated_value,
-            'Reserve Price (BHD)': a.reserve_price,
+            'Estimated Value (BHD)': Number(a.estimated_value || 0).toFixed(3),
+            'Reserve Price (BHD)': Number(a.reserve_price || 0).toFixed(3),
             'Status': a.status,
-            'Donor': a.donor_name || 'N/A',
-            'Donor Roll No': a.donor_code_c || 'N/A',
-            'Donor Phone': a.donor_phone || 'N/A',
-            'Donor CPR': a.donor_cpr || 'N/A'
+            'Donor Name': a.donor_name || '',
+            'Donor Roll No': a.donor_code_c || '',
+            'Donor Phone': a.donor_phone || '',
+            'Donor CPR': a.donor_cpr || '',
+            'Description': a.description || ''
         }));
         const worksheet = XLSX.utils.json_to_sheet(rows);
+        worksheet['!cols'] = [
+            { wch: 18 }, { wch: 14 }, { wch: 10 }, { wch: 40 }, { wch: 22 },
+            { wch: 22 }, { wch: 20 }, { wch: 14 }, { wch: 26 }, { wch: 16 },
+            { wch: 16 }, { wch: 16 }, { wch: 45 }
+        ];
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, `Articles_${year}`);
         XLSX.writeFile(workbook, `cathedral_articles_${year}.xlsx`);
@@ -1661,6 +1779,15 @@ function ArticlesView({ year, onOpenNewArticle, onEditArticle, onOpenImport, sho
                         </button>
                         <button className="btn btn-purple btn-sm" onClick={() => setCategoryModalOpen(true)} title="Manage Categories">
                             <i className="material-icons">category</i> Categories ({categories.length})
+                        </button>
+                        <button 
+                            type="button"
+                            className="btn btn-secondary btn-sm" 
+                            onClick={() => downloadExcelTemplate(year, categories)} 
+                            title="Download Excel Import Template based on Article Master"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', borderColor: 'var(--primary)', color: 'var(--primary)', background: 'rgba(142, 36, 170, 0.05)' }}
+                        >
+                            <i className="material-icons" style={{ fontSize: '16px', color: 'var(--primary)' }}>description</i> Download Import Template
                         </button>
                         <button className="btn btn-excel btn-sm" onClick={exportToCsv} title="Export all articles to Excel spreadsheet">
                             <i className="material-icons">file_download</i> Export Excel
@@ -2283,6 +2410,7 @@ function ExcelImportModal({ year, isOpen, onClose, onSuccess, showToast }) {
     const [parsedRows, setParsedRows] = useState([]);
     const [fileName, setFileName] = useState('');
     const [loading, setLoading] = useState(false);
+    const [updateExisting, setUpdateExisting] = useState(true);
     const [masterCategories, setMasterCategories] = useState([]);
     const fileInputRef = useRef(null);
 
@@ -2304,30 +2432,109 @@ function ExcelImportModal({ year, isOpen, onClose, onSuccess, showToast }) {
             try {
                 const data = new Uint8Array(evt.target.result);
                 const workbook = XLSX.read(data, { type: 'array' });
-                const sheetName = workbook.SheetNames[0];
+                
+                // Identify target data sheet (prefer sheet containing 'article' or default to first sheet)
+                let sheetName = workbook.SheetNames[0];
+                const matchingSheet = workbook.SheetNames.find(s => {
+                    const low = s.toLowerCase();
+                    return low.includes('article') || low.includes('data') || low.includes('item');
+                });
+                if (matchingSheet) sheetName = matchingSheet;
+
                 const worksheet = workbook.Sheets[sheetName];
                 const json = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
 
-                // Map header variations to standardized names
+                // Map header variations to standardized names matching Article Master
                 const formatted = json.map(r => {
-                    const row = {};
+                    const row = {
+                        article_number: '',
+                        tag_number: '',
+                        applicable_year: year,
+                        article_name: '',
+                        category: 'General',
+                        estimated_value: 0,
+                        reserve_price: 0,
+                        donor_name: '',
+                        donor_code_c: '',
+                        donor_phone: '',
+                        donor_cpr: '',
+                        description: ''
+                    };
+
                     Object.keys(r).forEach(k => {
-                        const cleanKey = k.toLowerCase().trim().replace(/[\s\-\#]/g, '_');
-                        if (cleanKey.includes('article') || cleanKey.includes('art_no')) row.article_number = String(r[k]).trim();
-                        else if (cleanKey.includes('tag')) row.tag_number = String(r[k]).trim();
-                        else if (cleanKey.includes('year')) row.applicable_year = Number(r[k]) || year;
-                        else if (cleanKey.includes('name') || cleanKey.includes('title')) row.article_name = String(r[k]).trim();
-                        else if (cleanKey.includes('category')) row.category = String(r[k]).trim();
-                        else if (cleanKey.includes('value') || cleanKey.includes('price')) row.estimated_value = Number(r[k]) || 0;
-                        else if (cleanKey.includes('donor')) row.donor_name = String(r[k]).trim();
+                        const rawVal = r[k];
+                        if (rawVal === undefined || rawVal === null) return;
+                        const strVal = String(rawVal).trim();
+                        // Ignore string 'N/A' or '-' placeholders from export
+                        const val = (strVal.toUpperCase() === 'N/A' || strVal === '-') ? '' : strVal;
+                        const cleanKey = k.toLowerCase().trim().replace(/[\s\-\#\(\)\/]/g, '_').replace(/__+/g, '_');
+
+                        // 1. Tag number
+                        if (cleanKey.includes('tag')) {
+                            row.tag_number = val;
+                        }
+                        // 2. Article number
+                        else if (cleanKey.includes('article_no') || cleanKey.includes('article_num') || cleanKey.includes('art_no') || cleanKey === 'article') {
+                            row.article_number = val;
+                        }
+                        // 3. Year
+                        else if (cleanKey.includes('year')) {
+                            const parsedYear = parseInt(val, 10);
+                            if (!isNaN(parsedYear) && parsedYear > 2000) {
+                                row.applicable_year = parsedYear;
+                            }
+                        }
+                        // 4. Reserve Price
+                        else if (cleanKey.includes('reserve') || cleanKey.includes('res_price') || cleanKey.includes('min_bid')) {
+                            const num = parseFloat(val);
+                            row.reserve_price = !isNaN(num) ? num : 0;
+                        }
+                        // 5. Estimated Value
+                        else if (cleanKey.includes('estimated') || cleanKey.includes('est_val') || cleanKey.includes('value') || cleanKey.includes('price')) {
+                            const num = parseFloat(val);
+                            row.estimated_value = !isNaN(num) ? num : 0;
+                        }
+                        // 6. Donor Roll No / Member Code
+                        else if (cleanKey.includes('roll') || cleanKey.includes('code_c') || cleanKey.includes('member_code') || cleanKey.includes('donor_code') || cleanKey.includes('roll_no')) {
+                            row.donor_code_c = val;
+                        }
+                        // 7. Donor Phone
+                        else if (cleanKey.includes('phone') || cleanKey.includes('contact') || cleanKey.includes('mobile')) {
+                            row.donor_phone = val;
+                        }
+                        // 8. Donor CPR
+                        else if (cleanKey.includes('cpr')) {
+                            row.donor_cpr = val;
+                        }
+                        // 9. Donor Name
+                        else if (cleanKey.includes('donor') || cleanKey.includes('contributor') || cleanKey.includes('member_name')) {
+                            row.donor_name = val;
+                        }
+                        // 10. Category
+                        else if (cleanKey.includes('category') || cleanKey.includes('cat')) {
+                            row.category = val || 'General';
+                        }
+                        // 11. Description / Remarks
+                        else if (cleanKey.includes('desc') || cleanKey.includes('remark') || cleanKey.includes('note')) {
+                            row.description = val;
+                        }
+                        // 12. Article Name
+                        else if (cleanKey.includes('name') || cleanKey.includes('title') || cleanKey.includes('item')) {
+                            row.article_name = val;
+                        }
                     });
+
                     if (!row.applicable_year) row.applicable_year = year;
+                    // Default reserve price to estimated value if not specifically given
+                    if (row.reserve_price <= 0 && row.estimated_value > 0) {
+                        row.reserve_price = row.estimated_value;
+                    }
                     return row;
-                }).filter(r => r.article_number && r.tag_number);
+                }).filter(r => (r.article_name && r.article_name.trim() !== '') || (r.tag_number && r.tag_number.trim() !== ''));
 
                 setParsedRows(formatted);
                 if (formatted.length === 0) {
-                    showToast('error', 'No valid rows found. Please ensure Article Number and Tag Number exist.');
+                    showToast('error', 'No valid rows found. Please ensure Article Name or Tag Number exist in the file.');
                 }
             } catch (err) {
                 showToast('error', 'Error reading Excel/CSV: ' + err.message);
@@ -2340,9 +2547,22 @@ function ExcelImportModal({ year, isOpen, onClose, onSuccess, showToast }) {
         if (!parsedRows.length) return;
         setLoading(true);
         try {
-            const res = await api.post('/api/excel/import', { rows: parsedRows });
+            const res = await api.post('/api/excel/import', { 
+                rows: parsedRows,
+                update_existing: updateExisting
+            });
             if (res.success) {
-                showToast('success', res.message);
+                if (typeof window.swal === 'function') {
+                    const hasErrors = res.errors && res.errors.length > 0;
+                    window.swal({
+                        title: "Import Finished!",
+                        text: res.message + (hasErrors ? "\n\nSkipped items:\n" + res.errors.slice(0, 5).join("\n") + (res.errors.length > 5 ? `\n...and ${res.errors.length - 5} more.` : "") : ""),
+                        icon: (hasErrors && res.imported === 0 && (!res.updated || res.updated === 0)) ? "warning" : "success",
+                        button: "Done"
+                    });
+                } else {
+                    showToast('success', res.message);
+                }
                 onSuccess();
                 onClose();
             } else {
@@ -2360,7 +2580,7 @@ function ExcelImportModal({ year, isOpen, onClose, onSuccess, showToast }) {
             header: '#',
             id: 'index',
             sortable: false,
-            style: { width: '50px' },
+            style: { width: '45px' },
             footer: () => (
                 <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-muted)', fontWeight: 700 }}>
                     Total
@@ -2369,35 +2589,42 @@ function ExcelImportModal({ year, isOpen, onClose, onSuccess, showToast }) {
             render: (r, i) => i + 1
         },
         {
-            header: 'Article No',
-            accessor: 'article_number',
+            header: 'Tag No',
+            accessor: 'tag_number',
             sortable: true,
             footer: (allRows) => (
                 <span style={{ color: 'var(--text-primary)', fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap' }}>
                     {allRows.length} Items
                 </span>
             ),
-            render: (r) => <strong>{r.article_number}</strong>
+            render: (r) => <span className="tag-badge">{r.tag_number || '(Auto)'}</span>
         },
         {
-            header: 'Tag No',
-            accessor: 'tag_number',
+            header: 'Article No',
+            accessor: 'article_number',
             sortable: true,
             footer: () => null,
-            render: (r) => <span className="tag-badge">{r.tag_number}</span>
+            render: (r) => r.article_number ? (
+                <strong>{r.article_number}</strong>
+            ) : (
+                <span className="badge badge-primary" style={{ fontStyle: 'italic', fontSize: '10px' }} title="System auto-generates unique Article No (ART-YYYY-XXX) upon import">
+                    Auto-Generate
+                </span>
+            )
         },
         {
             header: 'Year',
             accessor: 'applicable_year',
             sortable: true,
             footer: () => null,
-            style: { width: '75px' }
+            style: { width: '65px' }
         },
         {
             header: 'Article Name',
             accessor: 'article_name',
             footer: () => null,
-            sortable: true
+            sortable: true,
+            render: (r) => <span style={{ fontWeight: 600 }}>{r.article_name}</span>
         },
         {
             header: 'Category',
@@ -2407,7 +2634,7 @@ function ExcelImportModal({ year, isOpen, onClose, onSuccess, showToast }) {
             render: (r) => <span className="badge badge-secondary">{r.category || 'General'}</span>
         },
         {
-            header: 'Value (BHD)',
+            header: 'Est. Value',
             accessor: 'estimated_value',
             sortable: true,
             sortValue: (r) => Number(r.estimated_value) || 0,
@@ -2415,7 +2642,7 @@ function ExcelImportModal({ year, isOpen, onClose, onSuccess, showToast }) {
                 const total = allRows.reduce((sum, r) => sum + (Number(r.estimated_value) || 0), 0);
                 return (
                     <div className="dt-footer-amount-box">
-                        <span className="dt-footer-amount-label">Est. Value Total</span>
+                        <span className="dt-footer-amount-label">Est. Total</span>
                         <span className="dt-footer-amount-val" style={{ color: 'var(--primary)' }}>
                             BHD {total.toFixed(3)}
                         </span>
@@ -2423,12 +2650,58 @@ function ExcelImportModal({ year, isOpen, onClose, onSuccess, showToast }) {
                 );
             },
             render: (r) => Number(r.estimated_value || 0).toFixed(3)
+        },
+        {
+            header: 'Reserve',
+            accessor: 'reserve_price',
+            sortable: true,
+            sortValue: (r) => Number(r.reserve_price) || 0,
+            footer: (allRows) => {
+                const total = allRows.reduce((sum, r) => sum + (Number(r.reserve_price) || 0), 0);
+                return (
+                    <div className="dt-footer-amount-box">
+                        <span className="dt-footer-amount-label">Reserve Total</span>
+                        <span className="dt-footer-amount-val" style={{ color: 'var(--success)' }}>
+                            BHD {total.toFixed(3)}
+                        </span>
+                    </div>
+                );
+            },
+            render: (r) => Number(r.reserve_price || 0).toFixed(3)
+        },
+        {
+            header: 'Donor Details',
+            accessor: 'donor_name',
+            sortable: true,
+            footer: () => null,
+            render: (r) => (
+                <div style={{ fontSize: '12px' }}>
+                    <div style={{ fontWeight: 600 }}>{r.donor_name || 'Well-Wisher'}</div>
+                    {(r.donor_code_c || r.donor_phone) && (
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '2px' }}>
+                            {r.donor_code_c && <span>Roll: <strong style={{ color: 'var(--primary)' }}>{r.donor_code_c}</strong></span>}
+                            {r.donor_phone && <span>Ph: {r.donor_phone}</span>}
+                        </div>
+                    )}
+                </div>
+            )
+        },
+        {
+            header: 'Description',
+            accessor: 'description',
+            sortable: false,
+            footer: () => null,
+            render: (r) => (
+                <span title={r.description} style={{ maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-block', fontSize: '11px', color: 'var(--text-secondary)' }}>
+                    {r.description || '-'}
+                </span>
+            )
         }
     ];
 
     return (
         <div className="modal-overlay">
-            <div className="modal-content" style={{ maxWidth: '880px' }}>
+            <div className="modal-content" style={{ maxWidth: '960px' }}>
                 <ModalHeader 
                     title="Excel / CSV Article Batch Import" 
                     icon="cloud_upload" 
@@ -2445,7 +2718,7 @@ function ExcelImportModal({ year, isOpen, onClose, onSuccess, showToast }) {
                                     <i className="material-icons" style={{ fontSize: '20px' }}>description</i> Download Import Template
                                 </h4>
                                 <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>
-                                    Download the template to add article data with pre-filled sample rows and the live Master Categories tab.
+                                    Template is structured directly on Article Master. Article Numbers are automatically generated by the system upon import.
                                 </p>
                             </div>
                             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -2459,7 +2732,7 @@ function ExcelImportModal({ year, isOpen, onClose, onSuccess, showToast }) {
                                     Download Excel (.xlsx)
                                 </button>
                                 <a 
-                                    href="/api/excel/template" 
+                                    href={`/api/excel/template?year=${year}`} 
                                     download 
                                     className="btn btn-secondary btn-sm" 
                                     style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
@@ -2514,6 +2787,7 @@ function ExcelImportModal({ year, isOpen, onClose, onSuccess, showToast }) {
                         </div>
                     </div>
 
+                    {/* File Dropzone */}
                     <div 
                         style={{ 
                             border: '2px dashed var(--border-color)', 
@@ -2536,20 +2810,53 @@ function ExcelImportModal({ year, isOpen, onClose, onSuccess, showToast }) {
                         <h4 style={{ fontSize: '15px', marginBottom: '4px' }}>
                             {fileName ? `Selected: ${fileName}` : 'Click or Drag & Drop Excel / CSV file here'}
                         </h4>
-                        <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Supports .xlsx, .xls, and .csv formats</p>
+                        <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                            Supports .xlsx, .xls, and .csv formats. No Article Number column required — the system will automatically assign unique Article Numbers.
+                        </p>
+                    </div>
+
+                    {/* Import Options Toggle */}
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        marginTop: '16px',
+                        background: 'rgba(142, 36, 170, 0.04)',
+                        padding: '12px 16px',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(142, 36, 170, 0.18)',
+                        flexWrap: 'wrap',
+                        gap: '10px'
+                    }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0, fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                            <input 
+                                type="checkbox" 
+                                checked={updateExisting} 
+                                onChange={e => setUpdateExisting(e.target.checked)} 
+                                style={{ width: '16px', height: '16px', accentColor: 'var(--primary)', cursor: 'pointer' }}
+                            />
+                            <span>Update existing articles if Tag No / Article No matches</span>
+                        </label>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                            {updateExisting 
+                                ? '✓ Updates title, category, values, reserve price & donor details on matching Available articles' 
+                                : '⚠ Skips rows where Tag No / Article No already exists in the system'}
+                        </span>
                     </div>
 
                     {parsedRows.length > 0 && (
                         <div style={{ marginTop: '24px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                                <h4 style={{ fontSize: '14px', fontWeight: '700', margin: 0 }}>File Preview ({parsedRows.length} Valid Records Detected)</h4>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+                                <h4 style={{ fontSize: '14px', fontWeight: '700', margin: 0 }}>
+                                    File Preview ({parsedRows.length} Valid Records Detected)
+                                </h4>
                                 <span className="badge badge-success">Ready to Import</span>
                             </div>
                             <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
                                 <DataTable 
                                     columns={previewColumns}
                                     data={parsedRows}
-                                    keyField={(r, i) => `${r.article_number}_${i}`}
+                                    keyField={(r, i) => `${r.article_number || 'auto'}_${i}`}
                                     initialPageSize={10}
                                     searchPlaceholder="Search in imported file..."
                                     emptyMessage="No rows parsed."

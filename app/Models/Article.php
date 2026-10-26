@@ -289,10 +289,11 @@ class Article extends Model {
         return $stmt->fetchColumn() > 0;
     }
 
-    public function batchImport(array $rows, int $userId): array {
+    public function batchImport(array $rows, int $userId, bool $updateExisting = false): array {
         $imported = 0;
-        $skipped = 0;
-        $errors = [];
+        $updated  = 0;
+        $skipped  = 0;
+        $errors   = [];
 
         $this->db->beginTransaction();
         try {
@@ -306,46 +307,138 @@ class Article extends Model {
 
             $addCategoryStmt = $this->db->prepare("INSERT IGNORE INTO hf_categories (category_name) VALUES (:name)");
 
-            $stmt = $this->db->prepare("
+            // Member lookup statement by roll number (code_c)
+            $memberStmt = $this->db->prepare("
+                SELECT primary_member_id, primary_member_name, code_c, bahrain_contact_no, cpr_no 
+                FROM tbl_primary_member 
+                WHERE code_c = :code_c 
+                LIMIT 1
+            ");
+
+            // Check existing article by article number
+            $checkStmt = $this->db->prepare("
+                SELECT article_id, article_number, tag_number, status, applicable_year 
+                FROM hf_articles 
+                WHERE applicable_year = :year AND article_number = :num
+                LIMIT 1
+            ");
+
+            // Check existing article by tag number (for sheets where Article No is omitted)
+            $checkByTagStmt = $this->db->prepare("
+                SELECT article_id, article_number, tag_number, status, applicable_year 
+                FROM hf_articles 
+                WHERE applicable_year = :year AND tag_number = :tag
+                LIMIT 1
+            ");
+
+            // Insert statement with all Article Master fields
+            $insertStmt = $this->db->prepare("
                 INSERT INTO hf_articles (
                     article_number, tag_number, applicable_year, article_name, description,
-                    category, donor_name, estimated_value, reserve_price, status, created_by
+                    category, donor_member_id, donor_name, donor_code_c, donor_phone, donor_cpr,
+                    estimated_value, reserve_price, status, created_by
                 ) VALUES (
                     :article_number, :tag_number, :applicable_year, :article_name, :description,
-                    :category, :donor_name, :estimated_value, :reserve_price, 'Available', :created_by
+                    :category, :donor_member_id, :donor_name, :donor_code_c, :donor_phone, :donor_cpr,
+                    :estimated_value, :reserve_price, 'Available', :created_by
                 )
             ");
 
-            foreach ($rows as $index => $row) {
-                $rowNum = $index + 2; // account for header
-                $artNo = trim($row['article_number'] ?? '');
-                $tagNo = trim($row['tag_number'] ?? '');
-                $year  = (int)($row['applicable_year'] ?? date('Y'));
-                $name  = trim($row['article_name'] ?? '');
+            // Update statement for existing articles
+            $updateStmt = $this->db->prepare("
+                UPDATE hf_articles SET
+                    tag_number      = :tag_number,
+                    article_name    = :article_name,
+                    description     = :description,
+                    category        = :category,
+                    donor_member_id = :donor_member_id,
+                    donor_name      = :donor_name,
+                    donor_code_c    = :donor_code_c,
+                    donor_phone     = :donor_phone,
+                    donor_cpr       = :donor_cpr,
+                    estimated_value = :estimated_value,
+                    reserve_price   = :reserve_price
+                WHERE article_id = :id
+            ");
 
-                if ($artNo === '' || $tagNo === '') {
-                    $errors[] = "Row {$rowNum}: Article Number and Tag Number are required.";
-                    $skipped++;
-                    continue;
+            // Track assigned sequences in this batch to prevent collisions
+            $allocatedNumbers = [];
+
+            foreach ($rows as $index => $row) {
+                $rowNum = $index + 2; // account for header line in spreadsheet
+                $hasExplicitArtNo = !empty(trim($row['article_number'] ?? ''));
+                $artNo  = trim($row['article_number'] ?? '');
+                $tagNo  = trim($row['tag_number'] ?? '');
+                $year   = (int)($row['applicable_year'] ?? date('Y'));
+                if ($year <= 2000) $year = (int)date('Y');
+                $name   = trim($row['article_name'] ?? '');
+
+                // Check if article already exists:
+                // 1) If Article No is explicitly provided in sheet, check by Article No
+                // 2) If Article No is omitted, check by Tag No
+                $existingArticle = null;
+                if ($hasExplicitArtNo) {
+                    $checkStmt->execute(['year' => $year, 'num' => $artNo]);
+                    $existingArticle = $checkStmt->fetch();
+                } elseif ($tagNo !== '') {
+                    $checkByTagStmt->execute(['year' => $year, 'tag' => $tagNo]);
+                    $existingArticle = $checkByTagStmt->fetch();
+                    if ($existingArticle) {
+                        $artNo = $existingArticle['article_number'];
+                    }
                 }
 
-                if ($this->checkExists($year, $artNo)) {
-                    $errors[] = "Row {$rowNum}: Article {$artNo} already exists for year {$year}.";
-                    $skipped++;
-                    continue;
+                // If article does not exist and Article No is blank, auto-generate sequential unique Article No
+                if (!$existingArticle && $artNo === '') {
+                    $nextSeq = 1;
+                    $candidate = sprintf("ART-%d-%03d", $year, $nextSeq);
+                    while ($this->checkExists($year, $candidate) || in_array($candidate, $allocatedNumbers, true)) {
+                        $nextSeq++;
+                        $candidate = sprintf("ART-%d-%03d", $year, $nextSeq);
+                    }
+                    $artNo = $candidate;
+                    $allocatedNumbers[] = $artNo;
+                } else {
+                    $allocatedNumbers[] = $artNo;
+                }
+
+                // Auto-generate tag number if blank
+                if ($tagNo === '') {
+                    $tagNo = str_replace("ART-{$year}-", "TAG-", $artNo);
+                    if ($tagNo === $artNo) {
+                        $tagNo = "TAG-" . substr($artNo, -3);
+                    }
                 }
 
                 if ($name === '') {
                     $name = "Article " . $artNo;
                 }
 
-                // Resolve category against Master categories
+                // Check if article already exists
+                $checkStmt->execute(['year' => $year, 'num' => $artNo]);
+                $existingArticle = $checkStmt->fetch();
+
+                if ($existingArticle) {
+                    if (!$updateExisting) {
+                        $errors[] = "Row {$rowNum}: Article [{$artNo}] already exists for year {$year} (Skipped).";
+                        $skipped++;
+                        continue;
+                    }
+
+                    // Only update if status is 'Available'
+                    if (strcasecmp($existingArticle['status'] ?? '', 'Available') !== 0) {
+                        $errors[] = "Row {$rowNum}: Article [{$artNo}] status is '{$existingArticle['status']}' (not Available) and cannot be updated.";
+                        $skipped++;
+                        continue;
+                    }
+                }
+
+                // Resolve category against Master categories (or auto-register)
                 $rawCategory = !empty($row['category']) ? trim($row['category']) : 'General';
                 $lowerCategory = strtolower($rawCategory);
                 if (isset($categoryMap[$lowerCategory])) {
                     $finalCategory = $categoryMap[$lowerCategory];
                 } else {
-                    // Auto-register newly introduced category into Master
                     try {
                         $addCategoryStmt->execute(['name' => $rawCategory]);
                         $categoryMap[$lowerCategory] = $rawCategory;
@@ -353,19 +446,77 @@ class Article extends Model {
                     $finalCategory = $rawCategory;
                 }
 
-                $stmt->execute([
-                    'article_number'  => $artNo,
-                    'tag_number'      => $tagNo,
-                    'applicable_year' => $year,
-                    'article_name'    => $name,
-                    'description'     => $row['description'] ?? 'Imported via Excel template',
-                    'category'        => $finalCategory,
-                    'donor_name'      => !empty($row['donor_name']) ? trim($row['donor_name']) : 'Well-Wisher',
-                    'estimated_value' => (float)($row['estimated_value'] ?? 0),
-                    'reserve_price'   => (float)($row['reserve_price'] ?? 0),
-                    'created_by'      => $userId
-                ]);
-                $imported++;
+                // Resolve Donor & Member details
+                $donorMemberId = !empty($row['donor_member_id']) ? (int)$row['donor_member_id'] : null;
+                $donorCodeC    = !empty($row['donor_code_c']) ? (int)$row['donor_code_c'] : null;
+                $donorName     = !empty($row['donor_name']) ? trim($row['donor_name']) : null;
+                $donorPhone    = !empty($row['donor_phone']) ? trim($row['donor_phone']) : null;
+                $donorCpr      = !empty($row['donor_cpr']) ? trim($row['donor_cpr']) : null;
+
+                // If Donor Roll No is provided, look up parish member directory
+                if ($donorCodeC && !$donorMemberId) {
+                    $memberStmt->execute(['code_c' => $donorCodeC]);
+                    $member = $memberStmt->fetch();
+                    if ($member) {
+                        $donorMemberId = (int)$member['primary_member_id'];
+                        if (empty($donorName) || strcasecmp($donorName, 'Well-Wisher') === 0 || strcasecmp($donorName, 'N/A') === 0) {
+                            $donorName = $member['primary_member_name'];
+                        }
+                        if (empty($donorPhone) && !empty($member['bahrain_contact_no'])) {
+                            $donorPhone = $member['bahrain_contact_no'];
+                        }
+                        if (empty($donorCpr) && !empty($member['cpr_no'])) {
+                            $donorCpr = $member['cpr_no'];
+                        }
+                    }
+                }
+
+                if (empty($donorName) || strcasecmp($donorName, 'N/A') === 0) {
+                    $donorName = 'Well-Wisher';
+                }
+
+                $estValue = (float)($row['estimated_value'] ?? 0);
+                $resPrice = (float)($row['reserve_price'] ?? 0);
+                if ($resPrice <= 0 && $estValue > 0) {
+                    $resPrice = $estValue;
+                }
+                $description = !empty($row['description']) ? trim($row['description']) : 'Imported via Excel template';
+
+                if ($existingArticle && $updateExisting) {
+                    $updateStmt->execute([
+                        'id'              => (int)$existingArticle['article_id'],
+                        'tag_number'      => $tagNo,
+                        'article_name'    => $name,
+                        'description'     => $description,
+                        'category'        => $finalCategory,
+                        'donor_member_id' => $donorMemberId,
+                        'donor_name'      => $donorName,
+                        'donor_code_c'    => $donorCodeC,
+                        'donor_phone'     => $donorPhone,
+                        'donor_cpr'       => $donorCpr,
+                        'estimated_value' => $estValue,
+                        'reserve_price'   => $resPrice
+                    ]);
+                    $updated++;
+                } else {
+                    $insertStmt->execute([
+                        'article_number'  => $artNo,
+                        'tag_number'      => $tagNo,
+                        'applicable_year' => $year,
+                        'article_name'    => $name,
+                        'description'     => $description,
+                        'category'        => $finalCategory,
+                        'donor_member_id' => $donorMemberId,
+                        'donor_name'      => $donorName,
+                        'donor_code_c'    => $donorCodeC,
+                        'donor_phone'     => $donorPhone,
+                        'donor_cpr'       => $donorCpr,
+                        'estimated_value' => $estValue,
+                        'reserve_price'   => $resPrice,
+                        'created_by'      => $userId
+                    ]);
+                    $imported++;
+                }
             }
 
             $this->db->commit();
@@ -376,6 +527,7 @@ class Article extends Model {
 
         return [
             'imported' => $imported,
+            'updated'  => $updated,
             'skipped'  => $skipped,
             'errors'   => $errors
         ];

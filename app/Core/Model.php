@@ -68,6 +68,30 @@ abstract class Model {
     }
 
     /**
+     * Ensures an index exists by adding it if missing.
+     */
+    public function ensureIndex(string $table, string $indexName, string $columns): bool {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT 1 
+                FROM information_schema.STATISTICS 
+                WHERE TABLE_SCHEMA = DATABASE() 
+                  AND TABLE_NAME = :table 
+                  AND INDEX_NAME = :indexName
+                LIMIT 1
+            ");
+            $stmt->execute(['table' => $table, 'indexName' => $indexName]);
+            if ($stmt->fetchColumn()) {
+                return true;
+            }
+            $this->db->exec("ALTER TABLE `{$table}` ADD INDEX `{$indexName}` ({$columns})");
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
      * Ensure optional/extended schema columns are present on base church tables.
      */
     protected function ensureAuctionSchema(): void {
@@ -80,7 +104,7 @@ abstract class Model {
 
         // Fast path: avoid running heavy ALTER checks and table scans on every HTTP request
         try {
-            $stmt = $this->db->prepare("SELECT setting_value FROM hf_settings WHERE setting_key = 'schema_migrated_v2' LIMIT 1");
+            $stmt = $this->db->prepare("SELECT setting_value FROM hf_settings WHERE setting_key = 'schema_migrated_v3' LIMIT 1");
             $stmt->execute();
             if ($stmt->fetchColumn() === '1') {
                 return;
@@ -96,10 +120,17 @@ abstract class Model {
         $this->ensureColumn('hf_auction_transactions', 'created_at', 'DATETIME DEFAULT CURRENT_TIMESTAMP');
         $this->ensureColumn('hf_auction_transactions', 'offering_type', "VARCHAR(50) DEFAULT 'Auction'");
         $this->ensureColumn('hf_auction_transactions', 'item_description', 'TEXT DEFAULT NULL');
+
+        // Ensure key performance indexes exist
+        $this->ensureIndex('acc_contribution', 'idx_article_id', '`article_id`');
+        $this->ensureIndex('acc_promises', 'idx_article_id', '`article_id`');
+        $this->ensureIndex('hf_payments', 'idx_transaction', '`transaction_id`');
+        $this->ensureIndex('hf_auction_transactions', 'idx_year_offering', '`applicable_year`, `offering_type`');
+
         $this->backfillSpecialOfferingRemarks();
 
         try {
-            $stmt = $this->db->prepare("INSERT INTO hf_settings (setting_key, setting_value) VALUES ('schema_migrated_v2', '1') ON DUPLICATE KEY UPDATE setting_value = '1'");
+            $stmt = $this->db->prepare("INSERT INTO hf_settings (setting_key, setting_value) VALUES ('schema_migrated_v3', '1') ON DUPLICATE KEY UPDATE setting_value = '1'");
             $stmt->execute();
         } catch (\Throwable $e) {}
     }

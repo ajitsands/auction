@@ -19,67 +19,15 @@ class Auction extends Model {
                 t.buyer_code_c,
                 COALESCE(NULLIF(t.buyer_phone, ''), m.bahrain_contact_no) as buyer_phone,
                 t.winning_bid_amount,
-                COALESCE(
-                    (SELECT SUM(c.contribution_amount) 
-                     FROM acc_contribution c 
-                     WHERE c.article_id = t.article_id 
-                       AND (t.buyer_member_id IS NULL OR t.buyer_member_id = 0 OR c.member_id = t.buyer_member_id)),
-                    t.paid_amount,
-                    0
-                ) as paid_amount,
-                CASE 
-                    WHEN EXISTS (
-                        SELECT 1 FROM acc_promises p 
-                        WHERE (t.acc_promise_id IS NOT NULL AND p.promise_id = t.acc_promise_id) 
-                           OR (p.article_id = t.article_id AND (t.buyer_member_id IS NULL OR t.buyer_member_id = 0 OR p.member_id = t.buyer_member_id))
-                    ) THEN (
-                        SELECT p.balance_amount FROM acc_promises p 
-                        WHERE (t.acc_promise_id IS NOT NULL AND p.promise_id = t.acc_promise_id) 
-                           OR (p.article_id = t.article_id AND (t.buyer_member_id IS NULL OR t.buyer_member_id = 0 OR p.member_id = t.buyer_member_id))
-                        ORDER BY p.promise_id DESC LIMIT 1
-                    )
-                    ELSE GREATEST(0, t.winning_bid_amount - COALESCE(
-                        (SELECT SUM(c.contribution_amount) 
-                         FROM acc_contribution c 
-                         WHERE c.article_id = t.article_id 
-                           AND (t.buyer_member_id IS NULL OR t.buyer_member_id = 0 OR c.member_id = t.buyer_member_id)),
-                        t.paid_amount,
-                        0
-                    ))
-                END as balance_amount,
-                CASE 
-                    WHEN (
-                        CASE 
-                            WHEN EXISTS (
-                                SELECT 1 FROM acc_promises p 
-                                WHERE (t.acc_promise_id IS NOT NULL AND p.promise_id = t.acc_promise_id) 
-                                   OR (p.article_id = t.article_id AND (t.buyer_member_id IS NULL OR t.buyer_member_id = 0 OR p.member_id = t.buyer_member_id))
-                            ) THEN (
-                                SELECT p.balance_amount FROM acc_promises p 
-                                WHERE (t.acc_promise_id IS NOT NULL AND p.promise_id = t.acc_promise_id) 
-                                   OR (p.article_id = t.article_id AND (t.buyer_member_id IS NULL OR t.buyer_member_id = 0 OR p.member_id = t.buyer_member_id))
-                                ORDER BY p.promise_id DESC LIMIT 1
-                            )
-                            ELSE GREATEST(0, t.winning_bid_amount - COALESCE(
-                                (SELECT SUM(c.contribution_amount) 
-                                 FROM acc_contribution c 
-                                 WHERE c.article_id = t.article_id 
-                                   AND (t.buyer_member_id IS NULL OR t.buyer_member_id = 0 OR c.member_id = t.buyer_member_id)),
-                                t.paid_amount,
-                                0
-                            ))
-                        END
-                    ) <= 0.0001 THEN 'Paid'
-                    WHEN COALESCE(
-                        (SELECT SUM(c.contribution_amount) 
-                         FROM acc_contribution c 
-                         WHERE c.article_id = t.article_id 
-                           AND (t.buyer_member_id IS NULL OR t.buyer_member_id = 0 OR c.member_id = t.buyer_member_id)),
-                        t.paid_amount,
-                        0
-                    ) > 0.0001 THEN 'Partial'
-                    ELSE 'Pending'
-                END as payment_status,
+                COALESCE(t.paid_amount, 0) as paid_amount,
+                COALESCE(t.balance_amount, GREATEST(0, t.winning_bid_amount - COALESCE(t.paid_amount, 0))) as balance_amount,
+                COALESCE(t.payment_status, 
+                    CASE 
+                        WHEN COALESCE(t.balance_amount, GREATEST(0, t.winning_bid_amount - COALESCE(t.paid_amount, 0))) <= 0.0001 THEN 'Paid'
+                        WHEN COALESCE(t.paid_amount, 0) > 0.0001 THEN 'Partial'
+                        ELSE 'Pending'
+                    END
+                ) as payment_status,
                 t.auction_date,
                 t.notes,
                 t.created_by,
@@ -154,113 +102,14 @@ class Auction extends Model {
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
-        $rows = $stmt->fetchAll();
-        $this->enrichTransactionsWithAccounts($rows);
-        return $rows;
+        return $stmt->fetchAll();
     }
 
     public function findById(int $transactionId): ?array {
         $stmt = $this->db->prepare("
             SELECT 
-                t.transaction_id,
-                t.auction_ref_no,
-                t.article_id,
-                t.applicable_year,
-                t.buyer_member_id,
-                t.buyer_name,
-                t.buyer_code_c,
-                COALESCE(NULLIF(t.buyer_phone, ''), m.bahrain_contact_no) as buyer_phone,
-                t.winning_bid_amount,
-                COALESCE(
-                    (SELECT SUM(c.contribution_amount) 
-                     FROM acc_contribution c 
-                     WHERE c.article_id = t.article_id 
-                       AND (t.buyer_member_id IS NULL OR t.buyer_member_id = 0 OR c.member_id = t.buyer_member_id)),
-                    t.paid_amount,
-                    0
-                ) as paid_amount,
-                CASE 
-                    WHEN EXISTS (
-                        SELECT 1 FROM acc_promises p 
-                        WHERE (t.acc_promise_id IS NOT NULL AND p.promise_id = t.acc_promise_id) 
-                           OR (p.article_id = t.article_id AND (t.buyer_member_id IS NULL OR t.buyer_member_id = 0 OR p.member_id = t.buyer_member_id))
-                    ) THEN (
-                        SELECT p.balance_amount FROM acc_promises p 
-                        WHERE (t.acc_promise_id IS NOT NULL AND p.promise_id = t.acc_promise_id) 
-                           OR (p.article_id = t.article_id AND (t.buyer_member_id IS NULL OR t.buyer_member_id = 0 OR p.member_id = t.buyer_member_id))
-                        ORDER BY p.promise_id DESC LIMIT 1
-                    )
-                    ELSE GREATEST(0, t.winning_bid_amount - COALESCE(
-                        (SELECT SUM(c.contribution_amount) 
-                         FROM acc_contribution c 
-                         WHERE c.article_id = t.article_id 
-                           AND (t.buyer_member_id IS NULL OR t.buyer_member_id = 0 OR c.member_id = t.buyer_member_id)),
-                        t.paid_amount,
-                        0
-                    ))
-                END as balance_amount,
-                CASE 
-                    WHEN (
-                        CASE 
-                            WHEN EXISTS (
-                                SELECT 1 FROM acc_promises p 
-                                WHERE (t.acc_promise_id IS NOT NULL AND p.promise_id = t.acc_promise_id) 
-                                   OR (p.article_id = t.article_id AND (t.buyer_member_id IS NULL OR t.buyer_member_id = 0 OR p.member_id = t.buyer_member_id))
-                            ) THEN (
-                                SELECT p.balance_amount FROM acc_promises p 
-                                WHERE (t.acc_promise_id IS NOT NULL AND p.promise_id = t.acc_promise_id) 
-                                   OR (p.article_id = t.article_id AND (t.buyer_member_id IS NULL OR t.buyer_member_id = 0 OR p.member_id = t.buyer_member_id))
-                                ORDER BY p.promise_id DESC LIMIT 1
-                            )
-                            ELSE GREATEST(0, t.winning_bid_amount - COALESCE(
-                                (SELECT SUM(c.contribution_amount) 
-                                 FROM acc_contribution c 
-                                 WHERE c.article_id = t.article_id 
-                                   AND (t.buyer_member_id IS NULL OR t.buyer_member_id = 0 OR c.member_id = t.buyer_member_id)),
-                                t.paid_amount,
-                                0
-                            ))
-                        END
-                    ) <= 0.0001 THEN 'Paid'
-                    WHEN COALESCE(
-                        (SELECT SUM(c.contribution_amount) 
-                         FROM acc_contribution c 
-                         WHERE c.article_id = t.article_id 
-                           AND (t.buyer_member_id IS NULL OR t.buyer_member_id = 0 OR c.member_id = t.buyer_member_id)),
-                        t.paid_amount,
-                        0
-                    ) > 0.0001 THEN 'Partial'
-                    ELSE 'Pending'
-                END as payment_status,
-                t.auction_date,
+                t.*,
                 COALESCE(t.offering_type, 'Auction') as offering_type,
-                t.item_description,
-                t.notes,
-                t.created_by,
-                t.created_at,
-                NOW() as current_time_bahrain,
-                GREATEST(0, TIMESTAMPDIFF(SECOND, COALESCE(t.created_at, CONCAT(t.auction_date, ' 00:00:00')), NOW())) as elapsed_seconds,
-                GREATEST(0, LEAST(86400, 86400 - GREATEST(0, TIMESTAMPDIFF(SECOND, COALESCE(t.created_at, CONCAT(t.auction_date, ' 00:00:00')), NOW())))) as remaining_seconds,
-                CASE 
-                    WHEN TIMESTAMPDIFF(SECOND, COALESCE(t.created_at, CONCAT(t.auction_date, ' 00:00:00')), NOW()) <= 86400 THEN 1 
-                    ELSE 0 
-                END as is_within_24h,
-                t.event_id,
-                t.event_name,
-                t.contrib_dr_code,
-                t.contrib_dr_name,
-                t.contrib_cr_code,
-                t.contrib_cr_name,
-                t.contrib_voucher_no,
-                t.acc_contribution_id,
-                t.promise_dr_code,
-                t.promise_dr_name,
-                t.promise_cr_code,
-                t.promise_cr_name,
-                t.promise_voucher_no,
-                t.acc_promise_id,
-                t.receipt_book_no,
-                t.manual_receipt_no,
                 a.article_number, a.tag_number, a.article_name, a.category, a.estimated_value, a.donor_name,
                 m.primary_member_name, m.cpr_no as buyer_cpr, m.bahrain_contact_no as member_mobile, m.prayer_group_name as buyer_prayer_group
             FROM hf_auction_transactions t
@@ -270,199 +119,106 @@ class Auction extends Model {
             LIMIT 1
         ");
         $stmt->execute(['id' => $transactionId]);
-        $row = $stmt->fetch();
-        if ($row) {
-            $single = [$row];
-            $this->enrichTransactionsWithAccounts($single);
-            return $single[0];
-        }
-        return null;
+        return $stmt->fetch() ?: null;
     }
 
-    private function enrichTransactionsWithAccounts(array &$rows): void {
-        if (empty($rows)) {
-            return;
+    /**
+     * Fetch complete account posting, vouchers, and payments for a single auction transaction on demand.
+     * This avoids running heavy queries across large church accounting tables during main table loads.
+     */
+    public function getAccountPostingDetails(int $transactionId): array {
+        // 1. Fetch transaction basic details
+        $stmt = $this->db->prepare("
+            SELECT 
+                t.*,
+                COALESCE(t.offering_type, 'Auction') as offering_type,
+                a.article_number, a.tag_number, a.article_name, a.category, a.estimated_value, a.donor_name,
+                m.primary_member_name, m.cpr_no as buyer_cpr, m.bahrain_contact_no as member_mobile, m.prayer_group_name as buyer_prayer_group
+            FROM hf_auction_transactions t
+            JOIN hf_articles a ON t.article_id = a.article_id
+            LEFT JOIN tbl_primary_member m ON t.buyer_member_id = m.primary_member_id
+            WHERE t.transaction_id = :id
+            LIMIT 1
+        ");
+        $stmt->execute(['id' => $transactionId]);
+        $trans = $stmt->fetch();
+        if (!$trans) {
+            return [];
         }
 
-        $auctionRows = array_filter($rows, fn($r) => empty($r['offering_type']) || $r['offering_type'] === 'Auction');
-        $articleIds = array_values(array_unique(array_filter(array_column($auctionRows, 'article_id'))));
-        $contribIds = array_values(array_unique(array_filter(array_column($rows, 'acc_contribution_id'))));
-        $promiseIds = array_values(array_unique(array_filter(array_column($rows, 'acc_promise_id'))));
+        // 2. Fetch all payment records from hf_payments for this transaction
+        $payStmt = $this->db->prepare("
+            SELECT 
+                p.payment_id,
+                p.transaction_id,
+                p.receipt_no,
+                p.payment_date,
+                p.amount_paid,
+                p.payment_mode,
+                p.reference_no,
+                p.remarks,
+                p.dr_code, p.dr_name, p.cr_code, p.cr_name,
+                p.voucher_no,
+                p.acc_contribution_id,
+                p.receipt_book_no,
+                p.manual_receipt_no,
+                p.created_at,
+                u.user_name as recorded_by
+            FROM hf_payments p
+            LEFT JOIN tbl_users u ON p.created_by = u.user_id
+            WHERE p.transaction_id = :id
+            ORDER BY p.payment_id ASC
+        ");
+        $payStmt->execute(['id' => $transactionId]);
+        $payments = $payStmt->fetchAll();
 
-        // 1. Fetch contributions from acc_contribution
-        $contribMap = [];
-        if (!empty($articleIds) || !empty($contribIds)) {
-            $cWhere = [];
-            $cParams = [];
-            if (!empty($articleIds)) {
-                $cWhere[] = "c.article_id IN (" . implode(',', array_fill(0, count($articleIds), '?')) . ")";
-                $cParams = array_merge($cParams, $articleIds);
-            }
-            if (!empty($contribIds)) {
-                $cWhere[] = "c.contribution_id IN (" . implode(',', array_fill(0, count($contribIds), '?')) . ")";
-                $cParams = array_merge($cParams, $contribIds);
-            }
-
-            $cSql = "
+        // 3. Fetch initial contribution record from acc_contribution by primary key if exists
+        $contribution = null;
+        if (!empty($trans['acc_contribution_id'])) {
+            $cStmt = $this->db->prepare("
                 SELECT 
                     c.contribution_id,
-                    c.article_id,
-                    c.member_id,
                     c.voucher_ref_no as voucher_no,
                     c.contribution_amount,
                     c.contribution_date,
-                    c.manual_book_no,
-                    c.manual_receipt_no,
                     c.dr_code, c.dr_name, c.cr_code, c.cr_name,
-                    p.receipt_no
+                    c.manual_book_no, c.manual_receipt_no,
+                    c.narration, c.item_description
                 FROM acc_contribution c
-                LEFT JOIN hf_payments p ON (p.acc_contribution_id = c.contribution_id OR p.voucher_no = c.voucher_ref_no)
-                WHERE " . implode(' OR ', $cWhere) . "
-                ORDER BY c.contribution_id ASC
-            ";
-            $cStmt = $this->db->prepare($cSql);
-            $cStmt->execute($cParams);
-            $allContribs = $cStmt->fetchAll();
-
-            foreach ($allContribs as $cb) {
-                $artId = (int)$cb['article_id'];
-                $memId = (int)$cb['member_id'];
-                $cid = (int)$cb['contribution_id'];
-
-                if ($artId > 0 && $memId > 0) {
-                    $contribMap['art_' . $artId . '_mem_' . $memId][] = $cb;
-                } elseif ($artId > 0) {
-                    $contribMap['art_' . $artId][] = $cb;
-                }
-                if ($cid > 0) {
-                    $contribMap['cid_' . $cid] = $cb;
-                }
-            }
+                WHERE c.contribution_id = :cid
+                LIMIT 1
+            ");
+            $cStmt->execute(['cid' => (int)$trans['acc_contribution_id']]);
+            $contribution = $cStmt->fetch() ?: null;
         }
 
-        // 2. Fetch promises from acc_promises
-        $promiseMap = [];
-        if (!empty($articleIds) || !empty($promiseIds)) {
-            $pWhere = [];
-            $pParams = [];
-            if (!empty($articleIds)) {
-                $pWhere[] = "pr.article_id IN (" . implode(',', array_fill(0, count($articleIds), '?')) . ")";
-                $pParams = array_merge($pParams, $articleIds);
-            }
-            if (!empty($promiseIds)) {
-                $pWhere[] = "pr.promise_id IN (" . implode(',', array_fill(0, count($promiseIds), '?')) . ")";
-                $pParams = array_merge($pParams, $promiseIds);
-            }
-
-            $pSql = "
+        // 4. Fetch promise record from acc_promises by primary key if exists
+        $promise = null;
+        if (!empty($trans['acc_promise_id'])) {
+            $pStmt = $this->db->prepare("
                 SELECT 
                     pr.promise_id,
-                    pr.article_id,
-                    pr.member_id,
                     pr.voucher_ref_no as voucher_no,
                     pr.promise_amount,
                     pr.balance_amount,
                     pr.promise_date,
                     pr.promise_status,
-                    pr.dr_code, pr.dr_name, pr.cr_code, pr.cr_name
+                    pr.dr_code, pr.dr_name, pr.cr_code, pr.cr_name,
+                    pr.narration, pr.item_description
                 FROM acc_promises pr
-                WHERE " . implode(' OR ', $pWhere) . "
-                ORDER BY pr.promise_id ASC
-            ";
-            $pStmt = $this->db->prepare($pSql);
-            $pStmt->execute($pParams);
-            $allPromises = $pStmt->fetchAll();
-
-            foreach ($allPromises as $pm) {
-                $artId = (int)$pm['article_id'];
-                $memId = (int)$pm['member_id'];
-                $pid = (int)$pm['promise_id'];
-
-                if ($artId > 0 && $memId > 0) {
-                    $promiseMap['art_' . $artId . '_mem_' . $memId][] = $pm;
-                } elseif ($artId > 0) {
-                    $promiseMap['art_' . $artId][] = $pm;
-                }
-                if ($pid > 0) {
-                    $promiseMap['pid_' . $pid] = $pm;
-                }
-            }
+                WHERE pr.promise_id = :pid
+                LIMIT 1
+            ");
+            $pStmt->execute(['pid' => (int)$trans['acc_promise_id']]);
+            $promise = $pStmt->fetch() ?: null;
         }
 
-        // 3. Attach to transactions
-        foreach ($rows as &$t) {
-            $isOffering = !empty($t['offering_type']) && $t['offering_type'] !== 'Auction';
-            $artId = (int)($t['article_id'] ?? 0);
-            $memId = (int)($t['buyer_member_id'] ?? 0);
-            $cid = (int)($t['acc_contribution_id'] ?? 0);
-            $pid = (int)($t['acc_promise_id'] ?? 0);
-
-            $cKeyMem = 'art_' . $artId . '_mem_' . $memId;
-            $cKeyArt = 'art_' . $artId;
-            $cKeyId  = 'cid_' . $cid;
-
-            $cList = [];
-            if ($cid > 0 && isset($contribMap[$cKeyId])) {
-                $cList = [$contribMap[$cKeyId]];
-            } elseif (!$isOffering && $artId > 0 && $memId > 0 && isset($contribMap[$cKeyMem])) {
-                $cList = $contribMap[$cKeyMem];
-            } elseif (!$isOffering && $artId > 0 && isset($contribMap[$cKeyArt])) {
-                $cList = $contribMap[$cKeyArt];
-            } elseif (!empty($t['contrib_voucher_no'])) {
-                $cList = [[
-                    'contribution_id'     => $t['acc_contribution_id'],
-                    'voucher_no'          => $t['contrib_voucher_no'],
-                    'contribution_amount' => $t['paid_amount'],
-                    'contribution_date'   => $t['auction_date'],
-                    'manual_receipt_no'   => $t['manual_receipt_no'],
-                    'receipt_no'          => null
-                ]];
-            }
-
-            $uniqueContribs = [];
-            $seenC = [];
-            foreach ($cList as $item) {
-                $key = !empty($item['contribution_id']) ? 'id_' . $item['contribution_id'] : ('vno_' . $item['voucher_no']);
-                if (!isset($seenC[$key])) {
-                    $seenC[$key] = true;
-                    $uniqueContribs[] = $item;
-                }
-            }
-            $t['contributions'] = $uniqueContribs;
-
-            $pKeyMem = 'art_' . $artId . '_mem_' . $memId;
-            $pKeyArt = 'art_' . $artId;
-            $pKeyId  = 'pid_' . $pid;
-
-            $pList = [];
-            if ($pid > 0 && isset($promiseMap[$pKeyId])) {
-                $pList = [$promiseMap[$pKeyId]];
-            } elseif (!$isOffering && $artId > 0 && $memId > 0 && isset($promiseMap[$pKeyMem])) {
-                $pList = $promiseMap[$pKeyMem];
-            } elseif (!$isOffering && $artId > 0 && isset($promiseMap[$pKeyArt])) {
-                $pList = $promiseMap[$pKeyArt];
-            } elseif (!empty($t['promise_voucher_no'])) {
-                $pList = [[
-                    'promise_id'     => $t['acc_promise_id'],
-                    'voucher_no'     => $t['promise_voucher_no'],
-                    'promise_amount' => $t['balance_amount'],
-                    'balance_amount' => $t['balance_amount'],
-                    'promise_date'   => $t['auction_date']
-                ]];
-            }
-
-            $uniquePromises = [];
-            $seenP = [];
-            foreach ($pList as $pItem) {
-                $key = !empty($pItem['promise_id']) ? 'id_' . $pItem['promise_id'] : ('vno_' . $pItem['voucher_no']);
-                if (!isset($seenP[$key])) {
-                    $seenP[$key] = true;
-                    $uniquePromises[] = $pItem;
-                }
-            }
-            $t['promises'] = $uniquePromises;
-        }
-        unset($t);
+        return [
+            'transaction'  => $trans,
+            'payments'     => $payments,
+            'contribution' => $contribution,
+            'promise'      => $promise
+        ];
     }
 
     /**
@@ -1038,39 +794,17 @@ class Auction extends Model {
                 COUNT(*) as live_auction_count,
                 COALESCE(SUM(t.winning_bid_amount), 0) as live_auction_sales,
                 COALESCE(SUM(
-                    COALESCE(
-                        (SELECT SUM(c.contribution_amount) 
-                         FROM acc_contribution c 
-                         WHERE c.article_id = t.article_id 
-                           AND (t.buyer_member_id IS NULL OR t.buyer_member_id = 0 OR c.member_id = t.buyer_member_id)),
-                        t.paid_amount,
-                        0
-                    )
+                    CASE 
+                        WHEN pr.balance_amount IS NOT NULL THEN GREATEST(COALESCE(t.paid_amount, 0), t.winning_bid_amount - pr.balance_amount)
+                        ELSE COALESCE(t.paid_amount, 0)
+                    END
                 ), 0) as live_auction_collected,
                 COALESCE(SUM(
-                    CASE 
-                        WHEN EXISTS (
-                            SELECT 1 FROM acc_promises p 
-                            WHERE (t.acc_promise_id IS NOT NULL AND p.promise_id = t.acc_promise_id) 
-                               OR (p.article_id = t.article_id AND (t.buyer_member_id IS NULL OR t.buyer_member_id = 0 OR p.member_id = t.buyer_member_id))
-                        ) THEN (
-                            SELECT p.balance_amount FROM acc_promises p 
-                            WHERE (t.acc_promise_id IS NOT NULL AND p.promise_id = t.acc_promise_id) 
-                               OR (p.article_id = t.article_id AND (t.buyer_member_id IS NULL OR t.buyer_member_id = 0 OR p.member_id = t.buyer_member_id))
-                            ORDER BY p.promise_id DESC LIMIT 1
-                        )
-                        ELSE GREATEST(0, t.winning_bid_amount - COALESCE(
-                            (SELECT SUM(c.contribution_amount) 
-                             FROM acc_contribution c 
-                             WHERE c.article_id = t.article_id 
-                               AND (t.buyer_member_id IS NULL OR t.buyer_member_id = 0 OR c.member_id = t.buyer_member_id)),
-                            t.paid_amount,
-                            0
-                        ))
-                    END
+                    COALESCE(pr.balance_amount, t.balance_amount, GREATEST(0, t.winning_bid_amount - COALESCE(t.paid_amount, 0)))
                 ), 0) as live_auction_pending,
                 COUNT(DISTINCT t.buyer_name) as unique_buyers
             FROM hf_auction_transactions t
+            LEFT JOIN acc_promises pr ON (t.acc_promise_id IS NOT NULL AND t.acc_promise_id = pr.promise_id)
             WHERE t.applicable_year = :year 
               AND (t.offering_type IS NULL OR t.offering_type NOT IN ('Gold', 'BedSheet'))
         ");
@@ -1125,7 +859,7 @@ class Auction extends Model {
                 COUNT(*) as active_promises_count, 
                 COALESCE(SUM(p.balance_amount), 0) as active_promises_balance
             FROM acc_promises p
-            JOIN hf_auction_transactions t ON (t.acc_promise_id = p.promise_id OR (p.article_id = t.article_id AND (t.buyer_member_id IS NULL OR p.member_id = t.buyer_member_id)))
+            JOIN hf_auction_transactions t ON (t.acc_promise_id IS NOT NULL AND t.acc_promise_id = p.promise_id)
             WHERE t.applicable_year = :year AND p.balance_amount > 0 AND p.promise_status = 'Active'
         ");
         $promStmt->execute(['year' => $year]);

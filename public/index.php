@@ -83,6 +83,7 @@ $router->post('/api/excel/import', [ExcelImportController::class, 'import']);
 $router->get('/api/auctions', [AuctionController::class, 'index']);
 $router->post('/api/auctions', [AuctionController::class, 'store']);
 $router->get('/api/auctions/stats', [AuctionController::class, 'stats']);
+$router->get('/api/auctions/{id}/posting', [AuctionController::class, 'postingDetails']);
 
 // Special Offering Item Descriptions Master Endpoints
 $router->get('/api/offerings/items', [AuctionController::class, 'getOfferingItems']);

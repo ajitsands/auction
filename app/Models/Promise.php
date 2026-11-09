@@ -17,58 +17,14 @@ class Promise extends Model {
                 p.member_code_c,
                 p.member_phone,
                 p.total_promise_amount,
-                COALESCE(
-                    (SELECT SUM(c.contribution_amount) 
-                     FROM acc_contribution c 
-                     WHERE c.article_id = p.article_id 
-                       AND (p.member_id IS NULL OR p.member_id = 0 OR c.member_id = p.member_id)),
-                    p.paid_amount,
-                    0
-                ) as paid_amount,
                 CASE 
-                    WHEN EXISTS (
-                        SELECT 1 FROM acc_promises p_acc 
-                        WHERE (p.acc_promise_id IS NOT NULL AND p_acc.promise_id = p.acc_promise_id) 
-                           OR (p_acc.article_id = p.article_id AND (p.member_id IS NULL OR p.member_id = 0 OR p_acc.member_id = p.member_id))
-                    ) THEN (
-                        SELECT p_acc.balance_amount FROM acc_promises p_acc 
-                        WHERE (p.acc_promise_id IS NOT NULL AND p_acc.promise_id = p.acc_promise_id) 
-                           OR (p_acc.article_id = p.article_id AND (p.member_id IS NULL OR p.member_id = 0 OR p_acc.member_id = p.member_id))
-                        ORDER BY p_acc.promise_id DESC LIMIT 1
-                    )
-                    ELSE GREATEST(0, p.total_promise_amount - COALESCE(
-                        (SELECT SUM(c.contribution_amount) 
-                         FROM acc_contribution c 
-                         WHERE c.article_id = p.article_id 
-                           AND (p.member_id IS NULL OR p.member_id = 0 OR c.member_id = p.member_id)),
-                        p.paid_amount,
-                        0
-                    ))
-                END as balance_amount,
+                    WHEN p_acc.balance_amount IS NOT NULL THEN GREATEST(COALESCE(p.paid_amount, 0), p.total_promise_amount - p_acc.balance_amount)
+                    ELSE COALESCE(p.paid_amount, 0)
+                END as paid_amount,
+                COALESCE(p_acc.balance_amount, p.balance_amount, GREATEST(0, p.total_promise_amount - COALESCE(p.paid_amount, 0))) as balance_amount,
                 p.due_date,
                 CASE 
-                    WHEN (
-                        CASE 
-                            WHEN EXISTS (
-                                SELECT 1 FROM acc_promises p_acc 
-                                WHERE (p.acc_promise_id IS NOT NULL AND p_acc.promise_id = p.acc_promise_id) 
-                                   OR (p_acc.article_id = p.article_id AND (p.member_id IS NULL OR p.member_id = 0 OR p_acc.member_id = p.member_id))
-                            ) THEN (
-                                SELECT p_acc.balance_amount FROM acc_promises p_acc 
-                                WHERE (p.acc_promise_id IS NOT NULL AND p_acc.promise_id = p.acc_promise_id) 
-                                   OR (p_acc.article_id = p.article_id AND (p.member_id IS NULL OR p.member_id = 0 OR p_acc.member_id = p.member_id))
-                                ORDER BY p_acc.promise_id DESC LIMIT 1
-                            )
-                            ELSE GREATEST(0, p.total_promise_amount - COALESCE(
-                                (SELECT SUM(c.contribution_amount) 
-                                 FROM acc_contribution c 
-                                 WHERE c.article_id = p.article_id 
-                                   AND (p.member_id IS NULL OR p.member_id = 0 OR c.member_id = p.member_id)),
-                                p.paid_amount,
-                                0
-                            ))
-                        END
-                    ) <= 0.0001 THEN 'Fulfilled'
+                    WHEN COALESCE(p_acc.balance_amount, p.balance_amount, GREATEST(0, p.total_promise_amount - COALESCE(p.paid_amount, 0))) <= 0.0001 THEN 'Fulfilled'
                     ELSE 'Active'
                 END as promise_status,
                 p.created_at,
@@ -84,8 +40,8 @@ class Promise extends Model {
                 COALESCE(t.offering_type, 'Auction') as offering_type,
                 t.item_description,
                 COALESCE(
-                    (SELECT p_acc.remarks FROM acc_promises p_acc WHERE p.acc_promise_id IS NOT NULL AND p_acc.promise_id = p.acc_promise_id LIMIT 1),
-                    (SELECT p_acc.narration FROM acc_promises p_acc WHERE p.acc_promise_id IS NOT NULL AND p_acc.promise_id = p.acc_promise_id LIMIT 1),
+                    NULLIF(p_acc.remarks, ''),
+                    NULLIF(p_acc.narration, ''),
                     t.item_description
                 ) as remarks,
                 a.article_number, a.tag_number, a.article_name, a.category,
@@ -94,6 +50,7 @@ class Promise extends Model {
             JOIN hf_auction_transactions t ON p.transaction_id = t.transaction_id
             JOIN hf_articles a ON p.article_id = a.article_id
             LEFT JOIN tbl_primary_member m ON p.member_id = m.primary_member_id
+            LEFT JOIN acc_promises p_acc ON (p.acc_promise_id IS NOT NULL AND p.acc_promise_id = p_acc.promise_id)
             WHERE p.applicable_year = :year
         ";
 
@@ -152,58 +109,14 @@ class Promise extends Model {
                 p.member_code_c,
                 p.member_phone,
                 p.total_promise_amount,
-                COALESCE(
-                    (SELECT SUM(c.contribution_amount) 
-                     FROM acc_contribution c 
-                     WHERE c.article_id = p.article_id 
-                       AND (p.member_id IS NULL OR p.member_id = 0 OR c.member_id = p.member_id)),
-                    p.paid_amount,
-                    0
-                ) as paid_amount,
                 CASE 
-                    WHEN EXISTS (
-                        SELECT 1 FROM acc_promises p_acc 
-                        WHERE (p.acc_promise_id IS NOT NULL AND p_acc.promise_id = p.acc_promise_id) 
-                           OR (p_acc.article_id = p.article_id AND (p.member_id IS NULL OR p.member_id = 0 OR p_acc.member_id = p.member_id))
-                    ) THEN (
-                        SELECT p_acc.balance_amount FROM acc_promises p_acc 
-                        WHERE (p.acc_promise_id IS NOT NULL AND p_acc.promise_id = p.acc_promise_id) 
-                           OR (p_acc.article_id = p.article_id AND (p.member_id IS NULL OR p.member_id = 0 OR p_acc.member_id = p.member_id))
-                        ORDER BY p_acc.promise_id DESC LIMIT 1
-                    )
-                    ELSE GREATEST(0, p.total_promise_amount - COALESCE(
-                        (SELECT SUM(c.contribution_amount) 
-                         FROM acc_contribution c 
-                         WHERE c.article_id = p.article_id 
-                           AND (p.member_id IS NULL OR p.member_id = 0 OR c.member_id = p.member_id)),
-                        p.paid_amount,
-                        0
-                    ))
-                END as balance_amount,
+                    WHEN p_acc.balance_amount IS NOT NULL THEN GREATEST(COALESCE(p.paid_amount, 0), p.total_promise_amount - p_acc.balance_amount)
+                    ELSE COALESCE(p.paid_amount, 0)
+                END as paid_amount,
+                COALESCE(p_acc.balance_amount, p.balance_amount, GREATEST(0, p.total_promise_amount - COALESCE(p.paid_amount, 0))) as balance_amount,
                 p.due_date,
                 CASE 
-                    WHEN (
-                        CASE 
-                            WHEN EXISTS (
-                                SELECT 1 FROM acc_promises p_acc 
-                                WHERE (p.acc_promise_id IS NOT NULL AND p_acc.promise_id = p.acc_promise_id) 
-                                   OR (p_acc.article_id = p.article_id AND (p.member_id IS NULL OR p.member_id = 0 OR p_acc.member_id = p.member_id))
-                            ) THEN (
-                                SELECT p_acc.balance_amount FROM acc_promises p_acc 
-                                WHERE (p.acc_promise_id IS NOT NULL AND p_acc.promise_id = p.acc_promise_id) 
-                                   OR (p_acc.article_id = p.article_id AND (p.member_id IS NULL OR p.member_id = 0 OR p_acc.member_id = p.member_id))
-                        ORDER BY p_acc.promise_id DESC LIMIT 1
-                            )
-                            ELSE GREATEST(0, p.total_promise_amount - COALESCE(
-                                (SELECT SUM(c.contribution_amount) 
-                                 FROM acc_contribution c 
-                                 WHERE c.article_id = p.article_id 
-                                   AND (p.member_id IS NULL OR p.member_id = 0 OR c.member_id = p.member_id)),
-                                p.paid_amount,
-                                0
-                            ))
-                        END
-                    ) <= 0.0001 THEN 'Fulfilled'
+                    WHEN COALESCE(p_acc.balance_amount, p.balance_amount, GREATEST(0, p.total_promise_amount - COALESCE(p.paid_amount, 0))) <= 0.0001 THEN 'Fulfilled'
                     ELSE 'Active'
                 END as promise_status,
                 p.created_at,
@@ -219,8 +132,8 @@ class Promise extends Model {
                 COALESCE(t.offering_type, 'Auction') as offering_type,
                 t.item_description,
                 COALESCE(
-                    (SELECT p_acc.remarks FROM acc_promises p_acc WHERE p.acc_promise_id IS NOT NULL AND p_acc.promise_id = p.acc_promise_id LIMIT 1),
-                    (SELECT p_acc.narration FROM acc_promises p_acc WHERE p.acc_promise_id IS NOT NULL AND p_acc.promise_id = p.acc_promise_id LIMIT 1),
+                    NULLIF(p_acc.remarks, ''),
+                    NULLIF(p_acc.narration, ''),
                     t.item_description
                 ) as remarks,
                 a.article_number, a.tag_number, a.article_name, a.category,
@@ -229,6 +142,7 @@ class Promise extends Model {
             JOIN hf_auction_transactions t ON p.transaction_id = t.transaction_id
             JOIN hf_articles a ON p.article_id = a.article_id
             LEFT JOIN tbl_primary_member m ON p.member_id = m.primary_member_id
+            LEFT JOIN acc_promises p_acc ON (p.acc_promise_id IS NOT NULL AND p.acc_promise_id = p_acc.promise_id)
             WHERE p.hf_promise_id = :id
             LIMIT 1
         ");

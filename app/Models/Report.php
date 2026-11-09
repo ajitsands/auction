@@ -14,38 +14,8 @@ class Report extends Model {
                 SUM(CASE WHEN a.status = 'Available' THEN 1 ELSE 0 END) as available_articles,
                 COALESCE(SUM(a.estimated_value), 0) as total_estimated_value,
                 COALESCE(SUM(t.winning_bid_amount), 0) as total_auction_revenue,
-                COALESCE(SUM(
-                    COALESCE(
-                        (SELECT SUM(c.contribution_amount) 
-                         FROM acc_contribution c 
-                         WHERE c.article_id = t.article_id 
-                           AND (t.buyer_member_id IS NULL OR t.buyer_member_id = 0 OR c.member_id = t.buyer_member_id)),
-                        t.paid_amount,
-                        0
-                    )
-                ), 0) as total_collected_amount,
-                COALESCE(SUM(
-                    CASE 
-                        WHEN EXISTS (
-                            SELECT 1 FROM acc_promises p 
-                            WHERE (t.acc_promise_id IS NOT NULL AND p.promise_id = t.acc_promise_id) 
-                               OR (p.article_id = t.article_id AND (t.buyer_member_id IS NULL OR t.buyer_member_id = 0 OR p.member_id = t.buyer_member_id))
-                        ) THEN (
-                            SELECT p.balance_amount FROM acc_promises p 
-                            WHERE (t.acc_promise_id IS NOT NULL AND p.promise_id = t.acc_promise_id) 
-                               OR (p.article_id = t.article_id AND (t.buyer_member_id IS NULL OR t.buyer_member_id = 0 OR p.member_id = t.buyer_member_id))
-                            ORDER BY p.promise_id DESC LIMIT 1
-                        )
-                        ELSE GREATEST(0, t.winning_bid_amount - COALESCE(
-                            (SELECT SUM(c.contribution_amount) 
-                             FROM acc_contribution c 
-                             WHERE c.article_id = t.article_id 
-                               AND (t.buyer_member_id IS NULL OR t.buyer_member_id = 0 OR c.member_id = t.buyer_member_id)),
-                            t.paid_amount,
-                            0
-                        ))
-                    END
-                ), 0) as total_receivable_promises,
+                COALESCE(SUM(COALESCE(t.paid_amount, 0)), 0) as total_collected_amount,
+                COALESCE(SUM(COALESCE(t.balance_amount, GREATEST(0, t.winning_bid_amount - COALESCE(t.paid_amount, 0)))), 0) as total_receivable_promises,
                 COUNT(DISTINCT t.buyer_name) as total_bidders
             FROM hf_articles a
             LEFT JOIN hf_auction_transactions t ON a.article_id = t.article_id AND t.applicable_year = :year AND (t.offering_type IS NULL OR t.offering_type NOT IN ('Gold', 'BedSheet'))
@@ -103,35 +73,13 @@ class Report extends Model {
                     t.buyer_phone,
                     t.buyer_member_id,
                     t.winning_bid_amount,
-                    COALESCE(
-                        (SELECT SUM(c.contribution_amount) 
-                         FROM acc_contribution c 
-                         WHERE c.article_id = t.article_id 
-                           AND (t.buyer_member_id IS NULL OR t.buyer_member_id = 0 OR c.member_id = t.buyer_member_id)),
-                        t.paid_amount,
-                        0
-                    ) as paid_amount,
                     CASE 
-                        WHEN EXISTS (
-                            SELECT 1 FROM acc_promises p 
-                            WHERE (t.acc_promise_id IS NOT NULL AND p.promise_id = t.acc_promise_id) 
-                               OR (p.article_id = t.article_id AND (t.buyer_member_id IS NULL OR t.buyer_member_id = 0 OR p.member_id = t.buyer_member_id))
-                        ) THEN (
-                            SELECT p.balance_amount FROM acc_promises p 
-                            WHERE (t.acc_promise_id IS NOT NULL AND p.promise_id = t.acc_promise_id) 
-                               OR (p.article_id = t.article_id AND (t.buyer_member_id IS NULL OR t.buyer_member_id = 0 OR p.member_id = t.buyer_member_id))
-                            ORDER BY p.promise_id DESC LIMIT 1
-                        )
-                        ELSE GREATEST(0, t.winning_bid_amount - COALESCE(
-                            (SELECT SUM(c.contribution_amount) 
-                             FROM acc_contribution c 
-                             WHERE c.article_id = t.article_id 
-                               AND (t.buyer_member_id IS NULL OR t.buyer_member_id = 0 OR c.member_id = t.buyer_member_id)),
-                            t.paid_amount,
-                            0
-                        ))
-                    END as balance_amount
+                        WHEN pr.balance_amount IS NOT NULL THEN GREATEST(COALESCE(t.paid_amount, 0), t.winning_bid_amount - pr.balance_amount)
+                        ELSE COALESCE(t.paid_amount, 0)
+                    END as paid_amount,
+                    COALESCE(pr.balance_amount, t.balance_amount, GREATEST(0, t.winning_bid_amount - COALESCE(t.paid_amount, 0))) as balance_amount
                 FROM hf_auction_transactions t
+                LEFT JOIN acc_promises pr ON (t.acc_promise_id IS NOT NULL AND t.acc_promise_id = pr.promise_id)
                 WHERE t.applicable_year = :year
                   AND (t.offering_type IS NULL OR t.offering_type NOT IN ('Gold', 'BedSheet'))
             ) sub

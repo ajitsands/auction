@@ -97,6 +97,19 @@ class AuctionController extends Controller {
         ]);
     }
 
+    public function postingDetails(array $params): void {
+        $this->requireAuth();
+        $id = (int)($params['id'] ?? ($_GET['id'] ?? 0));
+        if ($id <= 0) {
+            $this->jsonResponse(['success' => false, 'error' => 'Invalid transaction ID.'], 400);
+        }
+        $data = $this->auctionModel->getAccountPostingDetails($id);
+        if (empty($data)) {
+            $this->jsonResponse(['success' => false, 'error' => 'Transaction not found.'], 404);
+        }
+        $this->jsonResponse(array_merge(['success' => true], $data));
+    }
+
     public function getOfferingItems(): void {
         $this->requireAuth();
         $type = $_GET['offering_type'] ?? null;

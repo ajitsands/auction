@@ -3643,6 +3643,437 @@ function DefaultLedgerSettingsModal({ isOpen, onClose, showToast, onSaved, initi
     );
 }
 
+// =========================================================================
+// --- On-Demand Account Posting Details Modal                           ---
+// =========================================================================
+function AccountPostingModal({ transaction, isOpen, onClose, onOpenReceipt }) {
+    if (!isOpen || !transaction) return null;
+
+    const [loading, setLoading] = useState(true);
+    const [postingData, setPostingData] = useState(null);
+    const [fetchError, setFetchError] = useState(null);
+
+    useEffect(() => {
+        let isMounted = true;
+        setLoading(true);
+        setFetchError(null);
+
+        api.get(`/api/auctions/${transaction.transaction_id}/posting`)
+            .then(res => {
+                if (isMounted) {
+                    if (res.success) {
+                        setPostingData(res);
+                    } else {
+                        setFetchError(res.error || 'Failed to load account posting details.');
+                    }
+                }
+            })
+            .catch(err => {
+                if (isMounted) {
+                    setFetchError(err.message || 'Unable to connect to server.');
+                }
+            })
+            .finally(() => {
+                if (isMounted) setLoading(false);
+            });
+
+        return () => { isMounted = false; };
+    }, [transaction.transaction_id]);
+
+    const tx = postingData?.transaction || transaction;
+    const contrib = postingData?.contribution;
+    const promise = postingData?.promise;
+    const payments = postingData?.payments || [];
+
+    const isGold = tx.offering_type === 'Gold';
+    const isBedSheet = tx.offering_type === 'BedSheet';
+    const isOffering = isGold || isBedSheet;
+    const offeringLabel = isGold ? 'Gold Offering' : isBedSheet ? 'Bed Sheet Offering' : 'Live Floor Auction';
+
+    const winAmt = Number(tx.winning_bid_amount) || 0;
+    const paidAmt = Number(tx.paid_amount) || 0;
+    const balAmt = Number(tx.balance_amount) || 0;
+
+    return (
+        <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1100 }}>
+            <div 
+                className="modal-content" 
+                onClick={(e) => e.stopPropagation()} 
+                style={{ maxWidth: '880px', width: '95%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
+            >
+                <ModalHeader 
+                    title="Account Posting Details" 
+                    icon="account_balance" 
+                    onClose={onClose} 
+                    badge={tx.auction_ref_no} 
+                />
+
+                <div className="modal-body" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px 24px' }}>
+                    {loading ? (
+                        <div style={{ textAlign: 'center', padding: '48px 16px', color: 'var(--text-muted)' }}>
+                            <i className="material-icons" style={{ fontSize: '36px', color: 'var(--primary)', marginBottom: '12px' }}>sync</i>
+                            <div style={{ fontWeight: 600, fontSize: '14px' }}>Loading complete accounting posting details...</div>
+                            <div style={{ fontSize: '12px', marginTop: '4px', opacity: 0.8 }}>Fetching live vouchers, contribution ledgers, and promise records</div>
+                        </div>
+                    ) : fetchError ? (
+                        <div style={{ padding: '20px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '8px', color: 'var(--danger)', textAlign: 'center' }}>
+                            <i className="material-icons" style={{ fontSize: '32px', marginBottom: '8px' }}>error_outline</i>
+                            <div style={{ fontWeight: 700 }}>{fetchError}</div>
+                        </div>
+                    ) : (
+                        <div>
+                            {/* 1. Transaction Summary & Bidder Card */}
+                            <div style={{ background: 'rgba(0,0,0,0.03)', padding: '16px 18px', borderRadius: '10px', border: '1px solid var(--border-color)', marginBottom: '16px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                        <span className="badge" style={{
+                                            background: isGold ? '#d97706' : isBedSheet ? '#2563eb' : 'var(--primary)',
+                                            color: '#ffffff',
+                                            fontSize: '11px',
+                                            fontWeight: 700,
+                                            padding: '3px 8px'
+                                        }}>
+                                            {offeringLabel}
+                                        </span>
+                                        <span style={{ fontWeight: 800, fontSize: '15px', color: 'var(--text-primary)' }}>
+                                            {isOffering ? (tx.item_description || tx.article_name) : `${tx.article_name || 'Auction Item'} (#${tx.article_number || tx.tag_number || ''})`}
+                                        </span>
+                                    </div>
+                                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                        Date: <strong>{formatDateDMY(tx.auction_date)}</strong>
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                    <div>
+                                        <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>Winning Bidder / Devotee:</div>
+                                        <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '14px', marginTop: '2px' }}>
+                                            {tx.buyer_name}
+                                        </div>
+                                        <div style={{ marginTop: '2px' }}>
+                                            {tx.buyer_code_c && <span>Roll No: <strong style={{ color: 'var(--primary)' }}>#{tx.buyer_code_c}</strong> &nbsp;|&nbsp; </span>}
+                                            {tx.buyer_cpr && <span>CPR: <strong>{tx.buyer_cpr}</strong> &nbsp;|&nbsp; </span>}
+                                            {tx.buyer_phone && <span>Mobile: <strong>{tx.buyer_phone}</strong></span>}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>Accounting Event / Budget Head:</div>
+                                        <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
+                                            {tx.event_name || 'Harvest Festival'}
+                                        </div>
+                                        {(tx.receipt_book_no || tx.manual_receipt_no) && (
+                                            <div style={{ marginTop: '2px' }}>
+                                                Manual Receipt: <strong>{tx.receipt_book_no ? `Bk ${tx.receipt_book_no} ` : ''}#{tx.manual_receipt_no}</strong>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Financial Amounts Bar */}
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    flexWrap: 'wrap',
+                                    gap: '12px',
+                                    marginTop: '14px',
+                                    paddingTop: '12px',
+                                    borderTop: '1px solid var(--border-color)'
+                                }}>
+                                    <div>
+                                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Winning Amount: </span>
+                                        <strong style={{ fontSize: '15px', color: 'var(--text-primary)' }}>BHD {winAmt.toFixed(3)}</strong>
+                                    </div>
+                                    <div>
+                                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Total Paid: </span>
+                                        <strong style={{ fontSize: '15px', color: '#10b981' }}>BHD {paidAmt.toFixed(3)}</strong>
+                                    </div>
+                                    <div>
+                                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Balance Due: </span>
+                                        <strong style={{ fontSize: '15px', color: balAmt > 0.0001 ? '#ef4444' : 'var(--text-muted)' }}>
+                                            BHD {balAmt.toFixed(3)}
+                                        </strong>
+                                    </div>
+                                    <div>
+                                        <span className={`badge ${tx.payment_status === 'Paid' ? 'badge-success' : tx.payment_status === 'Partial' ? 'badge-warning' : 'badge-danger'}`} style={{ fontSize: '12px', padding: '4px 10px' }}>
+                                            {tx.payment_status || 'Pending'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 2. Contribution Posting Card (acc_contribution - HRCPT) */}
+                            <div style={{
+                                background: 'rgba(16, 185, 129, 0.04)',
+                                border: '1px solid rgba(16, 185, 129, 0.3)',
+                                borderLeft: '4px solid #10b981',
+                                borderRadius: '8px',
+                                padding: '16px',
+                                marginBottom: '16px'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <i className="material-icons" style={{ color: '#10b981', fontSize: '20px' }}>receipt</i>
+                                        <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                                            Contribution Receipt Posting (HRCPT)
+                                        </h4>
+                                        {(contrib?.voucher_no || tx.contrib_voucher_no) && (
+                                            <span className="badge badge-success" style={{ fontSize: '11px' }}>
+                                                Voucher #{contrib?.voucher_no || tx.contrib_voucher_no}
+                                            </span>
+                                        )}
+                                        {contrib?.contribution_id && (
+                                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                                (ID #{contrib.contribution_id})
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {/* Print / View Receipt Action */}
+                                    {(contrib?.voucher_no || tx.contrib_voucher_no || payments.length > 0) && typeof onOpenReceipt === 'function' && (
+                                        <button
+                                            type="button"
+                                            className="btn btn-sm btn-outline-success"
+                                            onClick={() => onOpenReceipt(contrib?.voucher_no || tx.contrib_voucher_no || (payments[0]?.receipt_no) || tx.transaction_id)}
+                                            style={{
+                                                fontSize: '12px',
+                                                padding: '4px 10px',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '5px',
+                                                borderRadius: '6px',
+                                                fontWeight: 600
+                                            }}
+                                            title="View and print official Cathedral Receipt"
+                                        >
+                                            <i className="material-icons" style={{ fontSize: '15px' }}>print</i>
+                                            Print / View Receipt
+                                        </button>
+                                    )}
+                                </div>
+
+                                {contrib || tx.contrib_voucher_no || paidAmt > 0 ? (
+                                    <div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '12px', marginBottom: '12px' }}>
+                                            <div style={{ background: 'rgba(2, 132, 199, 0.05)', border: '1px solid rgba(2, 132, 199, 0.25)', padding: '10px 14px', borderRadius: '8px' }}>
+                                                <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                                                    Debit Ledger Head (Cash / Bank)
+                                                </div>
+                                                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <span className="badge" style={{ background: '#0284c7', color: '#fff', fontSize: '11px' }}>
+                                                        {contrib?.dr_code || tx.contrib_dr_code || '—'}
+                                                    </span>
+                                                    <span>{contrib?.dr_name || tx.contrib_dr_name || 'Cash Head'}</span>
+                                                </div>
+                                            </div>
+
+                                            <div style={{ background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.25)', padding: '10px 14px', borderRadius: '8px' }}>
+                                                <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                                                    Credit Ledger Head (Harvest Income)
+                                                </div>
+                                                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <span className="badge" style={{ background: '#10b981', color: '#fff', fontSize: '11px' }}>
+                                                        {contrib?.cr_code || tx.contrib_cr_code || '—'}
+                                                    </span>
+                                                    <span>{contrib?.cr_name || tx.contrib_cr_name || 'Harvest Festival Income'}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                            <div>
+                                                <span>Posted Amount: <strong style={{ color: '#10b981' }}>BHD {Number(contrib?.contribution_amount || tx.paid_amount || 0).toFixed(3)}</strong></span>
+                                                {contrib?.contribution_date && (
+                                                    <span style={{ marginLeft: '12px' }}>Voucher Date: <strong>{formatDateDMY(contrib.contribution_date)}</strong></span>
+                                                )}
+                                            </div>
+                                            {(contrib?.manual_book_no || contrib?.manual_receipt_no) && (
+                                                <div>
+                                                    Book: #{contrib.manual_book_no} &nbsp;|&nbsp; Receipt: #{contrib.manual_receipt_no}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {(contrib?.narration || contrib?.item_description) && (
+                                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px', fontStyle: 'italic' }}>
+                                                Narration: {contrib.narration || contrib.item_description}
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                        No cash receipt recorded at auction desk. Full winning bid was booked as Cathedral Promise receivable.
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 3. Promise Posting Card (acc_promises - MP) */}
+                            <div style={{
+                                background: 'rgba(245, 158, 11, 0.04)',
+                                border: '1px solid rgba(245, 158, 11, 0.3)',
+                                borderLeft: '4px solid #f59e0b',
+                                borderRadius: '8px',
+                                padding: '16px',
+                                marginBottom: '16px'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <i className="material-icons" style={{ color: '#f59e0b', fontSize: '20px' }}>history_edu</i>
+                                        <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                                            Cathedral Promise Receivable (MP)
+                                        </h4>
+                                        {(promise?.voucher_no || tx.promise_voucher_no) && (
+                                            <span className="badge badge-warning" style={{ fontSize: '11px' }}>
+                                                Voucher #{promise?.voucher_no || tx.promise_voucher_no}
+                                            </span>
+                                        )}
+                                        {promise?.promise_id && (
+                                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                                (ID #{promise.promise_id})
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {promise?.promise_status && (
+                                        <span className={`badge ${promise.promise_status === 'Received' ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: '11px' }}>
+                                            Status: {promise.promise_status}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {promise || tx.promise_voucher_no ? (
+                                    <div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '12px', marginBottom: '12px' }}>
+                                            <div style={{ background: 'rgba(2, 132, 199, 0.05)', border: '1px solid rgba(2, 132, 199, 0.25)', padding: '10px 14px', borderRadius: '8px' }}>
+                                                <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                                                    Debit Ledger Head (Member Receivable)
+                                                </div>
+                                                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <span className="badge" style={{ background: '#0284c7', color: '#fff', fontSize: '11px' }}>
+                                                        {promise?.dr_code || tx.promise_dr_code || '—'}
+                                                    </span>
+                                                    <span>{promise?.dr_name || tx.promise_dr_name || 'Member Receivable Head'}</span>
+                                                </div>
+                                            </div>
+
+                                            <div style={{ background: 'rgba(245, 158, 11, 0.05)', border: '1px solid rgba(245, 158, 11, 0.25)', padding: '10px 14px', borderRadius: '8px' }}>
+                                                <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                                                    Credit Ledger Head (Harvest Income)
+                                                </div>
+                                                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <span className="badge" style={{ background: '#f59e0b', color: '#fff', fontSize: '11px' }}>
+                                                        {promise?.cr_code || tx.promise_cr_code || '—'}
+                                                    </span>
+                                                    <span>{promise?.cr_name || tx.promise_cr_name || 'Harvest Festival Income'}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                            <div>
+                                                <span>Initial Promise: <strong style={{ color: '#b45309' }}>BHD {Number(promise?.promise_amount || tx.balance_amount || 0).toFixed(3)}</strong></span>
+                                                <span style={{ marginLeft: '14px' }}>
+                                                    Outstanding Balance: <strong style={{ color: Number(promise?.balance_amount ?? tx.balance_amount) > 0 ? '#ef4444' : '#10b981' }}>
+                                                        BHD {Number(promise?.balance_amount ?? tx.balance_amount).toFixed(3)}
+                                                    </strong>
+                                                </span>
+                                            </div>
+                                            {promise?.promise_date && (
+                                                <div>Voucher Date: <strong>{formatDateDMY(promise.promise_date)}</strong></div>
+                                            )}
+                                        </div>
+
+                                        {(promise?.narration || promise?.item_description) && (
+                                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px', fontStyle: 'italic' }}>
+                                                Narration: {promise.narration || promise.item_description}
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                        No Cathedral Promise voucher registered. Full winning bid was settled immediately on the auction floor.
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 4. Payment History (hf_payments installments) */}
+                            {payments.length > 0 && (
+                                <div style={{
+                                    background: 'rgba(255, 255, 255, 0.02)',
+                                    border: '1px solid var(--border-color)',
+                                    borderRadius: '8px',
+                                    padding: '16px'
+                                }}>
+                                    <h4 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <i className="material-icons" style={{ fontSize: '18px', color: 'var(--primary)' }}>payments</i>
+                                        Floor Settlement Installments ({payments.length})
+                                    </h4>
+
+                                    <div style={{ overflowX: 'auto' }}>
+                                        <table className="table" style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
+                                            <thead>
+                                                <tr style={{ background: 'rgba(0,0,0,0.04)', borderBottom: '1px solid var(--border-color)' }}>
+                                                    <th style={{ padding: '8px 10px', textAlign: 'left' }}>Receipt / Voucher</th>
+                                                    <th style={{ padding: '8px 10px', textAlign: 'left' }}>Date</th>
+                                                    <th style={{ padding: '8px 10px', textAlign: 'right' }}>Amount</th>
+                                                    <th style={{ padding: '8px 10px', textAlign: 'left' }}>Mode</th>
+                                                    <th style={{ padding: '8px 10px', textAlign: 'left' }}>Ledgers</th>
+                                                    <th style={{ padding: '8px 10px', textAlign: 'center' }}>Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {payments.map(p => (
+                                                    <tr key={p.payment_id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                                        <td style={{ padding: '8px 10px' }}>
+                                                            <strong>{p.receipt_no || `Rcpt #${p.payment_id}`}</strong>
+                                                            {p.voucher_no && (
+                                                                <span className="badge badge-success" style={{ marginLeft: '6px', fontSize: '10px' }}>
+                                                                    #{p.voucher_no}
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                        <td style={{ padding: '8px 10px' }}>{formatDateDMY(p.payment_date)}</td>
+                                                        <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#10b981' }}>
+                                                            BHD {Number(p.amount_paid).toFixed(3)}
+                                                        </td>
+                                                        <td style={{ padding: '8px 10px' }}>{p.payment_mode || 'Cash'}</td>
+                                                        <td style={{ padding: '8px 10px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                                                            Dr: {p.dr_code} | Cr: {p.cr_code}
+                                                        </td>
+                                                        <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                                                            {typeof onOpenReceipt === 'function' && (
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn btn-sm btn-outline-primary"
+                                                                    onClick={() => onOpenReceipt(p.receipt_no || p.voucher_no || p.payment_id)}
+                                                                    style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px' }}
+                                                                    title="View this receipt"
+                                                                >
+                                                                    <i className="material-icons" style={{ fontSize: '13px' }}>receipt</i> View
+                                                                </button>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                <div className="modal-footer" style={{ borderTop: '1px solid var(--border-color)', padding: '12px 22px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                    <button type="button" className="btn btn-secondary" onClick={onClose}>
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // --- Live Auction Desk View ---
 function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDataChanged, isAdmin }) {
     const [transactions, setTransactions] = useState([]);
@@ -3651,6 +4082,7 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
     const [recording, setRecording] = useState(false);
     const [paymentModalData, setPaymentModalData] = useState(null);
     const [ledgerSettingsOpen, setLedgerSettingsOpen] = useState(false);
+    const [postingModalTransaction, setPostingModalTransaction] = useState(null);
 
     // Periodic ticker to recalculate and refresh live countdown remaining time
     const [, setCountdownTick] = useState(0);
@@ -4861,109 +5293,96 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
                             sortable: false,
                             footer: () => null,
                             searchValue: (t) => {
-                                const cvs = (t.contributions || []).map(c => `Receipt HRCPT ${c.voucher_no || ''} ${c.contribution_amount || ''} ${c.receipt_no || ''}`).join(' ');
-                                const pvs = (t.promises || []).map(p => `MP ${p.voucher_no || ''} ${p.promise_amount || ''}`).join(' ');
-                                return `${cvs} ${pvs} ${t.contrib_voucher_no || ''} ${t.promise_voucher_no || ''} ${t.manual_receipt_no || ''} ${t.receipt_book_no || ''}`;
+                                return `${t.contrib_voucher_no || ''} ${t.promise_voucher_no || ''} ${t.manual_receipt_no || ''} ${t.receipt_book_no || ''}`;
                             },
                             render: (t) => {
-                                const contribs = (t.contributions && t.contributions.length > 0) 
-                                    ? t.contributions 
-                                    : (t.contrib_voucher_no ? [{
-                                        voucher_no: t.contrib_voucher_no,
-                                        contribution_amount: t.paid_amount,
-                                        contribution_date: t.auction_date,
-                                        receipt_no: t.receipt_no || t.manual_receipt_no
-                                    }] : []);
-
-                                const promises = (t.promises && t.promises.length > 0) 
-                                    ? t.promises 
-                                    : (t.promise_voucher_no ? [{
-                                        voucher_no: t.promise_voucher_no,
-                                        promise_amount: t.balance_amount,
-                                        balance_amount: t.balance_amount
-                                    }] : []);
-
-                                const hasContribs = contribs.length > 0;
-                                const hasPromises = promises.length > 0;
+                                const hasContrib = !!t.contrib_voucher_no;
+                                const hasPromise = !!t.promise_voucher_no;
 
                                 return (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minWidth: '160px' }}>
-                                        {/* Contribution Voucher Badges from acc_contribution (Clickable to view/print receipt) */}
-                                        {contribs.map((c, cIdx) => (
-                                            <button
-                                                type="button"
-                                                key={c.contribution_id ? `cid_${c.contribution_id}` : `c_${cIdx}_${c.voucher_no}`}
-                                                className="badge badge-success voucher-clickable-badge"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onOpenReceipt(c.receipt_no || c.voucher_no || c.contribution_id);
-                                                }}
-                                                style={{
-                                                    fontSize: '11px',
-                                                    padding: '3px 7px',
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '4px',
-                                                    cursor: 'pointer',
-                                                    border: '1px solid rgba(16, 185, 129, 0.4)',
-                                                    background: 'rgba(16, 185, 129, 0.12)',
-                                                    color: '#10b981',
-                                                    borderRadius: '6px',
-                                                    fontWeight: 600,
-                                                    textAlign: 'left',
-                                                    width: 'fit-content'
-                                                }}
-                                                title={`Click to view & print official receipt #${c.voucher_no}`}
-                                            >
-                                                <i className="material-icons" style={{ fontSize: '13px' }}>receipt</i>
-                                                <span>Receipt #{c.voucher_no}</span>
-                                                {Number(c.contribution_amount) > 0 && (
-                                                    <span>• BHD {Number(c.contribution_amount).toFixed(3)}</span>
-                                                )}
-                                                {c.contribution_date && (
-                                                    <span style={{ fontSize: '10px', opacity: 0.85 }}>• {formatDateDMY(c.contribution_date)}</span>
-                                                )}
-                                            </button>
-                                        ))}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '130px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                                            {hasContrib && (
+                                                <button
+                                                    type="button"
+                                                    className="badge badge-success voucher-clickable-badge"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onOpenReceipt(t.contrib_voucher_no || t.manual_receipt_no || t.transaction_id);
+                                                    }}
+                                                    style={{
+                                                        fontSize: '11px',
+                                                        padding: '2px 6px',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '3px',
+                                                        cursor: 'pointer',
+                                                        border: '1px solid rgba(16, 185, 129, 0.4)',
+                                                        background: 'rgba(16, 185, 129, 0.12)',
+                                                        color: '#10b981',
+                                                        borderRadius: '5px',
+                                                        fontWeight: 600
+                                                    }}
+                                                    title={`Click to view & print official receipt #${t.contrib_voucher_no}`}
+                                                >
+                                                    <i className="material-icons" style={{ fontSize: '12px' }}>receipt</i>
+                                                    #{t.contrib_voucher_no}
+                                                </button>
+                                            )}
+                                            {hasPromise && (
+                                                <span
+                                                    className="badge badge-warning"
+                                                    style={{
+                                                        fontSize: '11px',
+                                                        padding: '2px 6px',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '3px',
+                                                        borderRadius: '5px',
+                                                        fontWeight: 600,
+                                                        border: '1px solid rgba(245, 158, 11, 0.4)',
+                                                        background: 'rgba(245, 158, 11, 0.12)',
+                                                        color: '#f59e0b'
+                                                    }}
+                                                    title={`Cathedral Promise Receivable MP #${t.promise_voucher_no}`}
+                                                >
+                                                    <i className="material-icons" style={{ fontSize: '12px' }}>history_edu</i>
+                                                    MP #{t.promise_voucher_no}
+                                                </span>
+                                            )}
+                                            {!hasContrib && !hasPromise && (
+                                                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>—</span>
+                                            )}
+                                        </div>
 
-                                        {/* Promise Voucher Badges from acc_promises */}
-                                        {promises.map((p, pIdx) => (
-                                            <span
-                                                key={p.promise_id ? `pid_${p.promise_id}` : `p_${pIdx}_${p.voucher_no}`}
-                                                className="badge badge-warning"
-                                                style={{
-                                                    fontSize: '11px',
-                                                    padding: '3px 7px',
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '4px',
-                                                    borderRadius: '6px',
-                                                    fontWeight: 600,
-                                                    border: '1px solid rgba(245, 158, 11, 0.4)',
-                                                    background: 'rgba(245, 158, 11, 0.12)',
-                                                    color: '#f59e0b',
-                                                    width: 'fit-content'
-                                                }}
-                                                title={`Cathedral Promise Receivable Voucher #${p.voucher_no} | Original: BHD ${Number(p.promise_amount || 0).toFixed(3)} | Due: BHD ${Number(p.balance_amount || 0).toFixed(3)}`}
-                                            >
-                                                <i className="material-icons" style={{ fontSize: '13px' }}>history_edu</i>
-                                                <span>MP #{p.voucher_no}</span>
-                                                {Number(p.promise_amount) > 0 && (
-                                                    <span>• BHD {Number(p.promise_amount).toFixed(3)}</span>
-                                                )}
-                                            </span>
-                                        ))}
-
-                                        {/* Optional Manual Receipt Reference */}
-                                        {(t.manual_receipt_no || t.receipt_book_no) && (
-                                            <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
-                                                Rcpt: {t.receipt_book_no ? `Bk ${t.receipt_book_no} ` : ''}#{t.manual_receipt_no}
-                                            </span>
-                                        )}
-
-                                        {!hasContribs && !hasPromises && (
-                                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>—</span>
-                                        )}
+                                        {/* On-Demand View Account Posting Button */}
+                                        <button
+                                            type="button"
+                                            className="btn btn-sm"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setPostingModalTransaction(t);
+                                            }}
+                                            style={{
+                                                fontSize: '11px',
+                                                padding: '2px 8px',
+                                                height: '24px',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '4px',
+                                                borderRadius: '5px',
+                                                fontWeight: 600,
+                                                cursor: 'pointer',
+                                                width: 'fit-content',
+                                                border: '1px solid var(--primary)',
+                                                background: 'rgba(123, 31, 162, 0.08)',
+                                                color: 'var(--primary)'
+                                            }}
+                                            title="View complete account posting, vouchers, and ledger heads"
+                                        >
+                                            <i className="material-icons" style={{ fontSize: '13px' }}>visibility</i>
+                                            View
+                                        </button>
                                     </div>
                                 );
                             }
@@ -5090,6 +5509,16 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
                     onOpenReceipt={onOpenReceipt}
                     showToast={showToast}
                     accountsData={accountsData}
+                />
+            )}
+
+            {/* Account Posting Details Modal (On-Demand) */}
+            {postingModalTransaction && (
+                <AccountPostingModal 
+                    transaction={postingModalTransaction}
+                    isOpen={!!postingModalTransaction}
+                    onClose={() => setPostingModalTransaction(null)}
+                    onOpenReceipt={onOpenReceipt}
                 />
             )}
 
@@ -5939,6 +6368,7 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
     const [recording, setRecording] = useState(false);
     const [paymentModalData, setPaymentModalData] = useState(null);
     const [ledgerSettingsOpen, setLedgerSettingsOpen] = useState(false);
+    const [postingModalTransaction, setPostingModalTransaction] = useState(null);
 
     // Offering Category Tab: 'Gold' or 'BedSheet'
     const [offeringSubTab, setOfferingSubTab] = useState('Gold');
@@ -6417,109 +6847,96 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
                 sortable: false,
                 footer: () => null,
                 searchValue: (t) => {
-                    const cvs = (t.contributions || []).map(c => `Receipt HRCPT ${c.voucher_no || ''} ${c.contribution_amount || ''} ${c.receipt_no || ''}`).join(' ');
-                    const pvs = (t.promises || []).map(p => `MP ${p.voucher_no || ''} ${p.promise_amount || ''}`).join(' ');
-                    return `${cvs} ${pvs} ${t.contrib_voucher_no || ''} ${t.promise_voucher_no || ''} ${t.manual_receipt_no || ''} ${t.receipt_book_no || ''}`;
+                    return `${t.contrib_voucher_no || ''} ${t.promise_voucher_no || ''} ${t.manual_receipt_no || ''} ${t.receipt_book_no || ''}`;
                 },
                 render: (t) => {
-                    const contribs = (t.contributions && t.contributions.length > 0) 
-                        ? t.contributions 
-                        : (t.contrib_voucher_no ? [{
-                            voucher_no: t.contrib_voucher_no,
-                            contribution_amount: t.paid_amount,
-                            contribution_date: t.auction_date,
-                            receipt_no: t.receipt_no || t.manual_receipt_no
-                        }] : []);
-
-                    const promises = (t.promises && t.promises.length > 0) 
-                        ? t.promises 
-                        : (t.promise_voucher_no ? [{
-                            voucher_no: t.promise_voucher_no,
-                            promise_amount: t.balance_amount,
-                            balance_amount: t.balance_amount
-                        }] : []);
-
-                    const hasContribs = contribs.length > 0;
-                    const hasPromises = promises.length > 0;
+                    const hasContrib = !!t.contrib_voucher_no;
+                    const hasPromise = !!t.promise_voucher_no;
 
                     return (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minWidth: '160px' }}>
-                            {/* Contribution Voucher Badges from acc_contribution (Clickable to view/print receipt) */}
-                            {contribs.map((c, cIdx) => (
-                                <button
-                                    type="button"
-                                    key={c.contribution_id ? `cid_${c.contribution_id}` : `c_${cIdx}_${c.voucher_no}`}
-                                    className="badge badge-success voucher-clickable-badge"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onOpenReceipt(c.receipt_no || c.voucher_no || c.contribution_id);
-                                    }}
-                                    style={{
-                                        fontSize: '11px',
-                                        padding: '3px 7px',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '4px',
-                                        cursor: 'pointer',
-                                        border: '1px solid rgba(16, 185, 129, 0.4)',
-                                        background: 'rgba(16, 185, 129, 0.12)',
-                                        color: '#10b981',
-                                        borderRadius: '6px',
-                                        fontWeight: 600,
-                                        textAlign: 'left',
-                                        width: 'fit-content'
-                                    }}
-                                    title={`Click to view & print official receipt #${c.voucher_no}`}
-                                >
-                                    <i className="material-icons" style={{ fontSize: '13px' }}>receipt</i>
-                                    <span>Receipt #{c.voucher_no}</span>
-                                    {Number(c.contribution_amount) > 0 && (
-                                        <span>• BHD {Number(c.contribution_amount).toFixed(3)}</span>
-                                    )}
-                                    {c.contribution_date && (
-                                        <span style={{ fontSize: '10px', opacity: 0.85 }}>• {formatDateDMY(c.contribution_date)}</span>
-                                    )}
-                                </button>
-                            ))}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '130px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                                {hasContrib && (
+                                    <button
+                                        type="button"
+                                        className="badge badge-success voucher-clickable-badge"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onOpenReceipt(t.contrib_voucher_no || t.manual_receipt_no || t.transaction_id);
+                                        }}
+                                        style={{
+                                            fontSize: '11px',
+                                            padding: '2px 6px',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '3px',
+                                            cursor: 'pointer',
+                                            border: '1px solid rgba(16, 185, 129, 0.4)',
+                                            background: 'rgba(16, 185, 129, 0.12)',
+                                            color: '#10b981',
+                                            borderRadius: '5px',
+                                            fontWeight: 600
+                                        }}
+                                        title={`Click to view & print official receipt #${t.contrib_voucher_no}`}
+                                    >
+                                        <i className="material-icons" style={{ fontSize: '12px' }}>receipt</i>
+                                        #{t.contrib_voucher_no}
+                                    </button>
+                                )}
+                                {hasPromise && (
+                                    <span
+                                        className="badge badge-warning"
+                                        style={{
+                                            fontSize: '11px',
+                                            padding: '2px 6px',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '3px',
+                                            borderRadius: '5px',
+                                            fontWeight: 600,
+                                            border: '1px solid rgba(245, 158, 11, 0.4)',
+                                            background: 'rgba(245, 158, 11, 0.12)',
+                                            color: '#f59e0b'
+                                        }}
+                                        title={`Cathedral Promise Receivable MP #${t.promise_voucher_no}`}
+                                    >
+                                        <i className="material-icons" style={{ fontSize: '12px' }}>history_edu</i>
+                                        MP #{t.promise_voucher_no}
+                                    </span>
+                                )}
+                                {!hasContrib && !hasPromise && (
+                                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>—</span>
+                                )}
+                            </div>
 
-                            {/* Promise Voucher Badges from acc_promises */}
-                            {promises.map((p, pIdx) => (
-                                <span
-                                    key={p.promise_id ? `pid_${p.promise_id}` : `p_${pIdx}_${p.voucher_no}`}
-                                    className="badge badge-warning"
-                                    style={{
-                                        fontSize: '11px',
-                                        padding: '3px 7px',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '4px',
-                                        borderRadius: '6px',
-                                        fontWeight: 600,
-                                        border: '1px solid rgba(245, 158, 11, 0.4)',
-                                        background: 'rgba(245, 158, 11, 0.12)',
-                                        color: '#f59e0b',
-                                        width: 'fit-content'
-                                    }}
-                                    title={`Cathedral Promise Receivable Voucher #${p.voucher_no} | Original: BHD ${Number(p.promise_amount || 0).toFixed(3)} | Due: BHD ${Number(p.balance_amount || 0).toFixed(3)}`}
-                                >
-                                    <i className="material-icons" style={{ fontSize: '13px' }}>history_edu</i>
-                                    <span>MP #{p.voucher_no}</span>
-                                    {Number(p.promise_amount) > 0 && (
-                                        <span>• BHD {Number(p.promise_amount).toFixed(3)}</span>
-                                    )}
-                                </span>
-                            ))}
-
-                            {/* Optional Manual Receipt Reference */}
-                            {(t.manual_receipt_no || t.receipt_book_no) && (
-                                <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
-                                    Rcpt: {t.receipt_book_no ? `Bk ${t.receipt_book_no} ` : ''}#{t.manual_receipt_no}
-                                </span>
-                            )}
-
-                            {!hasContribs && !hasPromises && (
-                                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>—</span>
-                            )}
+                            {/* On-Demand View Account Posting Button */}
+                            <button
+                                type="button"
+                                className="btn btn-sm"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPostingModalTransaction(t);
+                                }}
+                                style={{
+                                    fontSize: '11px',
+                                    padding: '2px 8px',
+                                    height: '24px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    borderRadius: '5px',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    width: 'fit-content',
+                                    border: '1px solid var(--primary)',
+                                    background: 'rgba(123, 31, 162, 0.08)',
+                                    color: 'var(--primary)'
+                                }}
+                                title="View complete account posting, vouchers, and ledger heads"
+                            >
+                                <i className="material-icons" style={{ fontSize: '13px' }}>visibility</i>
+                                View
+                            </button>
                         </div>
                     );
                 }
@@ -7347,6 +7764,16 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
                     onOpenReceipt={onOpenReceipt}
                     showToast={showToast}
                     accountsData={accountsData}
+                />
+            )}
+
+            {/* Account Posting Details Modal (On-Demand) */}
+            {postingModalTransaction && (
+                <AccountPostingModal 
+                    transaction={postingModalTransaction}
+                    isOpen={!!postingModalTransaction}
+                    onClose={() => setPostingModalTransaction(null)}
+                    onOpenReceipt={onOpenReceipt}
                 />
             )}
 

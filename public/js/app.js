@@ -5586,18 +5586,6 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
                     loading={loading}
                     keyField="transaction_id"
                     initialPageSize={10}
-                    toolbarExtras={(
-                        <button 
-                            type="button" 
-                            className="btn btn-excel btn-sm" 
-                            onClick={exportAuctionToExcel} 
-                            title="Export Live Floor Auction transactions to Excel spreadsheet"
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', height: '32px', fontSize: '12px', padding: '0 10px' }}
-                        >
-                            <i className="material-icons" style={{ fontSize: '16px' }}>file_download</i>
-                            Export Excel
-                        </button>
-                    )}
                     searchPlaceholder="Search by SL No, Ref, Tag No, Tag Name, Article, Buyer, Roll, Phone, CPR, Voucher..."
                     emptyMessage="No auction sales recorded yet for this year."
                 />
@@ -7955,18 +7943,6 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
                         loading={loading}
                         keyField="transaction_id"
                         initialPageSize={10}
-                        toolbarExtras={(
-                            <button 
-                                type="button" 
-                                className="btn btn-excel btn-sm" 
-                                onClick={exportOfferingsToExcel} 
-                                title={`Export ${isGold ? 'Gold' : 'Bed Sheet'} Offerings to Excel spreadsheet`}
-                                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', height: '32px', fontSize: '12px', padding: '0 10px' }}
-                            >
-                                <i className="material-icons" style={{ fontSize: '16px' }}>file_download</i>
-                                Export Excel
-                            </button>
-                        )}
                         searchPlaceholder={isGold 
                             ? "Search Gold Ref (GLD), Member Name, Roll No, Phone, Gold Item Description..." 
                             : "Search Bed Sheet Ref (BED), Member Name, Roll No, Phone, Bed Sheet Description..."}

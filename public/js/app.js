@@ -4446,6 +4446,83 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
         }
     };
 
+    const exportAuctionToExcel = () => {
+        if (!transactions.length) {
+            showToast('info', 'No auction transactions to export.');
+            return;
+        }
+        if (typeof XLSX === 'undefined') {
+            showToast('error', 'Excel library (SheetJS) is not loaded.');
+            return;
+        }
+
+        const rows = transactions.map((t, idx) => ({
+            'SL No': idx + 1,
+            'Auction Ref': t.auction_ref_no || '',
+            'Auction Date': formatDateDMY(t.auction_date),
+            'Tag No': t.tag_number || '',
+            'Article No': t.article_number || '',
+            'Article / Tag Name': t.article_name || '',
+            'Category': t.category || '',
+            'Donor Name': t.donor_name || '',
+            'Estimated Value (BHD)': Number(t.estimated_value || 0).toFixed(3),
+            'Winning Bidder': t.buyer_name || '',
+            'Roll No': t.buyer_code_c || '',
+            'CPR': t.buyer_cpr || '',
+            'Phone': t.buyer_phone || '',
+            'Prayer Group': t.buyer_prayer_group || '',
+            'Winning Bid (BHD)': Number(t.winning_bid_amount || 0).toFixed(3),
+            'Paid Amount (BHD)': Number(t.paid_amount || 0).toFixed(3),
+            'Balance Due (BHD)': Number(t.balance_amount || 0).toFixed(3),
+            'Payment Status': t.payment_status || 'Pending',
+            'Receipt Voucher No': t.contrib_voucher_no ? `HRCPT #${t.contrib_voucher_no}` : '',
+            'Promise Voucher No': t.promise_voucher_no ? `MP #${t.promise_voucher_no}` : '',
+            'Manual Receipt No': (t.manual_receipt_no || t.receipt_book_no) ? `${t.receipt_book_no ? 'Bk ' + t.receipt_book_no + ' ' : ''}#${t.manual_receipt_no || ''}`.trim() : '',
+            'Budget Event': t.event_name || '',
+            'Receipt Dr Ledger': t.contrib_dr_code ? `[${t.contrib_dr_code}] ${t.contrib_dr_name || ''}`.trim() : '',
+            'Receipt Cr Ledger': t.contrib_cr_code ? `[${t.contrib_cr_code}] ${t.contrib_cr_name || ''}`.trim() : '',
+            'Promise Dr Ledger': t.promise_dr_code ? `[${t.promise_dr_code}] ${t.promise_dr_name || ''}`.trim() : '',
+            'Promise Cr Ledger': t.promise_cr_code ? `[${t.promise_cr_code}] ${t.promise_cr_name || ''}`.trim() : '',
+            'Notes': t.notes || ''
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(rows);
+        ws['!cols'] = [
+            { wch: 8 },  // SL No
+            { wch: 18 }, // Auction Ref
+            { wch: 14 }, // Date
+            { wch: 12 }, // Tag No
+            { wch: 16 }, // Article No
+            { wch: 32 }, // Article Name
+            { wch: 18 }, // Category
+            { wch: 22 }, // Donor
+            { wch: 20 }, // Est Value
+            { wch: 26 }, // Winning Bidder
+            { wch: 12 }, // Roll No
+            { wch: 16 }, // CPR
+            { wch: 16 }, // Phone
+            { wch: 20 }, // Prayer Group
+            { wch: 18 }, // Winning Bid
+            { wch: 18 }, // Paid
+            { wch: 18 }, // Balance
+            { wch: 14 }, // Status
+            { wch: 20 }, // Receipt Voucher
+            { wch: 20 }, // Promise Voucher
+            { wch: 18 }, // Manual Receipt
+            { wch: 22 }, // Budget Event
+            { wch: 26 }, // Receipt Dr
+            { wch: 26 }, // Receipt Cr
+            { wch: 26 }, // Promise Dr
+            { wch: 26 }, // Promise Cr
+            { wch: 28 }  // Notes
+        ];
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, `Live_Auction_${year}`);
+        XLSX.writeFile(wb, `cathedral_live_auction_${year}.xlsx`);
+        showToast('success', `Exported ${transactions.length} Live Floor Auction transactions to Excel!`);
+    };
+
     const currentBalance = Math.max(0, (Number(bidAmount) || 0) - (Number(paidAmount) || 0));
     const isPayingNow = Number(paidAmount || 0) > 0;
     const hasPromiseBalance = currentBalance > 0;
@@ -5124,7 +5201,19 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
                         <h3>Recent Auction Transactions ({year})</h3>
                         <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Browse, search, sort, and record settlements on auction ledger sales</p>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        {isAdmin && (
+                            <button 
+                                type="button" 
+                                className="btn btn-outline-secondary btn-sm"
+                                onClick={() => setLedgerSettingsOpen(true)}
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                title="Configure Default Accounting Heads & Events for Auction Posting"
+                            >
+                                <i className="material-icons" style={{ fontSize: '16px' }}>settings</i>
+                                Default Ledgers
+                            </button>
+                        )}
                         <button 
                             type="button" 
                             className="btn btn-secondary btn-sm" 
@@ -5136,6 +5225,15 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
                             style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                         >
                             <i className="material-icons" style={{ fontSize: '16px' }}>refresh</i> Reload Table
+                        </button>
+                        <button 
+                            type="button" 
+                            className="btn btn-excel btn-sm" 
+                            onClick={exportAuctionToExcel} 
+                            title="Export Live Floor Auction transactions to Excel spreadsheet"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                        >
+                            <i className="material-icons" style={{ fontSize: '16px' }}>file_download</i> Export Excel
                         </button>
                         <span className="badge badge-info">{transactions.length} Total Sales</span>
                     </div>
@@ -5488,6 +5586,18 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
                     loading={loading}
                     keyField="transaction_id"
                     initialPageSize={10}
+                    toolbarExtras={(
+                        <button 
+                            type="button" 
+                            className="btn btn-excel btn-sm" 
+                            onClick={exportAuctionToExcel} 
+                            title="Export Live Floor Auction transactions to Excel spreadsheet"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', height: '32px', fontSize: '12px', padding: '0 10px' }}
+                        >
+                            <i className="material-icons" style={{ fontSize: '16px' }}>file_download</i>
+                            Export Excel
+                        </button>
+                    )}
                     searchPlaceholder="Search by SL No, Ref, Tag No, Tag Name, Article, Buyer, Roll, Phone, CPR, Voucher..."
                     emptyMessage="No auction sales recorded yet for this year."
                 />
@@ -6700,6 +6810,103 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
         });
     }, [transactions, statusFilter]);
 
+    const exportOfferingsToExcel = () => {
+        const activeList = isGold ? goldOfferings : bedOfferings;
+        if (!activeList.length && !transactions.length) {
+            showToast('info', 'No offering records to export.');
+            return;
+        }
+        if (typeof XLSX === 'undefined') {
+            showToast('error', 'Excel library (SheetJS) is not loaded.');
+            return;
+        }
+
+        const mapOfferingRows = (list) => list.map((t, idx) => ({
+            'SL No': idx + 1,
+            'Offering Ref': t.auction_ref_no || '',
+            'Offering Date': formatDateDMY(t.auction_date),
+            'Offering Type': t.offering_type === 'Gold' ? 'Gold Offering' : 'Bed Sheet Offering',
+            'Item Description': t.item_description || t.article_name || '',
+            'Devotee / Member': t.buyer_name || '',
+            'Roll No': t.buyer_code_c || '',
+            'CPR': t.buyer_cpr || '',
+            'Phone': t.buyer_phone || '',
+            'Prayer Group': t.buyer_prayer_group || '',
+            'Offering Amount (BHD)': Number(t.winning_bid_amount || 0).toFixed(3),
+            'Paid So Far (BHD)': Number(t.paid_amount || 0).toFixed(3),
+            'Balance Due (BHD)': Number(t.balance_amount || 0).toFixed(3),
+            'Status': t.payment_status || 'Pending',
+            'Receipt Voucher No': t.contrib_voucher_no ? `HRCPT #${t.contrib_voucher_no}` : '',
+            'Promise Voucher No': t.promise_voucher_no ? `MP #${t.promise_voucher_no}` : '',
+            'Manual Receipt No': (t.manual_receipt_no || t.receipt_book_no) ? `${t.receipt_book_no ? 'Bk ' + t.receipt_book_no + ' ' : ''}#${t.manual_receipt_no || ''}`.trim() : '',
+            'Budget Event': t.event_name || '',
+            'Receipt Dr Ledger': t.contrib_dr_code ? `[${t.contrib_dr_code}] ${t.contrib_dr_name || ''}`.trim() : '',
+            'Receipt Cr Ledger': t.contrib_cr_code ? `[${t.contrib_cr_code}] ${t.contrib_cr_name || ''}`.trim() : '',
+            'Promise Dr Ledger': t.promise_dr_code ? `[${t.promise_dr_code}] ${t.promise_dr_name || ''}`.trim() : '',
+            'Promise Cr Ledger': t.promise_cr_code ? `[${t.promise_cr_code}] ${t.promise_cr_name || ''}`.trim() : '',
+            'Notes': t.notes || ''
+        }));
+
+        const colWidths = [
+            { wch: 8 },  // SL No
+            { wch: 18 }, // Offering Ref
+            { wch: 14 }, // Date
+            { wch: 20 }, // Offering Type
+            { wch: 34 }, // Item Description
+            { wch: 26 }, // Devotee
+            { wch: 12 }, // Roll No
+            { wch: 16 }, // CPR
+            { wch: 16 }, // Phone
+            { wch: 20 }, // Prayer Group
+            { wch: 20 }, // Offering Amount
+            { wch: 18 }, // Paid
+            { wch: 18 }, // Balance
+            { wch: 14 }, // Status
+            { wch: 20 }, // Receipt Voucher
+            { wch: 20 }, // Promise Voucher
+            { wch: 18 }, // Manual Receipt
+            { wch: 22 }, // Budget Event
+            { wch: 26 }, // Receipt Dr
+            { wch: 26 }, // Receipt Cr
+            { wch: 26 }, // Promise Dr
+            { wch: 26 }, // Promise Cr
+            { wch: 28 }  // Notes
+        ];
+
+        const wb = XLSX.utils.book_new();
+
+        // Sheet 1: Active Sub-tab (Gold or Bed Sheet)
+        const activeRows = mapOfferingRows(activeList);
+        const wsActive = XLSX.utils.json_to_sheet(activeRows);
+        wsActive['!cols'] = colWidths;
+        const activeSheetName = isGold ? `Gold_Offerings_${year}` : `BedSheet_Offerings_${year}`;
+        XLSX.utils.book_append_sheet(wb, wsActive, activeSheetName);
+
+        // Sheet 2: The other Sub-tab (if has data)
+        const otherList = isGold ? bedOfferings : goldOfferings;
+        if (otherList.length > 0) {
+            const otherRows = mapOfferingRows(otherList);
+            const wsOther = XLSX.utils.json_to_sheet(otherRows);
+            wsOther['!cols'] = colWidths;
+            const otherSheetName = isGold ? `BedSheet_Offerings_${year}` : `Gold_Offerings_${year}`;
+            XLSX.utils.book_append_sheet(wb, wsOther, otherSheetName);
+        }
+
+        // Sheet 3: All Special Offerings for year (if both exist)
+        if (transactions.length > 0 && goldOfferings.length > 0 && bedOfferings.length > 0) {
+            const allRows = mapOfferingRows(transactions);
+            const wsAll = XLSX.utils.json_to_sheet(allRows);
+            wsAll['!cols'] = colWidths;
+            XLSX.utils.book_append_sheet(wb, wsAll, `All_Offerings_${year}`);
+        }
+
+        const fileName = isGold 
+            ? `cathedral_gold_offerings_${year}.xlsx`
+            : `cathedral_bedsheet_offerings_${year}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+        showToast('success', `Exported ${isGold ? 'Gold' : 'Bed Sheet'} Offerings to Excel!`);
+    };
+
     // DataTable column definitions for Gold vs Bed Sheet Offerings
     const getOfferingColumns = (category) => {
         const isCatGold = category === 'Gold';
@@ -7729,6 +7936,16 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
                             >
                                 <i className="material-icons" style={{ fontSize: '16px' }}>refresh</i> Reload
                             </button>
+
+                            <button 
+                                type="button" 
+                                className="btn btn-excel btn-sm"
+                                onClick={exportOfferingsToExcel}
+                                title={`Export ${isGold ? 'Gold' : 'Bed Sheet'} Offerings transactions to Excel spreadsheet`}
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                            >
+                                <i className="material-icons" style={{ fontSize: '16px' }}>file_download</i> Export Excel
+                            </button>
                         </div>
                     </div>
 
@@ -7738,6 +7955,18 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
                         loading={loading}
                         keyField="transaction_id"
                         initialPageSize={10}
+                        toolbarExtras={(
+                            <button 
+                                type="button" 
+                                className="btn btn-excel btn-sm" 
+                                onClick={exportOfferingsToExcel} 
+                                title={`Export ${isGold ? 'Gold' : 'Bed Sheet'} Offerings to Excel spreadsheet`}
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', height: '32px', fontSize: '12px', padding: '0 10px' }}
+                            >
+                                <i className="material-icons" style={{ fontSize: '16px' }}>file_download</i>
+                                Export Excel
+                            </button>
+                        )}
                         searchPlaceholder={isGold 
                             ? "Search Gold Ref (GLD), Member Name, Roll No, Phone, Gold Item Description..." 
                             : "Search Bed Sheet Ref (BED), Member Name, Roll No, Phone, Bed Sheet Description..."}

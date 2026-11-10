@@ -46,32 +46,57 @@ class AuctionController extends Controller {
             }
         }
 
-        // Non-administrators must use administrator-configured default posting heads
+        $accountModel = new \App\Models\AccountHead();
+        $defaults = $accountModel->getDefaultHeads();
         $isAdmin = ($user['user_type'] ?? '') === 'Administrator';
-        if (!$isAdmin) {
-            $accountModel = new \App\Models\AccountHead();
-            $defaults = $accountModel->getDefaultHeads();
 
-            if (!empty($defaults['event_id'])) {
-                $data['event_id'] = $defaults['event_id'];
-                $data['event_name'] = $defaults['event_name'];
+        if ($offeringType === 'Gold') {
+            // Gold Offering: Always post to administrator-configured Gold default ledgers
+            $data['contrib_dr_code'] = $defaults['gold_contrib_dr_code'] ?? '02123';
+            $data['contrib_dr_name'] = $defaults['gold_contrib_dr_name'] ?? 'Cash on Hand-Harvest Festival';
+            $data['contrib_cr_code'] = $defaults['gold_contrib_cr_code'] ?? '07613';
+            $data['contrib_cr_name'] = $defaults['gold_contrib_cr_name'] ?? 'Harvest Festival - Gold';
+
+            $data['promise_dr_code'] = $defaults['gold_promise_dr_code'] ?? '07743';
+            $data['promise_dr_name'] = $defaults['gold_promise_dr_name'] ?? 'A/R Harvest Festival 2011 - Gold Offer';
+            $data['promise_cr_code'] = $defaults['gold_promise_cr_code'] ?? '07637';
+            $data['promise_cr_name'] = $defaults['gold_promise_cr_name'] ?? 'Gold not auctioned from Vanchi';
+        } elseif ($offeringType === 'BedSheet') {
+            // Bed Sheet Offering: Always post to administrator-configured Bed Sheet default ledgers
+            $data['contrib_dr_code'] = $defaults['bed_contrib_dr_code'] ?? '02123';
+            $data['contrib_dr_name'] = $defaults['bed_contrib_dr_name'] ?? 'Cash on Hand-Harvest Festival';
+            $data['contrib_cr_code'] = $defaults['bed_contrib_cr_code'] ?? '07502';
+            $data['contrib_cr_name'] = $defaults['bed_contrib_cr_name'] ?? 'Harvest Festival - Bed Sheet';
+
+            $data['promise_dr_code'] = $defaults['bed_promise_dr_code'] ?? '07744';
+            $data['promise_dr_name'] = $defaults['bed_promise_dr_name'] ?? 'A/R Harvest Festival 2011 - Bedsheet Offer';
+            $data['promise_cr_code'] = $defaults['bed_promise_cr_code'] ?? '07503';
+            $data['promise_cr_name'] = $defaults['bed_promise_cr_name'] ?? 'Harvest Festival - Article Auction';
+        } else {
+            // Live Floor Auction: Non-administrators must use administrator-configured default heads
+            if (!$isAdmin) {
+                if (!empty($defaults['contrib_dr_code'])) {
+                    $data['contrib_dr_code'] = $defaults['contrib_dr_code'];
+                    $data['contrib_dr_name'] = $defaults['contrib_dr_name'];
+                }
+                if (!empty($defaults['contrib_cr_code'])) {
+                    $data['contrib_cr_code'] = $defaults['contrib_cr_code'];
+                    $data['contrib_cr_name'] = $defaults['contrib_cr_name'];
+                }
+                if (!empty($defaults['promise_dr_code'])) {
+                    $data['promise_dr_code'] = $defaults['promise_dr_code'];
+                    $data['promise_dr_name'] = $defaults['promise_dr_name'];
+                }
+                if (!empty($defaults['promise_cr_code'])) {
+                    $data['promise_cr_code'] = $defaults['promise_cr_code'];
+                    $data['promise_cr_name'] = $defaults['promise_cr_name'];
+                }
             }
-            if (!empty($defaults['contrib_dr_code'])) {
-                $data['contrib_dr_code'] = $defaults['contrib_dr_code'];
-                $data['contrib_dr_name'] = $defaults['contrib_dr_name'];
-            }
-            if (!empty($defaults['contrib_cr_code'])) {
-                $data['contrib_cr_code'] = $defaults['contrib_cr_code'];
-                $data['contrib_cr_name'] = $defaults['contrib_cr_name'];
-            }
-            if (!empty($defaults['promise_dr_code'])) {
-                $data['promise_dr_code'] = $defaults['promise_dr_code'];
-                $data['promise_dr_name'] = $defaults['promise_dr_name'];
-            }
-            if (!empty($defaults['promise_cr_code'])) {
-                $data['promise_cr_code'] = $defaults['promise_cr_code'];
-                $data['promise_cr_name'] = $defaults['promise_cr_name'];
-            }
+        }
+
+        if (empty($data['event_id']) && !empty($defaults['event_id'])) {
+            $data['event_id'] = $defaults['event_id'];
+            $data['event_name'] = $defaults['event_name'];
         }
 
         try {

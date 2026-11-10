@@ -376,14 +376,47 @@ class Auction extends Model {
             $generatedReceiptNo = sprintf("RCPT-%d-%04d", $year, $pSeq);
             $effectiveReceiptNo = ($receiptNoInput !== '0' && $receiptNoInput !== '') ? $receiptNoInput : $generatedReceiptNo;
 
+            // Resolve default heads from admin settings based on offering type
+            $accountHeadModel = new \App\Models\AccountHead();
+            $defaultHeads = $accountHeadModel->getDefaultHeads();
+
+            if ($offeringType === 'Gold') {
+                $defPromiseDrCode = $defaultHeads['gold_promise_dr_code'] ?? '07743';
+                $defPromiseDrName = $defaultHeads['gold_promise_dr_name'] ?? 'A/R Harvest Festival 2011 - Gold Offer';
+                $defPromiseCrCode = $defaultHeads['gold_promise_cr_code'] ?? '07637';
+                $defPromiseCrName = $defaultHeads['gold_promise_cr_name'] ?? 'Gold not auctioned from Vanchi';
+                $defContribDrCode = $defaultHeads['gold_contrib_dr_code'] ?? '02123';
+                $defContribDrName = $defaultHeads['gold_contrib_dr_name'] ?? 'Cash on Hand-Harvest Festival';
+                $defContribCrCode = $defaultHeads['gold_contrib_cr_code'] ?? '07613';
+                $defContribCrName = $defaultHeads['gold_contrib_cr_name'] ?? 'Harvest Festival - Gold';
+            } elseif ($offeringType === 'BedSheet') {
+                $defPromiseDrCode = $defaultHeads['bed_promise_dr_code'] ?? '07744';
+                $defPromiseDrName = $defaultHeads['bed_promise_dr_name'] ?? 'A/R Harvest Festival 2011 - Bedsheet Offer';
+                $defPromiseCrCode = $defaultHeads['bed_promise_cr_code'] ?? '07503';
+                $defPromiseCrName = $defaultHeads['bed_promise_cr_name'] ?? 'Harvest Festival - Article Auction';
+                $defContribDrCode = $defaultHeads['bed_contrib_dr_code'] ?? '02123';
+                $defContribDrName = $defaultHeads['bed_contrib_dr_name'] ?? 'Cash on Hand-Harvest Festival';
+                $defContribCrCode = $defaultHeads['bed_contrib_cr_code'] ?? '07502';
+                $defContribCrName = $defaultHeads['bed_contrib_cr_name'] ?? 'Harvest Festival - Bed Sheet';
+            } else {
+                $defPromiseDrCode = $defaultHeads['promise_dr_code'] ?? '08583';
+                $defPromiseDrName = $defaultHeads['promise_dr_name'] ?? 'Harvest Festival Auction Receivable';
+                $defPromiseCrCode = $defaultHeads['promise_cr_code'] ?? '07503';
+                $defPromiseCrName = $defaultHeads['promise_cr_name'] ?? 'Harvest Festival - Article Auction';
+                $defContribDrCode = $defaultHeads['contrib_dr_code'] ?? '02123';
+                $defContribDrName = $defaultHeads['contrib_dr_name'] ?? 'Cash on Hand-Harvest Festival';
+                $defContribCrCode = $defaultHeads['contrib_cr_code'] ?? '02206';
+                $defContribCrName = $defaultHeads['contrib_cr_name'] ?? 'Church Building Fund - Harvest Festival';
+            }
+
             // --- 1. Post Promise Entry (Member Receivable) for the full Winning Bid Amount ---
             $promiseVoucherNo = null;
             $accPromiseId = null;
 
-            $promiseDrCode = !empty($data['promise_dr_code']) ? trim($data['promise_dr_code']) : '08583';
-            $promiseDrName = !empty($data['promise_dr_name']) ? trim($data['promise_dr_name']) : 'A/R Harvest Festival 2025 - Auction';
-            $promiseCrCode = !empty($data['promise_cr_code']) ? trim($data['promise_cr_code']) : '07503';
-            $promiseCrName = !empty($data['promise_cr_name']) ? trim($data['promise_cr_name']) : 'Harvest Festival - Article Auction';
+            $promiseDrCode = !empty($data['promise_dr_code']) ? trim($data['promise_dr_code']) : $defPromiseDrCode;
+            $promiseDrName = !empty($data['promise_dr_name']) ? trim($data['promise_dr_name']) : $defPromiseDrName;
+            $promiseCrCode = !empty($data['promise_cr_code']) ? trim($data['promise_cr_code']) : $defPromiseCrCode;
+            $promiseCrName = !empty($data['promise_cr_name']) ? trim($data['promise_cr_name']) : $defPromiseCrName;
 
             // Execute stored procedure with Winning Bid Amount ($bidAmount) so promise_amount and acc_ledger_entries reflect the winning bid
             $pProc = $this->db->prepare('CALL acc_proc_add_member_receivables_v1(
@@ -489,10 +522,10 @@ class Auction extends Model {
             $contribBatchCode = null;
             $accContribId = null;
 
-            $contribDrCode = !empty($data['contrib_dr_code']) ? trim($data['contrib_dr_code']) : '02123';
-            $contribDrName = !empty($data['contrib_dr_name']) ? trim($data['contrib_dr_name']) : 'Cash on Hand-Harvest Festival';
-            $contribCrCode = !empty($data['contrib_cr_code']) ? trim($data['contrib_cr_code']) : '02206';
-            $contribCrName = !empty($data['contrib_cr_name']) ? trim($data['contrib_cr_name']) : 'Church Building Fund - Harvest Festival';
+            $contribDrCode = !empty($data['contrib_dr_code']) ? trim($data['contrib_dr_code']) : $defContribDrCode;
+            $contribDrName = !empty($data['contrib_dr_name']) ? trim($data['contrib_dr_name']) : $defContribDrName;
+            $contribCrCode = !empty($data['contrib_cr_code']) ? trim($data['contrib_cr_code']) : $defContribCrCode;
+            $contribCrName = !empty($data['contrib_cr_name']) ? trim($data['contrib_cr_name']) : $defContribCrName;
 
             if ($paidAmount > 0) {
                 if (!$isOffering) {
@@ -633,10 +666,10 @@ class Auction extends Model {
                 'created_by'          => $userId,
                 'event_id'            => $eventId,
                 'event_name'          => $eventName,
-                'contrib_dr_code'     => $paidAmount > 0 ? $contribDrCode : null,
-                'contrib_dr_name'     => $paidAmount > 0 ? $contribDrName : null,
-                'contrib_cr_code'     => $paidAmount > 0 ? $contribCrCode : null,
-                'contrib_cr_name'     => $paidAmount > 0 ? $contribCrName : null,
+                'contrib_dr_code'     => $contribDrCode ?: null,
+                'contrib_dr_name'     => $contribDrName ?: null,
+                'contrib_cr_code'     => $contribCrCode ?: null,
+                'contrib_cr_name'     => $contribCrName ?: null,
                 'contrib_voucher_no'  => $contribVoucherNo,
                 'acc_contribution_id' => $accContribId,
                 'promise_dr_code'     => $promiseDrCode,

@@ -6730,10 +6730,10 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
                 receipt_no: receiptNo.trim() || null,
                 event_id: selectedEventId || (currentEvent ? currentEvent.event_id : 10),
                 event_name: currentEvent ? currentEvent.event_name : ('Budget ' + year),
-                contrib_dr_code: isPayingNow && effectiveContribDr ? effectiveContribDr.head_code : null,
-                contrib_dr_name: isPayingNow && effectiveContribDr ? effectiveContribDr.head_name : null,
-                contrib_cr_code: isPayingNow && effectiveContribCr ? effectiveContribCr.head_code : null,
-                contrib_cr_name: isPayingNow && effectiveContribCr ? effectiveContribCr.head_name : null,
+                contrib_dr_code: effectiveContribDr ? effectiveContribDr.head_code : null,
+                contrib_dr_name: effectiveContribDr ? effectiveContribDr.head_name : null,
+                contrib_cr_code: effectiveContribCr ? effectiveContribCr.head_code : null,
+                contrib_cr_name: effectiveContribCr ? effectiveContribCr.head_name : null,
                 promise_dr_code: effectivePromiseDr ? effectivePromiseDr.head_code : null,
                 promise_dr_name: effectivePromiseDr ? effectivePromiseDr.head_name : null,
                 promise_cr_code: effectivePromiseCr ? effectivePromiseCr.head_code : null,
@@ -8042,15 +8042,21 @@ function RecordPaymentModal({ transaction, isOpen, onClose, onSuccess, onOpenRec
 
     // Set default debit & credit heads based on transaction and accountsData
     useEffect(() => {
+        const defs = accountsData?.default_heads || {};
+        const isGold = transaction?.offering_type === 'Gold';
+        const isBed = transaction?.offering_type === 'BedSheet';
+        const targetDrCode = transaction?.contrib_dr_code || (isBed ? (defs.bed_contrib_dr_code || '02123') : isGold ? (defs.gold_contrib_dr_code || '02123') : (defs.contrib_dr_code || '02123'));
+        const targetCrCode = transaction?.contrib_cr_code || (isBed ? (defs.bed_contrib_cr_code || '07502') : isGold ? (defs.gold_contrib_cr_code || '07613') : (defs.contrib_cr_code || '02206'));
+
         if (accountsData?.contribution_debit_heads?.length > 0) {
-            const defDr = accountsData.contribution_debit_heads.find(h => h.head_code === (transaction.contrib_dr_code || '02123')) 
+            const defDr = accountsData.contribution_debit_heads.find(h => h.head_code === targetDrCode) 
                 || accountsData.contribution_debit_heads.find(h => h.head_code === '02123')
                 || accountsData.contribution_debit_heads[0];
             setSelectedDr(defDr);
         }
         if (accountsData?.contribution_credit_heads?.length > 0) {
-            const defCr = accountsData.contribution_credit_heads.find(h => h.head_code === (transaction.contrib_cr_code || '07503'))
-                || accountsData.contribution_credit_heads.find(h => h.head_code === '02206')
+            const defCr = accountsData.contribution_credit_heads.find(h => h.head_code === targetCrCode)
+                || accountsData.contribution_credit_heads.find(h => h.head_code === (isGold ? '07613' : isBed ? '07502' : '02206'))
                 || accountsData.contribution_credit_heads[0];
             setSelectedCr(defCr);
         }

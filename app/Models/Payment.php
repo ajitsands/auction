@@ -97,10 +97,31 @@ class Payment extends Model {
             $contribVoucherNo = null;
             $accContribId = null;
 
-            $drCode = !empty($data['dr_code']) ? trim($data['dr_code']) : (!empty($trans['contrib_dr_code']) ? $trans['contrib_dr_code'] : '02123');
-            $drName = !empty($data['dr_name']) ? trim($data['dr_name']) : (!empty($trans['contrib_dr_name']) ? $trans['contrib_dr_name'] : 'Cash on Hand-Harvest Festival');
-            $crCode = !empty($data['cr_code']) ? trim($data['cr_code']) : (!empty($trans['contrib_cr_code']) ? $trans['contrib_cr_code'] : '02206');
-            $crName = !empty($data['cr_name']) ? trim($data['cr_name']) : (!empty($trans['contrib_cr_name']) ? $trans['contrib_cr_name'] : 'Church Building Fund - Harvest Festival');
+            $accountHeadModel = new \App\Models\AccountHead();
+            $defaultHeads = $accountHeadModel->getDefaultHeads();
+            $offType = $trans['offering_type'] ?? 'Auction';
+
+            if ($offType === 'Gold') {
+                $fallbackDrCode = $defaultHeads['gold_contrib_dr_code'] ?? '02123';
+                $fallbackDrName = $defaultHeads['gold_contrib_dr_name'] ?? 'Cash on Hand-Harvest Festival';
+                $fallbackCrCode = $defaultHeads['gold_contrib_cr_code'] ?? '07613';
+                $fallbackCrName = $defaultHeads['gold_contrib_cr_name'] ?? 'Harvest Festival - Gold';
+            } elseif ($offType === 'BedSheet') {
+                $fallbackDrCode = $defaultHeads['bed_contrib_dr_code'] ?? '02123';
+                $fallbackDrName = $defaultHeads['bed_contrib_dr_name'] ?? 'Cash on Hand-Harvest Festival';
+                $fallbackCrCode = $defaultHeads['bed_contrib_cr_code'] ?? '07502';
+                $fallbackCrName = $defaultHeads['bed_contrib_cr_name'] ?? 'Harvest Festival - Bed Sheet';
+            } else {
+                $fallbackDrCode = $defaultHeads['contrib_dr_code'] ?? '02123';
+                $fallbackDrName = $defaultHeads['contrib_dr_name'] ?? 'Cash on Hand-Harvest Festival';
+                $fallbackCrCode = $defaultHeads['contrib_cr_code'] ?? '02206';
+                $fallbackCrName = $defaultHeads['contrib_cr_name'] ?? 'Church Building Fund - Harvest Festival';
+            }
+
+            $drCode = !empty($data['dr_code']) ? trim($data['dr_code']) : (!empty($trans['contrib_dr_code']) ? $trans['contrib_dr_code'] : $fallbackDrCode);
+            $drName = !empty($data['dr_name']) ? trim($data['dr_name']) : (!empty($trans['contrib_dr_name']) ? $trans['contrib_dr_name'] : $fallbackDrName);
+            $crCode = !empty($data['cr_code']) ? trim($data['cr_code']) : (!empty($trans['contrib_cr_code']) ? $trans['contrib_cr_code'] : $fallbackCrCode);
+            $crName = !empty($data['cr_name']) ? trim($data['cr_name']) : (!empty($trans['contrib_cr_name']) ? $trans['contrib_cr_name'] : $fallbackCrName);
 
             $eventId = !empty($data['event_id']) ? (int)$data['event_id'] : (!empty($trans['event_id']) ? (int)$trans['event_id'] : 10);
             $eventName = !empty($data['event_name']) ? trim($data['event_name']) : (!empty($trans['event_name']) ? $trans['event_name'] : ('Budget ' . $year));
@@ -110,22 +131,30 @@ class Payment extends Model {
             $effectiveReceiptNo = ($manualReceiptNo !== '0' && !empty($manualReceiptNo)) ? $manualReceiptNo : $receiptNo;
 
             if (!empty($drCode) && !empty($crCode)) {
-                $artTag = !empty($trans['tag_number']) ? $trans['tag_number'] : ('#' . $trans['article_id']);
+                $isOffering = in_array($offType, ['Gold', 'BedSheet']);
+                $artTag = !empty($trans['tag_number']) ? $trans['tag_number'] : ($isOffering ? strtoupper($offType) : ('#' . $trans['article_id']));
                 $artNo = !empty($trans['article_number']) ? $trans['article_number'] : ('ART-' . $trans['article_id']);
-                $artName = !empty($trans['article_name']) ? $trans['article_name'] : 'Article';
-                $artCategory = !empty($trans['category']) ? $trans['category'] : 'Auction';
-                $artDonor = !empty($trans['donor_name']) ? $trans['donor_name'] : 'Church';
-                $artEstValue = isset($trans['estimated_value']) ? number_format((float)$trans['estimated_value'], 3) : '0.000';
-                $articleDetails = sprintf("Tag: %s | Art No: %s | %s | Cat: %s | Donor: %s | Est: %s BHD", $artTag, $artNo, $artName, $artCategory, $artDonor, $artEstValue);
+                $artName = !empty($trans['article_name']) ? $trans['article_name'] : ($isOffering ? "{$offType} Offering" : 'Article');
 
-                $cNarration = sprintf(
-                    "Auction Payment: [%s / %s] %s * %s * %s",
-                    $artTag,
-                    $artNo,
-                    $artName,
-                    $trans['auction_ref_no'],
-                    trim($trans['buyer_name'])
-                );
+                if ($isOffering) {
+                    $itemDesc = !empty($trans['item_description']) ? $trans['item_description'] : "{$offType} Offering";
+                    $articleDetails = sprintf("[%s] %s", $artTag, $itemDesc);
+                    $cNarration = sprintf("%s Offering Payment: [%s] %s * %s * %s", $offType, $artTag, $itemDesc, $trans['auction_ref_no'], trim($trans['buyer_name']));
+                } else {
+                    $artCategory = !empty($trans['category']) ? $trans['category'] : 'Auction';
+                    $artDonor = !empty($trans['donor_name']) ? $trans['donor_name'] : 'Church';
+                    $artEstValue = isset($trans['estimated_value']) ? number_format((float)$trans['estimated_value'], 3) : '0.000';
+                    $articleDetails = sprintf("Tag: %s | Art No: %s | %s | Cat: %s | Donor: %s | Est: %s BHD", $artTag, $artNo, $artName, $artCategory, $artDonor, $artEstValue);
+
+                    $cNarration = sprintf(
+                        "Auction Payment: [%s / %s] %s * %s * %s",
+                        $artTag,
+                        $artNo,
+                        $artName,
+                        $trans['auction_ref_no'],
+                        trim($trans['buyer_name'])
+                    );
+                }
                 if (!empty($trans['buyer_code_c'])) {
                     $cNarration .= " (Roll: " . $trans['buyer_code_c'] . ")";
                 }
@@ -258,14 +287,26 @@ class Payment extends Model {
                 UPDATE hf_auction_transactions SET
                     paid_amount    = :paid,
                     balance_amount = :bal,
-                    payment_status = :status
+                    payment_status = :status,
+                    contrib_dr_code = COALESCE(contrib_dr_code, :dr_code),
+                    contrib_dr_name = COALESCE(contrib_dr_name, :dr_name),
+                    contrib_cr_code = COALESCE(contrib_cr_code, :cr_code),
+                    contrib_cr_name = COALESCE(contrib_cr_name, :cr_name),
+                    contrib_voucher_no = COALESCE(contrib_voucher_no, :v_no),
+                    acc_contribution_id = COALESCE(acc_contribution_id, :cid)
                 WHERE transaction_id = :id
             ");
             $uStmt->execute([
-                'paid'   => $newPaid,
-                'bal'    => $newBalance,
-                'status' => $newStatus,
-                'id'     => $transactionId
+                'paid'    => $newPaid,
+                'bal'     => $newBalance,
+                'status'  => $newStatus,
+                'dr_code' => $drCode,
+                'dr_name' => $drName,
+                'cr_code' => $crCode,
+                'cr_name' => $crName,
+                'v_no'    => $contribVoucherNo,
+                'cid'     => $accContribId,
+                'id'      => $transactionId
             ]);
 
             // Update Promise in hf_promises and acc_promises if one exists

@@ -152,6 +152,7 @@ class AuctionController extends Controller {
         $data = $this->getJsonInput();
         $type = trim($data['offering_type'] ?? 'Gold');
         $desc = trim($data['item_description'] ?? $data['description'] ?? '');
+        $amount = (float)($data['default_amount'] ?? $data['value_amount'] ?? $data['amount'] ?? 0);
 
         if ($desc === '') {
             $this->jsonResponse(['success' => false, 'error' => 'Item description is required.'], 400);
@@ -159,7 +160,7 @@ class AuctionController extends Controller {
 
         try {
             $itemModel = new \App\Models\OfferingItem();
-            $item = $itemModel->add($type, $desc);
+            $item = $itemModel->add($type, $desc, $amount);
             $items = $itemModel->getAll();
             $this->jsonResponse([
                 'success' => true,
@@ -167,6 +168,30 @@ class AuctionController extends Controller {
                 'item'    => $item,
                 'items'   => $items
             ], 201);
+        } catch (\Exception $e) {
+            $this->jsonResponse(['success' => false, 'error' => $e->getMessage()], 400);
+        }
+    }
+
+    public function updateOfferingItem(array $params): void {
+        $this->requireAuth();
+        $id = (int)($params['id'] ?? 0);
+
+        if ($id <= 0) {
+            $this->jsonResponse(['success' => false, 'error' => 'Invalid item ID.'], 400);
+        }
+
+        $data = $this->getJsonInput();
+        try {
+            $itemModel = new \App\Models\OfferingItem();
+            $item = $itemModel->update($id, $data);
+            $items = $itemModel->getAll();
+            $this->jsonResponse([
+                'success' => true,
+                'message' => "Item '{$item['item_description']}' updated successfully.",
+                'item'    => $item,
+                'items'   => $items
+            ]);
         } catch (\Exception $e) {
             $this->jsonResponse(['success' => false, 'error' => $e->getMessage()], 400);
         }

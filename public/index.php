@@ -88,6 +88,7 @@ $router->get('/api/auctions/{id}/posting', [AuctionController::class, 'postingDe
 // Special Offering Item Descriptions Master Endpoints
 $router->get('/api/offerings/items', [AuctionController::class, 'getOfferingItems']);
 $router->post('/api/offerings/items', [AuctionController::class, 'addOfferingItem']);
+$router->put('/api/offerings/items/{id}', [AuctionController::class, 'updateOfferingItem']);
 $router->delete('/api/offerings/items/{id}', [AuctionController::class, 'deleteOfferingItem']);
 
 // Payments & Receipts Endpoints

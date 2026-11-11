@@ -5704,7 +5704,8 @@ function SearchableOfferingItemSelect({
         } else if (e.key === 'Enter') {
             if (isOpen && highlightedIndex >= 0 && highlightedIndex < filteredItems.length) {
                 e.preventDefault();
-                onChange(getOfferingItemDesc(filteredItems[highlightedIndex]));
+                const sel = filteredItems[highlightedIndex];
+                onChange(getOfferingItemDesc(sel), sel);
                 setIsOpen(false);
             }
         } else if (e.key === 'Escape') {
@@ -5868,11 +5869,12 @@ function SearchableOfferingItemSelect({
                                 const id = getOfferingItemId(item) || idx;
                                 const isSelected = (value || '').trim().toLowerCase() === desc.trim().toLowerCase();
                                 const isHighlighted = idx === highlightedIndex;
+                                const itemAmt = Number(item.default_amount || item.value_amount || item.amount || 0);
                                 return (
                                     <div
                                         key={id}
                                         onClick={() => {
-                                            onChange(desc);
+                                            onChange(desc, item);
                                             setIsOpen(false);
                                         }}
                                         onMouseEnter={() => setHighlightedIndex(idx)}
@@ -5905,19 +5907,34 @@ function SearchableOfferingItemSelect({
                                                 {desc}
                                             </span>
                                         </div>
-                                        {isSelected && (
-                                            <span style={{
-                                                color: accentColor,
-                                                fontSize: '11px',
-                                                fontWeight: 700,
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: '2px',
-                                                flexShrink: 0
-                                            }}>
-                                                <i className="material-icons" style={{ fontSize: '16px' }}>check_circle</i>
-                                            </span>
-                                        )}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                            {itemAmt > 0 && (
+                                                <span style={{
+                                                    background: isGold ? 'rgba(245, 158, 11, 0.14)' : 'rgba(59, 130, 246, 0.14)',
+                                                    color: accentColor,
+                                                    border: `1px solid ${isGold ? 'rgba(245, 158, 11, 0.35)' : 'rgba(59, 130, 246, 0.35)'}`,
+                                                    padding: '2px 8px',
+                                                    borderRadius: '12px',
+                                                    fontSize: '11.5px',
+                                                    fontWeight: 700,
+                                                    letterSpacing: '0.2px'
+                                                }}>
+                                                    BHD {itemAmt.toFixed(3)}
+                                                </span>
+                                            )}
+                                            {isSelected && (
+                                                <span style={{
+                                                    color: accentColor,
+                                                    fontSize: '11px',
+                                                    fontWeight: 700,
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '2px'
+                                                }}>
+                                                    <i className="material-icons" style={{ fontSize: '16px' }}>check_circle</i>
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 );
                             })
@@ -5930,17 +5947,21 @@ function SearchableOfferingItemSelect({
 }
 
 // =========================================================================
-// --- Offering Item Description Master Modal (Add & Delete Only)        ---
+// --- Offering Item Description Master Modal & Value Amount Assignment   ---
 // =========================================================================
 function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items = [], onItemsUpdated, showToast }) {
     if (!isOpen) return null;
 
     const [activeType, setActiveType] = useState(initialType || 'Gold');
     const [newDescription, setNewDescription] = useState('');
+    const [newAmount, setNewAmount] = useState('');
     const [searchFilter, setSearchFilter] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [deletingId, setDeletingId] = useState(null);
+    const [editingId, setEditingId] = useState(null);
+    const [editingAmount, setEditingAmount] = useState('');
+    const [updatingId, setUpdatingId] = useState(null);
     const [localItems, setLocalItems] = useState(Array.isArray(items) ? items : []);
 
     const isGold = activeType === 'Gold';
@@ -5992,7 +6013,7 @@ function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items 
         return categoryItems.filter(it => getOfferingItemDesc(it).toLowerCase().includes(q));
     }, [categoryItems, searchFilter]);
 
-    // Add item handler (Strictly Add Option)
+    // Add item handler with value amount
     const handleAdd = async (e) => {
         if (e && e.preventDefault) e.preventDefault();
         const trimmed = newDescription.trim();
@@ -6000,6 +6021,8 @@ function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items 
             if (typeof showToast === 'function') showToast('error', 'Please enter an item description.');
             return;
         }
+
+        const amtNum = Math.max(0, Number(newAmount) || 0);
 
         // Check if description already exists in this category
         const exists = categoryItems.some(it => getOfferingItemDesc(it).trim().toLowerCase() === trimmed.toLowerCase());
@@ -6012,13 +6035,15 @@ function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items 
         try {
             const res = await api.post('/api/offerings/items', {
                 offering_type: activeType,
-                description: trimmed
+                description: trimmed,
+                default_amount: amtNum
             });
             if (res.success) {
                 if (typeof showToast === 'function') {
-                    showToast('success', `Added "${trimmed}" to ${activeType} Master.`);
+                    showToast('success', `Added "${trimmed}" ${amtNum > 0 ? '(BHD ' + amtNum.toFixed(3) + ')' : ''} to ${activeType} Master.`);
                 }
                 setNewDescription('');
+                setNewAmount('');
                 if (res.items && Array.isArray(res.items)) {
                     setLocalItems(res.items);
                     if (typeof onItemsUpdated === 'function') {
@@ -6043,7 +6068,57 @@ function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items 
         }
     };
 
-    // Delete item handler (Strictly Delete Option with SweetAlert)
+    // Inline edit amount handlers
+    const startEditAmount = (item) => {
+        const id = getOfferingItemId(item);
+        setEditingId(id);
+        const currentAmt = Number(item.default_amount || item.value_amount || item.amount || 0);
+        setEditingAmount(currentAmt > 0 ? currentAmt.toFixed(3) : '');
+    };
+
+    const cancelEditAmount = () => {
+        setEditingId(null);
+        setEditingAmount('');
+    };
+
+    const handleSaveAmount = async (id, desc) => {
+        const amtNum = Math.max(0, Number(editingAmount) || 0);
+        setUpdatingId(id);
+        try {
+            const res = await api.put(`/api/offerings/items/${id}`, {
+                default_amount: amtNum
+            });
+            if (res.success) {
+                if (typeof showToast === 'function') {
+                    showToast('success', `Assigned BHD ${amtNum.toFixed(3)} to "${desc}".`);
+                }
+                setEditingId(null);
+                setEditingAmount('');
+                if (res.items && Array.isArray(res.items)) {
+                    setLocalItems(res.items);
+                    if (typeof onItemsUpdated === 'function') {
+                        onItemsUpdated(res.items);
+                    }
+                } else if (res.item) {
+                    const next = localItems.map(it => getOfferingItemId(it) === id ? { ...it, ...res.item } : it);
+                    setLocalItems(next);
+                    if (typeof onItemsUpdated === 'function') {
+                        onItemsUpdated(next);
+                    }
+                } else {
+                    await reloadItems();
+                }
+            } else {
+                if (typeof showToast === 'function') showToast('error', res.error || 'Failed to update amount');
+            }
+        } catch (err) {
+            if (typeof showToast === 'function') showToast('error', err.message);
+        } finally {
+            setUpdatingId(null);
+        }
+    };
+
+    // Delete item handler (with SweetAlert)
     const performDelete = async (id, desc) => {
         setDeletingId(id);
         try {
@@ -6132,7 +6207,7 @@ function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items 
                 className="modal-content"
                 style={{
                     width: '95%',
-                    maxWidth: '680px',
+                    maxWidth: '720px',
                     margin: 'auto',
                     maxHeight: '90vh',
                     display: 'flex',
@@ -6143,7 +6218,7 @@ function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items 
                 onClick={e => e.stopPropagation()}
             >
                 <ModalHeader
-                    title="Item Description Master"
+                    title="Item Description Master & Value Amounts"
                     icon="category"
                     onClose={onClose}
                     badge={activeBadge}
@@ -6163,7 +6238,7 @@ function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items 
                     <div style={{ display: 'flex', gap: '8px' }}>
                         <button
                             type="button"
-                            onClick={() => { setActiveType('Gold'); setSearchFilter(''); }}
+                            onClick={() => { setActiveType('Gold'); setSearchFilter(''); cancelEditAmount(); }}
                             className={`btn btn-sm ${activeType === 'Gold' ? 'btn-warning' : 'btn-outline-secondary'}`}
                             style={{
                                 display: 'flex',
@@ -6182,7 +6257,7 @@ function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items 
                         </button>
                         <button
                             type="button"
-                            onClick={() => { setActiveType('BedSheet'); setSearchFilter(''); }}
+                            onClick={() => { setActiveType('BedSheet'); setSearchFilter(''); cancelEditAmount(); }}
                             className={`btn btn-sm ${activeType === 'BedSheet' ? 'btn-primary' : 'btn-outline-secondary'}`}
                             style={{
                                 display: 'flex',
@@ -6203,13 +6278,13 @@ function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items 
 
                     <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>
                         <i className="material-icons" style={{ fontSize: '13px', verticalAlign: 'middle', marginRight: '3px' }}>info</i>
-                        Only Add & Delete Allowed
+                        Assign Value Amounts & Manage Presets
                     </span>
                 </div>
 
                 <div className="modal-body" style={{ padding: '18px 20px', flex: 1, overflowY: 'auto' }}>
                     
-                    {/* 1. ADD OPTION: Add New Preset Description */}
+                    {/* 1. ADD OPTION: Add New Preset Description & Value Amount */}
                     <div style={{
                         background: isGold ? 'rgba(245, 158, 11, 0.05)' : 'rgba(59, 130, 246, 0.05)',
                         border: isGold ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid rgba(59, 130, 246, 0.3)',
@@ -6229,18 +6304,18 @@ function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items 
                             gap: '6px'
                         }}>
                             <i className="material-icons" style={{ fontSize: '16px' }}>add_circle</i>
-                            Add New {isGold ? 'Gold' : 'Bed Sheet'} Item Description
+                            Add New {isGold ? 'Gold' : 'Bed Sheet'} Master Item & Value Amount
                         </div>
-                        <form onSubmit={handleAdd} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <form onSubmit={handleAdd} style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                             <input
                                 type="text"
                                 className="form-control"
-                                placeholder={isGold ? "e.g., Gold Coin 8g, Sovereign Ring, Gold Bar 10g..." : "e.g., Double Bed Sheet, Cotton King Sheet..."}
+                                placeholder={isGold ? "Item description (e.g., Gold Coin 8g, Sovereign Ring)..." : "Item description (e.g., King Size Double Bed Sheet)..."}
                                 value={newDescription}
                                 onChange={e => setNewDescription(e.target.value)}
                                 style={{
-                                    flex: '1 1 auto',
-                                    minWidth: '0',
+                                    flex: '1 1 240px',
+                                    minWidth: '200px',
                                     height: '40px',
                                     fontSize: '14px',
                                     padding: '8px 12px',
@@ -6249,6 +6324,34 @@ function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items 
                                 disabled={submitting}
                                 autoFocus
                             />
+                            <div style={{ position: 'relative', width: '150px', flexShrink: 0 }}>
+                                <input
+                                    type="number"
+                                    step="0.001"
+                                    min="0"
+                                    className="form-control"
+                                    placeholder="0.000"
+                                    value={newAmount}
+                                    onChange={e => setNewAmount(e.target.value)}
+                                    style={{
+                                        height: '40px',
+                                        fontSize: '14px',
+                                        padding: '8px 12px 8px 42px',
+                                        borderRadius: '6px'
+                                    }}
+                                    disabled={submitting}
+                                    title="Default offering amount in BHD (Optional)"
+                                />
+                                <span style={{
+                                    position: 'absolute',
+                                    left: '10px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    color: 'var(--text-muted)'
+                                }}>BHD</span>
+                            </div>
                             <button
                                 type="submit"
                                 className="btn"
@@ -6277,7 +6380,7 @@ function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items 
                         </form>
                     </div>
 
-                    {/* 2. DELETE OPTION: List of Items with Delete Action */}
+                    {/* 2. EXISTING PRESETS & AMOUNT ASSIGNMENT LIST */}
                     <div>
                         <div style={{
                             display: 'flex',
@@ -6351,6 +6454,9 @@ function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items 
                                 displayedItems.map((item, idx) => {
                                     const desc = getOfferingItemDesc(item);
                                     const id = getOfferingItemId(item) || idx;
+                                    const currentAmt = Number(item.default_amount || item.value_amount || item.amount || 0);
+                                    const isEditing = editingId === id;
+                                    const isUpdating = updatingId === id;
                                     return (
                                         <div
                                             key={id}
@@ -6361,7 +6467,9 @@ function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items 
                                                 justifyContent: 'space-between',
                                                 gap: '12px',
                                                 borderBottom: idx < displayedItems.length - 1 ? '1px solid var(--border-color)' : 'none',
-                                                background: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.015)'
+                                                background: isEditing 
+                                                    ? (isGold ? 'rgba(245, 158, 11, 0.08)' : 'rgba(59, 130, 246, 0.08)') 
+                                                    : (idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.015)')
                                             }}
                                         >
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
@@ -6392,31 +6500,132 @@ function OfferingItemMasterModal({ isOpen, onClose, initialType = 'Gold', items 
                                                 </div>
                                             </div>
 
-                                            {/* STRICTLY DELETE OPTION */}
-                                            <button
-                                                type="button"
-                                                className="btn btn-sm btn-outline-danger"
-                                                onClick={() => handleDelete(item)}
-                                                disabled={deletingId === id}
-                                                style={{
-                                                    padding: '4px 8px',
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '4px',
-                                                    fontSize: '12px',
-                                                    color: '#ef4444',
-                                                    borderColor: 'rgba(239, 68, 68, 0.3)',
-                                                    borderRadius: '6px',
-                                                    flexShrink: 0,
-                                                    cursor: deletingId === id ? 'not-allowed' : 'pointer'
-                                                }}
-                                                title="Delete this item description"
-                                            >
-                                                <i className="material-icons" style={{ fontSize: '16px' }}>
-                                                    {deletingId === id ? 'sync' : 'delete'}
-                                                </i>
-                                                <span>{deletingId === id ? 'Deleting...' : 'Delete'}</span>
-                                            </button>
+                                            {/* Assigned Value Amount & Actions Section */}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                                {isEditing ? (
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        <div style={{ position: 'relative', width: '125px' }}>
+                                                            <input
+                                                                type="number"
+                                                                step="0.001"
+                                                                min="0"
+                                                                className="form-control form-control-sm"
+                                                                placeholder="0.000"
+                                                                value={editingAmount}
+                                                                onChange={e => setEditingAmount(e.target.value)}
+                                                                onKeyDown={e => {
+                                                                    if (e.key === 'Enter') {
+                                                                        e.preventDefault();
+                                                                        handleSaveAmount(id, desc);
+                                                                    } else if (e.key === 'Escape') {
+                                                                        cancelEditAmount();
+                                                                    }
+                                                                }}
+                                                                disabled={isUpdating}
+                                                                autoFocus
+                                                                style={{
+                                                                    fontSize: '12.5px',
+                                                                    fontWeight: 700,
+                                                                    paddingLeft: '32px',
+                                                                    borderRadius: '5px'
+                                                                }}
+                                                            />
+                                                            <span style={{
+                                                                position: 'absolute',
+                                                                left: '6px',
+                                                                top: '50%',
+                                                                transform: 'translateY(-50%)',
+                                                                fontSize: '10px',
+                                                                fontWeight: 700,
+                                                                color: 'var(--text-muted)'
+                                                            }}>BHD</span>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-sm btn-success"
+                                                            onClick={() => handleSaveAmount(id, desc)}
+                                                            disabled={isUpdating}
+                                                            style={{
+                                                                padding: '4px 8px',
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                borderRadius: '5px'
+                                                            }}
+                                                            title="Save Value Amount"
+                                                        >
+                                                            <i className="material-icons" style={{ fontSize: '16px' }}>
+                                                                {isUpdating ? 'sync' : 'check'}
+                                                            </i>
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-sm btn-secondary"
+                                                            onClick={cancelEditAmount}
+                                                            disabled={isUpdating}
+                                                            style={{
+                                                                padding: '4px 8px',
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                borderRadius: '5px'
+                                                            }}
+                                                            title="Cancel"
+                                                        >
+                                                            <i className="material-icons" style={{ fontSize: '16px' }}>close</i>
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => startEditAmount(item)}
+                                                            style={{
+                                                                background: currentAmt > 0 ? (isGold ? 'rgba(245, 158, 11, 0.12)' : 'rgba(59, 130, 246, 0.12)') : 'rgba(100, 116, 139, 0.08)',
+                                                                border: `1px solid ${currentAmt > 0 ? (isGold ? 'rgba(245, 158, 11, 0.35)' : 'rgba(59, 130, 246, 0.35)') : 'rgba(100, 116, 139, 0.25)'}`,
+                                                                color: currentAmt > 0 ? accentColor : 'var(--text-muted)',
+                                                                padding: '3px 9px',
+                                                                borderRadius: '6px',
+                                                                fontSize: '12px',
+                                                                fontWeight: 700,
+                                                                cursor: 'pointer',
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                gap: '4px',
+                                                                transition: 'all 0.15s ease'
+                                                            }}
+                                                            title="Click to assign or change default value amount"
+                                                        >
+                                                            <span>{currentAmt > 0 ? `BHD ${currentAmt.toFixed(3)}` : 'Set Amount'}</span>
+                                                            <i className="material-icons" style={{ fontSize: '13px', opacity: 0.7 }}>edit</i>
+                                                        </button>
+                                                    </div>
+                                                )}
+
+                                                {/* DELETE OPTION */}
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-sm btn-outline-danger"
+                                                    onClick={() => handleDelete(item)}
+                                                    disabled={deletingId === id || isUpdating}
+                                                    style={{
+                                                        padding: '4px 8px',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px',
+                                                        fontSize: '12px',
+                                                        color: '#ef4444',
+                                                        borderColor: 'rgba(239, 68, 68, 0.3)',
+                                                        borderRadius: '6px',
+                                                        flexShrink: 0,
+                                                        cursor: deletingId === id ? 'not-allowed' : 'pointer'
+                                                    }}
+                                                    title="Delete this item description"
+                                                >
+                                                    <i className="material-icons" style={{ fontSize: '16px' }}>
+                                                        {deletingId === id ? 'sync' : 'delete'}
+                                                    </i>
+                                                    <span>{deletingId === id ? 'Deleting...' : 'Delete'}</span>
+                                                </button>
+                                            </div>
                                         </div>
                                     );
                                 })
@@ -7268,7 +7477,12 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
                     }}>
                         <button
                             type="button"
-                            onClick={() => setOfferingSubTab('Gold')}
+                            onClick={() => {
+                                setOfferingSubTab('Gold');
+                                setItemDescription('');
+                                setBidAmount('');
+                                setPaidAmount('');
+                            }}
                             style={{
                                 padding: '8px 20px',
                                 borderRadius: '9px',
@@ -7290,7 +7504,12 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
                         </button>
                         <button
                             type="button"
-                            onClick={() => setOfferingSubTab('BedSheet')}
+                            onClick={() => {
+                                setOfferingSubTab('BedSheet');
+                                setItemDescription('');
+                                setBidAmount('');
+                                setPaidAmount('');
+                            }}
                             style={{
                                 padding: '8px 20px',
                                 borderRadius: '9px',
@@ -7430,7 +7649,19 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
                             </div>
                             <SearchableOfferingItemSelect
                                 value={itemDescription}
-                                onChange={setItemDescription}
+                                onChange={(desc, selItem) => {
+                                    setItemDescription(desc);
+                                    const matched = selItem || masterItems.find(i => 
+                                        i.offering_type === offeringSubTab && 
+                                        getOfferingItemDesc(i).trim().toLowerCase() === String(desc).trim().toLowerCase()
+                                    );
+                                    if (matched) {
+                                        const amt = Number(matched.default_amount || matched.value_amount || matched.amount || 0);
+                                        if (amt > 0) {
+                                            setBidAmount(amt.toFixed(3));
+                                        }
+                                    }
+                                }}
                                 items={masterItems.filter(i => i.offering_type === offeringSubTab)}
                                 offeringType={offeringSubTab}
                                 placeholder={isGold ? "Search or enter Gold item description (e.g., Gold Coin 8g)..." : "Search or enter Bed Sheet description (e.g., Double Bed Sheet)..."}

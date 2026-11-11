@@ -194,6 +194,12 @@ ALTER TABLE `hf_auction_transactions` ADD INDEX `idx_offering_type` (`offering_t
 ALTER TABLE `hf_auction_transactions` ADD INDEX `idx_year_offering` (`applicable_year`, `offering_type`);
 
 -- ------------------------------------------------------------------------------
+-- 7.2 Master Presets Default Amount Extension
+-- Allows assigning default value amount to Gold and Bed Sheet master items:
+-- ------------------------------------------------------------------------------
+ALTER TABLE `hf_offering_items` ADD COLUMN `default_amount` decimal(18,3) NOT NULL DEFAULT '0.000' AFTER `item_description`;
+
+-- ------------------------------------------------------------------------------
 -- 8. Seed Default Categories
 -- ------------------------------------------------------------------------------
 INSERT INTO `hf_categories` (`category_name`) VALUES 
@@ -224,6 +230,7 @@ CREATE TABLE IF NOT EXISTS `hf_offering_items` (
   `item_id` int(11) NOT NULL AUTO_INCREMENT,
   `offering_type` varchar(50) NOT NULL,
   `item_description` varchar(255) NOT NULL,
+  `default_amount` decimal(18,3) NOT NULL DEFAULT '0.000',
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`item_id`),
   UNIQUE KEY `uq_type_desc` (`offering_type`, `item_description`),

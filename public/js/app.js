@@ -7651,6 +7651,10 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
                                 value={itemDescription}
                                 onChange={(desc, selItem) => {
                                     setItemDescription(desc);
+                                    if (!desc || !desc.trim()) {
+                                        setBidAmount('');
+                                        return;
+                                    }
                                     const matched = selItem || masterItems.find(i => 
                                         i.offering_type === offeringSubTab && 
                                         getOfferingItemDesc(i).trim().toLowerCase() === String(desc).trim().toLowerCase()
@@ -7659,6 +7663,8 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
                                         const amt = Number(matched.default_amount || matched.value_amount || matched.amount || 0);
                                         if (amt > 0) {
                                             setBidAmount(amt.toFixed(3));
+                                        } else {
+                                            setBidAmount('');
                                         }
                                     }
                                 }}

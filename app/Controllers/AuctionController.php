@@ -218,4 +218,39 @@ class AuctionController extends Controller {
             $this->jsonResponse(['success' => false, 'error' => $e->getMessage()], 400);
         }
     }
+
+    /**
+     * Update Auction Reference Number (Administrator only)
+     */
+    public function updateRefNo(array $params): void {
+        $user = $this->requireAuth();
+        if (($user['user_type'] ?? '') !== 'Administrator') {
+            $this->jsonResponse([
+                'success' => false,
+                'error'   => 'Access denied. Only Administrators can edit the Auction Reference Number.'
+            ], 403);
+        }
+
+        $id = (int)($params['id'] ?? ($_GET['id'] ?? 0));
+        if ($id <= 0) {
+            $this->jsonResponse(['success' => false, 'error' => 'Invalid transaction ID.'], 400);
+        }
+
+        $input = $this->getJsonInput();
+        $newRefNo = trim($input['auction_ref_no'] ?? $input['new_ref_no'] ?? '');
+        if ($newRefNo === '') {
+            $this->jsonResponse(['success' => false, 'error' => 'Auction Reference Number cannot be empty.'], 400);
+        }
+
+        try {
+            $result = $this->auctionModel->updateAuctionRefNo($id, $newRefNo, (int)$user['user_id']);
+            $this->jsonResponse([
+                'success' => true,
+                'message' => "Reference Number successfully updated from '{$result['old_ref_no']}' to '{$result['new_ref_no']}'.",
+                'data'    => $result
+            ]);
+        } catch (\Exception $e) {
+            $this->jsonResponse(['success' => false, 'error' => $e->getMessage()], 400);
+        }
+    }
 }

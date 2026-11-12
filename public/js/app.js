@@ -4074,6 +4074,216 @@ function AccountPostingModal({ transaction, isOpen, onClose, onOpenReceipt }) {
     );
 }
 
+// =========================================================================
+// --- Edit Auction Reference Number Modal (Administrator Only)          ---
+// =========================================================================
+function EditAuctionRefModal({ transaction, isOpen, onClose, onSaved, showToast }) {
+    if (!isOpen || !transaction) return null;
+
+    const [newRefNo, setNewRefNo] = useState(transaction.auction_ref_no || '');
+    const [saving, setSaving] = useState(false);
+
+    const isOffering = Boolean(transaction.offering_type && transaction.offering_type !== 'Auction');
+    const itemTitle = isOffering 
+        ? (transaction.item_description || transaction.article_name || `${transaction.offering_type} Offering`)
+        : (transaction.article_name || 'Auction Item');
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        const trimmed = newRefNo.trim();
+        if (!trimmed) {
+            showToast('error', 'Auction Reference Number cannot be empty.');
+            return;
+        }
+
+        if (trimmed === (transaction.auction_ref_no || '').trim()) {
+            showToast('info', 'No changes made to reference number.');
+            onClose();
+            return;
+        }
+
+        setSaving(true);
+        try {
+            const res = await api.put(`/auctions/${transaction.transaction_id}/ref-no`, {
+                auction_ref_no: trimmed
+            });
+
+            if (res && res.success) {
+                showToast('success', res.message || 'Reference number updated successfully!');
+                if (typeof onSaved === 'function') {
+                    onSaved({
+                        ...transaction,
+                        auction_ref_no: trimmed
+                    });
+                }
+                onClose();
+            } else {
+                showToast('error', res?.error || 'Failed to update reference number.');
+            }
+        } catch (err) {
+            showToast('error', err.message || 'Server error while updating reference number.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="modal-backdrop" onClick={onClose} style={{ zIndex: 1060 }}>
+            <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '520px', width: '92%', borderRadius: '12px', overflow: 'hidden' }}>
+                <div className="modal-header" style={{
+                    background: 'linear-gradient(135deg, rgba(123, 31, 162, 0.1), rgba(123, 31, 162, 0.02))',
+                    borderBottom: '1px solid var(--border-color)',
+                    padding: '16px 20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '8px',
+                            background: 'rgba(123, 31, 162, 0.15)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'var(--primary)'
+                        }}>
+                            <i className="material-icons" style={{ fontSize: '20px' }}>edit_note</i>
+                        </div>
+                        <div>
+                            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>Edit Reference Number</h3>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                <span className="badge badge-warning" style={{ fontSize: '10px', padding: '1px 5px', marginRight: '5px' }}>Administrator Only</span>
+                                Transaction #{transaction.transaction_id}
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" className="close-btn" onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: 'var(--text-muted)' }}>
+                        <i className="material-icons">close</i>
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit}>
+                    <div className="modal-body" style={{ padding: '20px' }}>
+                        {/* Transaction Summary Card */}
+                        <div style={{
+                            background: 'rgba(0, 0, 0, 0.02)',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '8px',
+                            padding: '12px 14px',
+                            marginBottom: '18px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '6px'
+                        }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Current Reference:</span>
+                                <span className="badge badge-primary" style={{ fontSize: '12px', fontFamily: 'monospace' }}>
+                                    {transaction.auction_ref_no}
+                                </span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Item / Description:</span>
+                                <strong style={{ fontSize: '12px', color: 'var(--text-primary)' }}>
+                                    {itemTitle}
+                                </strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Buyer / Devotee:</span>
+                                <span style={{ fontSize: '12px', fontWeight: 600 }}>
+                                    {transaction.buyer_name} {transaction.buyer_code_c ? `(Roll: ${transaction.buyer_code_c})` : ''}
+                                </span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Winning Amount:</span>
+                                <strong style={{ fontSize: '13px', color: 'var(--primary)' }}>
+                                    BHD {Number(transaction.winning_bid_amount || 0).toFixed(3)}
+                                </strong>
+                            </div>
+                        </div>
+
+                        {/* Input Field */}
+                        <div className="form-group" style={{ marginBottom: '14px' }}>
+                            <label className="form-label" style={{ fontWeight: 700, fontSize: '13px' }}>
+                                New Reference Number <span style={{ color: 'var(--danger)' }}>*</span>
+                            </label>
+                            <input
+                                type="text"
+                                className="form-control"
+                                style={{
+                                    fontSize: '15px',
+                                    fontWeight: 700,
+                                    fontFamily: 'monospace',
+                                    padding: '10px 12px'
+                                }}
+                                autoFocus
+                                required
+                                value={newRefNo}
+                                onChange={e => setNewRefNo(e.target.value)}
+                                placeholder="e.g. AUC-2026-0009"
+                            />
+                        </div>
+
+                        {/* Automatic Cascade Updates Notice */}
+                        <div style={{
+                            fontSize: '11px',
+                            color: 'var(--text-secondary)',
+                            background: 'rgba(59, 130, 246, 0.05)',
+                            border: '1px solid rgba(59, 130, 246, 0.25)',
+                            padding: '10px 12px',
+                            borderRadius: '6px',
+                            lineHeight: '1.5'
+                        }}>
+                            <div style={{ fontWeight: 700, color: '#2563eb', marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <i className="material-icons" style={{ fontSize: '14px' }}>info</i>
+                                Automatic Cascade Updates
+                            </div>
+                            Updating this reference will automatically synchronize across all related church accounting records:
+                            <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
+                                <li><strong>hf_auction_transactions</strong> (Master reference)</li>
+                                <li><strong>acc_promises</strong> (Receivable audit narrations)</li>
+                                <li><strong>acc_contribution</strong> (Receipt posting narrations)</li>
+                                <li><strong>acc_ledger_entries</strong> (General ledger journal lines)</li>
+                                <li><strong>hf_payments</strong> (Installment settlement remarks)</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div className="modal-footer" style={{
+                        padding: '12px 20px',
+                        borderTop: '1px solid var(--border-color)',
+                        display: 'flex',
+                        justifyContent: 'flex-end',
+                        gap: '10px',
+                        background: 'var(--bg-surface)'
+                    }}>
+                        <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={onClose}
+                            disabled={saving}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            className="btn btn-primary"
+                            disabled={saving || !newRefNo.trim()}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                        >
+                            <i className="material-icons" style={{ fontSize: '16px' }}>
+                                {saving ? 'sync' : 'save'}
+                            </i>
+                            <span>{saving ? 'Updating...' : 'Save Reference Number'}</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
 // --- Live Auction Desk View ---
 function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDataChanged, isAdmin }) {
     const [transactions, setTransactions] = useState([]);
@@ -4083,6 +4293,7 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
     const [paymentModalData, setPaymentModalData] = useState(null);
     const [ledgerSettingsOpen, setLedgerSettingsOpen] = useState(false);
     const [postingModalTransaction, setPostingModalTransaction] = useState(null);
+    const [editingRefTx, setEditingRefTx] = useState(null);
 
     // Periodic ticker to recalculate and refresh live countdown remaining time
     const [, setCountdownTick] = useState(0);
@@ -5302,7 +5513,37 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
                                     {allRows.length} Sales (All Pages)
                                 </span>
                             ),
-                            render: (t) => <strong style={{ color: 'var(--text-primary)' }}>{t.auction_ref_no}</strong>
+                            render: (t) => (
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                    <strong style={{ color: 'var(--text-primary)' }}>{t.auction_ref_no}</strong>
+                                    {isAdmin && (
+                                        <button
+                                            type="button"
+                                            className="btn btn-sm"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setEditingRefTx(t);
+                                            }}
+                                            style={{
+                                                padding: '2px 5px',
+                                                height: '22px',
+                                                background: 'rgba(123, 31, 162, 0.08)',
+                                                border: '1px solid rgba(123, 31, 162, 0.3)',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer',
+                                                color: 'var(--primary)',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '2px',
+                                                fontSize: '11px'
+                                            }}
+                                            title="Edit Auction Reference Number (Administrator only)"
+                                        >
+                                            <i className="material-icons" style={{ fontSize: '13px' }}>edit</i>
+                                        </button>
+                                    )}
+                                </div>
+                            )
                         },
                         {
                             header: 'Date',
@@ -5665,6 +5906,24 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
                     onClose={() => setLedgerSettingsOpen(false)}
                     showToast={showToast}
                     onSaved={() => fetchAuctionData()}
+                />
+            )}
+
+            {/* Edit Auction Reference Number Modal (Admins Only) */}
+            {editingRefTx && (
+                <EditAuctionRefModal 
+                    transaction={editingRefTx}
+                    isOpen={!!editingRefTx}
+                    onClose={() => setEditingRefTx(null)}
+                    showToast={showToast}
+                    onSaved={(updated) => {
+                        setTransactions(prev => prev.map(item => 
+                            item.transaction_id === updated.transaction_id 
+                                ? { ...item, auction_ref_no: updated.auction_ref_no }
+                                : item
+                        ));
+                        if (typeof onDataChanged === 'function') onDataChanged();
+                    }}
                 />
             )}
         </div>
@@ -6714,6 +6973,7 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
     const [paymentModalData, setPaymentModalData] = useState(null);
     const [ledgerSettingsOpen, setLedgerSettingsOpen] = useState(false);
     const [postingModalTransaction, setPostingModalTransaction] = useState(null);
+    const [editingRefTx, setEditingRefTx] = useState(null);
 
     // Offering Category Tab: 'Gold' or 'BedSheet'
     const [offeringSubTab, setOfferingSubTab] = useState('Gold');
@@ -7166,9 +7426,37 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
                 footer: (rows) => <span style={{ fontSize: '12px', fontWeight: 700 }}>{rows.length} {catLabel}</span>,
                 render: (t) => (
                     <div>
-                        <strong style={{ color: catRefColor, fontSize: '13px' }}>
-                            {t.auction_ref_no}
-                        </strong>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <strong style={{ color: catRefColor, fontSize: '13px' }}>
+                                {t.auction_ref_no}
+                            </strong>
+                            {isAdmin && (
+                                <button
+                                    type="button"
+                                    className="btn btn-sm"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEditingRefTx(t);
+                                    }}
+                                    style={{
+                                        padding: '2px 5px',
+                                        height: '22px',
+                                        background: 'rgba(123, 31, 162, 0.08)',
+                                        border: '1px solid rgba(123, 31, 162, 0.3)',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        color: 'var(--primary)',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '2px',
+                                        fontSize: '11px'
+                                    }}
+                                    title={`Edit ${catLabel} Offering Reference Number (Administrator only)`}
+                                >
+                                    <i className="material-icons" style={{ fontSize: '13px' }}>edit</i>
+                                </button>
+                            )}
+                        </div>
                         {t.receipt_no && (
                             <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '1px' }}>
                                 Rcpt: {t.receipt_no}
@@ -8287,6 +8575,24 @@ function OfferingsDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onD
                     items={masterItems}
                     onItemsUpdated={(newItems) => setMasterItems(newItems)}
                     showToast={showToast}
+                />
+            )}
+
+            {/* Edit Offering Reference Number Modal (Admins Only) */}
+            {editingRefTx && (
+                <EditAuctionRefModal 
+                    transaction={editingRefTx}
+                    isOpen={!!editingRefTx}
+                    onClose={() => setEditingRefTx(null)}
+                    showToast={showToast}
+                    onSaved={(updated) => {
+                        setTransactions(prev => prev.map(item => 
+                            item.transaction_id === updated.transaction_id 
+                                ? { ...item, auction_ref_no: updated.auction_ref_no }
+                                : item
+                        ));
+                        if (typeof onDataChanged === 'function') onDataChanged();
+                    }}
                 />
             )}
         </div>

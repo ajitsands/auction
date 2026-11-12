@@ -900,4 +900,142 @@ class Auction extends Model {
 
         return array_merge($artStats, $liveStats, $offeringStats, $overallStats, $promStats);
     }
+
+    /**
+     * Update Auction / Offering Reference Number for Administrators only
+     * Cascades reference updates to acc_promises, acc_contribution, acc_ledger_entries, and hf_payments
+     */
+    public function updateAuctionRefNo(int $transactionId, string $newRefNo, int $userId): array {
+        $newRefNo = trim($newRefNo);
+        if ($newRefNo === '') {
+            throw new \Exception('Auction Reference Number cannot be empty.');
+        }
+
+        // 1. Fetch current transaction
+        $stmt = $this->db->prepare("
+            SELECT transaction_id, auction_ref_no, applicable_year, offering_type, 
+                   acc_promise_id, acc_contribution_id, buyer_name
+            FROM hf_auction_transactions 
+            WHERE transaction_id = ?
+            LIMIT 1
+        ");
+        $stmt->execute([$transactionId]);
+        $trans = $stmt->fetch();
+        if (!$trans) {
+            throw new \Exception('Auction transaction not found.');
+        }
+
+        $oldRefNo = trim($trans['auction_ref_no'] ?? '');
+
+        // If identical, no change needed
+        if ($oldRefNo === $newRefNo) {
+            return [
+                'transaction_id' => $transactionId,
+                'old_ref_no'     => $oldRefNo,
+                'new_ref_no'     => $newRefNo,
+                'updated'        => false
+            ];
+        }
+
+        // 2. Check for duplicate reference number in hf_auction_transactions
+        $checkStmt = $this->db->prepare("
+            SELECT transaction_id 
+            FROM hf_auction_transactions 
+            WHERE auction_ref_no = ? 
+              AND transaction_id != ? 
+            LIMIT 1
+        ");
+        $checkStmt->execute([$newRefNo, $transactionId]);
+        if ($checkStmt->fetch()) {
+            throw new \Exception("Reference Number '{$newRefNo}' is already assigned to another transaction.");
+        }
+
+        $promiseId = (int)($trans['acc_promise_id'] ?? 0);
+        $contribId = (int)($trans['acc_contribution_id'] ?? 0);
+
+        // 3. Execute updates inside a database transaction
+        $this->db->beginTransaction();
+        try {
+            // A. Update master table hf_auction_transactions
+            $updTrans = $this->db->prepare("
+                UPDATE hf_auction_transactions 
+                SET auction_ref_no = ? 
+                WHERE transaction_id = ?
+            ");
+            $updTrans->execute([$newRefNo, $transactionId]);
+
+            // B. Cascade string updates to respective accounting and payments tables
+            if ($oldRefNo !== '') {
+                $searchPattern = '%' . $oldRefNo . '%';
+
+                // Update acc_promises (narration & remarks)
+                $updPromises = $this->db->prepare("
+                    UPDATE acc_promises 
+                    SET narration = REPLACE(COALESCE(narration, ''), ?, ?),
+                        remarks   = REPLACE(COALESCE(remarks, ''),   ?, ?)
+                    WHERE (narration LIKE ? OR remarks LIKE ?)
+                       OR (? > 0 AND promise_id = ?)
+                ");
+                $updPromises->execute([
+                    $oldRefNo, $newRefNo,
+                    $oldRefNo, $newRefNo,
+                    $searchPattern, $searchPattern,
+                    $promiseId, $promiseId
+                ]);
+
+                // Update acc_contribution (narration)
+                $updContrib = $this->db->prepare("
+                    UPDATE acc_contribution 
+                    SET narration = REPLACE(COALESCE(narration, ''), ?, ?)
+                    WHERE narration LIKE ?
+                       OR (? > 0 AND contribution_id = ?)
+                ");
+                $updContrib->execute([
+                    $oldRefNo, $newRefNo,
+                    $searchPattern,
+                    $contribId, $contribId
+                ]);
+
+                // Update acc_ledger_entries (narration for vouchers HRCPT, MP)
+                $updLedger = $this->db->prepare("
+                    UPDATE acc_ledger_entries 
+                    SET narration = REPLACE(COALESCE(narration, ''), ?, ?)
+                    WHERE narration LIKE ?
+                       OR (? > 0 AND promise_id = ?)
+                       OR (? > 0 AND contribution_id = ?)
+                ");
+                $updLedger->execute([
+                    $oldRefNo, $newRefNo,
+                    $searchPattern,
+                    $promiseId, $promiseId,
+                    $contribId, $contribId
+                ]);
+
+                // Update hf_payments (remarks)
+                $updPayments = $this->db->prepare("
+                    UPDATE hf_payments 
+                    SET remarks = REPLACE(COALESCE(remarks, ''), ?, ?)
+                    WHERE transaction_id = ? 
+                       OR remarks LIKE ?
+                ");
+                $updPayments->execute([
+                    $oldRefNo, $newRefNo,
+                    $transactionId,
+                    $searchPattern
+                ]);
+            }
+
+            $this->db->commit();
+
+            return [
+                'transaction_id' => $transactionId,
+                'old_ref_no'     => $oldRefNo,
+                'new_ref_no'     => $newRefNo,
+                'updated'        => true
+            ];
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
 }

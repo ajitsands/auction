@@ -4456,65 +4456,50 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
             return;
         }
 
+        const extractAuctionNo = (ref) => {
+            if (!ref && ref !== 0) return '';
+            const str = String(ref).trim();
+            if (!str) return '';
+            const parts = str.split('-');
+            const last = parts[parts.length - 1];
+            const num = parseInt(last, 10);
+            return isNaN(num) ? last : num;
+        };
+
         const rows = transactions.map((t, idx) => ({
-            'SL No': idx + 1,
-            'Auction Ref': t.auction_ref_no || '',
-            'Auction Date': formatDateDMY(t.auction_date),
-            'Tag No': t.tag_number || '',
-            'Article No': t.article_number || '',
-            'Article / Tag Name': t.article_name || '',
-            'Category': t.category || '',
-            'Donor Name': t.donor_name || '',
-            'Estimated Value (BHD)': Number(t.estimated_value || 0).toFixed(3),
-            'Winning Bidder': t.buyer_name || '',
-            'Roll No': t.buyer_code_c || '',
-            'CPR': t.buyer_cpr || '',
-            'Phone': t.buyer_phone || '',
-            'Prayer Group': t.buyer_prayer_group || '',
-            'Winning Bid (BHD)': Number(t.winning_bid_amount || 0).toFixed(3),
-            'Paid Amount (BHD)': Number(t.paid_amount || 0).toFixed(3),
-            'Balance Due (BHD)': Number(t.balance_amount || 0).toFixed(3),
-            'Payment Status': t.payment_status || 'Pending',
-            'Receipt Voucher No': t.contrib_voucher_no ? `HRCPT #${t.contrib_voucher_no}` : '',
-            'Promise Voucher No': t.promise_voucher_no ? `MP #${t.promise_voucher_no}` : '',
-            'Manual Receipt No': (t.manual_receipt_no || t.receipt_book_no) ? `${t.receipt_book_no ? 'Bk ' + t.receipt_book_no + ' ' : ''}#${t.manual_receipt_no || ''}`.trim() : '',
-            'Budget Event': t.event_name || '',
-            'Receipt Dr Ledger': t.contrib_dr_code ? `[${t.contrib_dr_code}] ${t.contrib_dr_name || ''}`.trim() : '',
-            'Receipt Cr Ledger': t.contrib_cr_code ? `[${t.contrib_cr_code}] ${t.contrib_cr_name || ''}`.trim() : '',
-            'Promise Dr Ledger': t.promise_dr_code ? `[${t.promise_dr_code}] ${t.promise_dr_name || ''}`.trim() : '',
-            'Promise Cr Ledger': t.promise_cr_code ? `[${t.promise_cr_code}] ${t.promise_cr_name || ''}`.trim() : '',
-            'Notes': t.notes || ''
+            'Sl. No': idx + 1,
+            'Auction No': extractAuctionNo(t.auction_ref_no),
+            'Article No.': t.tag_number || '',
+            'Auction Amt (BHD)': Number(Number(t.winning_bid_amount || 0).toFixed(3)),
+            'Article Name': t.article_name || '',
+            'Roll #': t.buyer_code_c || '',
+            'Name of the person/Bidder': t.buyer_name || '',
+            'Contact #': t.buyer_phone || ''
         }));
 
         const ws = XLSX.utils.json_to_sheet(rows);
+
+        // Ensure 3-decimal currency formatting for Auction Amt (BHD)
+        if (ws['!ref']) {
+            const range = XLSX.utils.decode_range(ws['!ref']);
+            for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+                const cellRef = XLSX.utils.encode_cell({ c: 3, r: R });
+                const cell = ws[cellRef];
+                if (cell && typeof cell.v === 'number') {
+                    cell.z = '0.000';
+                }
+            }
+        }
+
         ws['!cols'] = [
-            { wch: 8 },  // SL No
-            { wch: 18 }, // Auction Ref
-            { wch: 14 }, // Date
-            { wch: 12 }, // Tag No
-            { wch: 16 }, // Article No
+            { wch: 8 },  // Sl. No
+            { wch: 14 }, // Auction No
+            { wch: 14 }, // Article No.
+            { wch: 18 }, // Auction Amt (BHD)
             { wch: 32 }, // Article Name
-            { wch: 18 }, // Category
-            { wch: 22 }, // Donor
-            { wch: 20 }, // Est Value
-            { wch: 26 }, // Winning Bidder
-            { wch: 12 }, // Roll No
-            { wch: 16 }, // CPR
-            { wch: 16 }, // Phone
-            { wch: 20 }, // Prayer Group
-            { wch: 18 }, // Winning Bid
-            { wch: 18 }, // Paid
-            { wch: 18 }, // Balance
-            { wch: 14 }, // Status
-            { wch: 20 }, // Receipt Voucher
-            { wch: 20 }, // Promise Voucher
-            { wch: 18 }, // Manual Receipt
-            { wch: 22 }, // Budget Event
-            { wch: 26 }, // Receipt Dr
-            { wch: 26 }, // Receipt Cr
-            { wch: 26 }, // Promise Dr
-            { wch: 26 }, // Promise Cr
-            { wch: 28 }  // Notes
+            { wch: 12 }, // Roll #
+            { wch: 28 }, // Name of the person/Bidder
+            { wch: 18 }  // Contact #
         ];
 
         const wb = XLSX.utils.book_new();

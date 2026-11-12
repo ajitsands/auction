@@ -31,7 +31,7 @@ class AuctionController extends Controller {
 
     public function store(): void {
         $user = $this->requireAuth();
-        $isAdmin = ($user['user_type'] ?? '') === 'Administrator';
+        $isAdmin = strcasecmp(trim($user['user_type'] ?? ''), 'Administrator') === 0;
         $data = $this->getJsonInput();
         $data['is_admin'] = $isAdmin;
 
@@ -39,14 +39,17 @@ class AuctionController extends Controller {
         $isOffering = ($offeringType !== 'Auction');
 
         $bidVal = $data['winning_bid_amount'] ?? ($data['bid_amount'] ?? null);
+        if ($isAdmin && ($bidVal === null || $bidVal === '')) {
+            $bidVal = 0;
+        }
         $hasBid = ($bidVal !== null && $bidVal !== '' && is_numeric($bidVal));
         $bidNum = (float)($bidVal ?? 0);
 
         if (!$hasBid || $bidNum < 0) {
-            $this->jsonResponse(['success' => false, 'error' => 'Please enter a valid winning bid / promise amount.'], 400);
+            $this->jsonResponse(['success' => false, 'error' => 'Please enter a valid winning bid amount.'], 400);
         }
 
-        // Non-administrators cannot enter 0 promise amount
+        // Non-administrators cannot enter 0 winning bid
         if ($bidNum <= 0.0001 && !$isAdmin) {
             $this->jsonResponse(['success' => false, 'error' => 'Winning bid amount must be greater than zero.'], 400);
         }

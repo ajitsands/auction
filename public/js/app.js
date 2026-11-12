@@ -4506,7 +4506,7 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
             return;
         }
 
-        const bid = Number(bidAmount);
+        const bid = Number(bidAmount || 0);
         if (isNaN(bid) || bid < 0) {
             showToast('error', 'Please enter a valid winning bid amount.');
             return;
@@ -4968,7 +4968,7 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
                                     }}
                                     placeholder="0.000"
                                     data-currency="true"
-                                    required 
+                                    required={!isAdmin} 
                                     value={bidAmount}
                                     onFocus={() => handleCurrencyFocus(bidAmount, setBidAmount)}
                                     onChange={e => setBidAmount(e.target.value)}

@@ -325,18 +325,28 @@ class Auction extends Model {
                 $paymentStatus = 'Partial';
             }
 
-            // Generate unique auction/offering ref no with dedicated prefixes
+            // Generate unique auction/offering ref no with dedicated prefixes and collision avoidance
             if ($isOffering) {
                 $prefix = ($offeringType === 'Gold') ? 'GLD' : 'BED';
-                $countStmt = $this->db->prepare("SELECT COUNT(*) FROM hf_auction_transactions WHERE applicable_year = :year AND auction_ref_no LIKE :prefix");
-                $countStmt->execute(['year' => $year, 'prefix' => "{$prefix}-%"]);
-                $seq = $countStmt->fetchColumn() + 1;
-                $auctionRefNo = sprintf("%s-%d-%04d", $prefix, $year, $seq);
+                $maxStmt = $this->db->prepare("SELECT COALESCE(MAX(CAST(SUBSTRING_INDEX(auction_ref_no, '-', -1) AS UNSIGNED)), 0) FROM hf_auction_transactions WHERE applicable_year = :year AND auction_ref_no LIKE :prefix");
+                $maxStmt->execute(['year' => $year, 'prefix' => "{$prefix}-%"]);
+                $seq = (int)$maxStmt->fetchColumn();
+                do {
+                    $seq++;
+                    $auctionRefNo = sprintf("%s-%d-%04d", $prefix, $year, $seq);
+                    $chk = $this->db->prepare("SELECT 1 FROM hf_auction_transactions WHERE auction_ref_no = :ref LIMIT 1");
+                    $chk->execute(['ref' => $auctionRefNo]);
+                } while ($chk->fetchColumn());
             } else {
-                $countStmt = $this->db->prepare("SELECT COUNT(*) FROM hf_auction_transactions WHERE applicable_year = :year AND auction_ref_no LIKE 'AUC-%'");
-                $countStmt->execute(['year' => $year]);
-                $seq = $countStmt->fetchColumn() + 1;
-                $auctionRefNo = sprintf("AUC-%d-%04d", $year, $seq);
+                $maxStmt = $this->db->prepare("SELECT COALESCE(MAX(CAST(SUBSTRING_INDEX(auction_ref_no, '-', -1) AS UNSIGNED)), 0) FROM hf_auction_transactions WHERE applicable_year = :year AND auction_ref_no LIKE 'AUC-%'");
+                $maxStmt->execute(['year' => $year]);
+                $seq = (int)$maxStmt->fetchColumn();
+                do {
+                    $seq++;
+                    $auctionRefNo = sprintf("AUC-%d-%04d", $year, $seq);
+                    $chk = $this->db->prepare("SELECT 1 FROM hf_auction_transactions WHERE auction_ref_no = :ref LIMIT 1");
+                    $chk->execute(['ref' => $auctionRefNo]);
+                } while ($chk->fetchColumn());
             }
 
             $eventId = !empty($data['event_id']) ? (int)$data['event_id'] : 10;

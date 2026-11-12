@@ -4104,7 +4104,7 @@ function EditAuctionRefModal({ transaction, isOpen, onClose, onSaved, showToast 
 
         setSaving(true);
         try {
-            const res = await api.put(`/auctions/${transaction.transaction_id}/ref-no`, {
+            const res = await api.put(`/api/auctions/${transaction.transaction_id}/ref-no`, {
                 auction_ref_no: trimmed
             });
 

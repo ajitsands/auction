@@ -4506,14 +4506,18 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
             return;
         }
 
-        const bid = Number(bidAmount || 0);
-        if (bid <= 0) {
+        const bid = Number(bidAmount);
+        if (isNaN(bid) || bid < 0) {
+            showToast('error', 'Please enter a valid winning bid amount.');
+            return;
+        }
+        if (!isAdmin && bid <= 0) {
             showToast('error', 'Winning bid amount must be greater than zero.');
             return;
         }
 
         const minReserve = selectedArticle ? Number(selectedArticle.reserve_price || 0) : 0;
-        if (minReserve > 0 && bid < minReserve) {
+        if (!isAdmin && minReserve > 0 && bid < minReserve) {
             showToast('error', `Winning bid (BHD ${bid.toFixed(3)}) cannot be less than the Reserve Price of BHD ${minReserve.toFixed(3)}.`);
             return;
         }
@@ -4749,7 +4753,7 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
     const isPayingNow = Number(paidAmount || 0) > 0;
     const hasPromiseBalance = currentBalance > 0;
     const reservePrice = Number(selectedArticle?.reserve_price || 0);
-    const isBelowReserve = Boolean(selectedArticle && reservePrice > 0 && bidAmount !== '' && Number(bidAmount) < reservePrice);
+    const isBelowReserve = Boolean(!isAdmin && selectedArticle && reservePrice > 0 && bidAmount !== '' && Number(bidAmount) < reservePrice);
     const isPaidExceedingBid = Boolean(bidAmount !== '' && paidAmount !== '' && Number(paidAmount) > Number(bidAmount));
 
     return (
@@ -4941,13 +4945,19 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
                                     {selectedArticle && reservePrice > 0 && (
                                         <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                                             Reserve: <strong style={{ color: 'var(--primary)' }}>BHD {reservePrice.toFixed(3)}</strong>
+                                            {isAdmin && <span style={{ color: '#10b981', marginLeft: '4px' }}>(Admin override active)</span>}
+                                        </span>
+                                    )}
+                                    {isAdmin && !reservePrice && (
+                                        <span className="badge badge-warning" style={{ fontSize: '10px', padding: '1px 5px' }}>
+                                            0 Allowed for Admin
                                         </span>
                                     )}
                                 </label>
                                 <input 
                                     type="number" 
                                     step="0.001" 
-                                    min={selectedArticle && reservePrice > 0 ? reservePrice : 0.001}
+                                    min={isAdmin ? 0 : (selectedArticle && reservePrice > 0 ? reservePrice : 0.001)}
                                     className="form-control" 
                                     style={{ 
                                         fontSize: '18px', 

@@ -31,24 +31,38 @@ class AuctionController extends Controller {
 
     public function store(): void {
         $user = $this->requireAuth();
+        $isAdmin = ($user['user_type'] ?? '') === 'Administrator';
         $data = $this->getJsonInput();
+        $data['is_admin'] = $isAdmin;
 
         $offeringType = in_array($data['offering_type'] ?? '', ['Gold', 'BedSheet']) ? $data['offering_type'] : 'Auction';
         $isOffering = ($offeringType !== 'Auction');
 
+        $bidVal = $data['winning_bid_amount'] ?? ($data['bid_amount'] ?? null);
+        $hasBid = ($bidVal !== null && $bidVal !== '' && is_numeric($bidVal));
+        $bidNum = (float)($bidVal ?? 0);
+
+        if (!$hasBid || $bidNum < 0) {
+            $this->jsonResponse(['success' => false, 'error' => 'Please enter a valid winning bid / promise amount.'], 400);
+        }
+
+        // Non-administrators cannot enter 0 promise amount
+        if ($bidNum <= 0.0001 && !$isAdmin) {
+            $this->jsonResponse(['success' => false, 'error' => 'Winning bid amount must be greater than zero.'], 400);
+        }
+
         if ($isOffering) {
-            if (empty($data['item_description']) || empty($data['winning_bid_amount']) || empty($data['buyer_name'])) {
-                $this->jsonResponse(['success' => false, 'error' => 'Item Description, Offering Amount, and Devotee Name are required.'], 400);
+            if (empty($data['item_description']) || empty($data['buyer_name'])) {
+                $this->jsonResponse(['success' => false, 'error' => 'Item Description and Devotee Name are required.'], 400);
             }
         } else {
-            if (empty($data['article_id']) || empty($data['winning_bid_amount']) || empty($data['buyer_name'])) {
-                $this->jsonResponse(['success' => false, 'error' => 'Article, Winning Bid Amount, and Buyer Name are required.'], 400);
+            if (empty($data['article_id']) || empty($data['buyer_name'])) {
+                $this->jsonResponse(['success' => false, 'error' => 'Article and Buyer Name are required.'], 400);
             }
         }
 
         $accountModel = new \App\Models\AccountHead();
         $defaults = $accountModel->getDefaultHeads();
-        $isAdmin = ($user['user_type'] ?? '') === 'Administrator';
 
         if ($offeringType === 'Gold') {
             // Gold Offering: Always post to administrator-configured Gold default ledgers

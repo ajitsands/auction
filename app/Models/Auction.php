@@ -267,9 +267,15 @@ class Auction extends Model {
             $offeringType = in_array($data['offering_type'] ?? '', ['Gold', 'BedSheet']) ? $data['offering_type'] : 'Auction';
             $isOffering = ($offeringType !== 'Auction');
             $year = !empty($data['applicable_year']) ? (int)$data['applicable_year'] : (int)date('Y');
+            $isAdmin = !empty($data['is_admin']);
             $bidAmount = (float)($data['winning_bid_amount'] ?? ($data['bid_amount'] ?? 0));
             $paidAmount = (float)($data['paid_amount'] ?? ($data['amount_paid'] ?? 0));
             $balanceAmount = max(0, $bidAmount - $paidAmount);
+
+            // Non-administrators cannot enter 0 promise / bid amount
+            if ($bidAmount < 0 || (!$isAdmin && $bidAmount <= 0.0001)) {
+                throw new \Exception("Winning bid amount must be greater than zero.");
+            }
 
             if ($isOffering) {
                 $itemDescription = trim($data['item_description'] ?? '');
@@ -293,9 +299,9 @@ class Auction extends Model {
 
                 $year = !empty($art['applicable_year']) ? (int)$art['applicable_year'] : $year;
 
-                // Validate against article reserve price
+                // Validate against article reserve price (bypassed for Administrators entering 0 or override bids)
                 $reservePrice = !empty($art['reserve_price']) ? (float)$art['reserve_price'] : 0.0;
-                if ($reservePrice > 0.0001 && $bidAmount < ($reservePrice - 0.0001)) {
+                if (!$isAdmin && $reservePrice > 0.0001 && $bidAmount < ($reservePrice - 0.0001)) {
                     throw new \Exception(sprintf(
                         "Winning bid amount (BHD %.3f) cannot be less than the article's reserve price of BHD %.3f.",
                         $bidAmount,

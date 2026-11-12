@@ -4130,39 +4130,12 @@ function EditAuctionRefModal({ transaction, isOpen, onClose, onSaved, showToast 
     return (
         <div className="modal-backdrop" onClick={onClose} style={{ zIndex: 1060 }}>
             <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '520px', width: '92%', borderRadius: '12px', overflow: 'hidden' }}>
-                <div className="modal-header" style={{
-                    background: 'linear-gradient(135deg, rgba(123, 31, 162, 0.1), rgba(123, 31, 162, 0.02))',
-                    borderBottom: '1px solid var(--border-color)',
-                    padding: '16px 20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{
-                            width: '36px',
-                            height: '36px',
-                            borderRadius: '8px',
-                            background: 'rgba(123, 31, 162, 0.15)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: 'var(--primary)'
-                        }}>
-                            <i className="material-icons" style={{ fontSize: '20px' }}>edit_note</i>
-                        </div>
-                        <div>
-                            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>Edit Reference Number</h3>
-                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                                <span className="badge badge-warning" style={{ fontSize: '10px', padding: '1px 5px', marginRight: '5px' }}>Administrator Only</span>
-                                Transaction #{transaction.transaction_id}
-                            </div>
-                        </div>
-                    </div>
-                    <button type="button" className="close-btn" onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: 'var(--text-muted)' }}>
-                        <i className="material-icons">close</i>
-                    </button>
-                </div>
+                <ModalHeader 
+                    title="Edit Reference Number" 
+                    icon="edit_note" 
+                    onClose={onClose} 
+                    badge={`Admin • #${transaction.transaction_id}`}
+                />
 
                 <form onSubmit={handleSubmit}>
                     <div className="modal-body" style={{ padding: '20px' }}>

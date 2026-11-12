@@ -4466,7 +4466,19 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
             return isNaN(num) ? last : num;
         };
 
-        const rows = transactions.map((t, idx) => ({
+        // Sort records ascending by Auction No (1, 2, 3 ... N)
+        const sortedList = [...transactions].sort((a, b) => {
+            const noA = extractAuctionNo(a.auction_ref_no);
+            const noB = extractAuctionNo(b.auction_ref_no);
+            const numA = typeof noA === 'number' ? noA : parseInt(noA, 10);
+            const numB = typeof noB === 'number' ? noB : parseInt(noB, 10);
+            if (!isNaN(numA) && !isNaN(numB)) {
+                return numA - numB;
+            }
+            return String(a.auction_ref_no || '').localeCompare(String(b.auction_ref_no || ''));
+        });
+
+        const rows = sortedList.map((t, idx) => ({
             'Sl. No': idx + 1,
             'Auction No': extractAuctionNo(t.auction_ref_no),
             'Article No.': t.tag_number || '',
@@ -4474,21 +4486,44 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
             'Article Name': t.article_name || '',
             'Roll #': t.buyer_code_c || '',
             'Name of the person/Bidder': t.buyer_name || '',
-            'Contact #': t.buyer_phone || ''
+            'Contact #': t.buyer_phone || '',
+            'Paid Amount (BHD)': Number(Number(t.paid_amount || 0).toFixed(3)),
+            'Balance Due (BHD)': Number(Number(t.balance_amount || 0).toFixed(3)),
+            'Payment Status': t.payment_status || 'Pending',
+            'Auction Date': formatDateDMY(t.auction_date),
+            'Category': t.category || '',
+            'Donor Name': t.donor_name || '',
+            'Estimated Value (BHD)': Number(Number(t.estimated_value || 0).toFixed(3)),
+            'CPR': t.buyer_cpr || '',
+            'Prayer Group': t.buyer_prayer_group || '',
+            'Receipt Voucher No': t.contrib_voucher_no ? `HRCPT #${t.contrib_voucher_no}` : '',
+            'Promise Voucher No': t.promise_voucher_no ? `MP #${t.promise_voucher_no}` : '',
+            'Manual Receipt No': (t.manual_receipt_no || t.receipt_book_no) ? `${t.receipt_book_no ? 'Bk ' + t.receipt_book_no + ' ' : ''}#${t.manual_receipt_no || ''}`.trim() : '',
+            'Budget Event': t.event_name || '',
+            'Receipt Dr Ledger': t.contrib_dr_code ? `[${t.contrib_dr_code}] ${t.contrib_dr_name || ''}`.trim() : '',
+            'Receipt Cr Ledger': t.contrib_cr_code ? `[${t.contrib_cr_code}] ${t.contrib_cr_name || ''}`.trim() : '',
+            'Promise Dr Ledger': t.promise_dr_code ? `[${t.promise_dr_code}] ${t.promise_dr_name || ''}`.trim() : '',
+            'Promise Cr Ledger': t.promise_cr_code ? `[${t.promise_cr_code}] ${t.promise_cr_name || ''}`.trim() : '',
+            'Notes': t.notes || ''
         }));
 
         const ws = XLSX.utils.json_to_sheet(rows);
 
-        // Ensure 3-decimal currency formatting for Auction Amt (BHD)
+        // Ensure 3-decimal currency formatting for all monetary columns
         if (ws['!ref']) {
             const range = XLSX.utils.decode_range(ws['!ref']);
+            const currencyCols = [3, 8, 9, 14]; // Auction Amt, Paid Amount, Balance Due, Estimated Value
             for (let R = range.s.r + 1; R <= range.e.r; ++R) {
-                const cellRef = XLSX.utils.encode_cell({ c: 3, r: R });
-                const cell = ws[cellRef];
-                if (cell && typeof cell.v === 'number') {
-                    cell.z = '0.000';
-                }
+                currencyCols.forEach(C => {
+                    const cellRef = XLSX.utils.encode_cell({ c: C, r: R });
+                    const cell = ws[cellRef];
+                    if (cell && typeof cell.v === 'number') {
+                        cell.z = '0.000';
+                    }
+                });
             }
+            // AutoFilter enabling filter/sort dropdowns (asc to desc) in Excel
+            ws['!autofilter'] = { ref: ws['!ref'] };
         }
 
         ws['!cols'] = [
@@ -4499,13 +4534,31 @@ function AuctionDeskView({ year, showToast, onOpenReceipt, refreshTrigger, onDat
             { wch: 32 }, // Article Name
             { wch: 12 }, // Roll #
             { wch: 28 }, // Name of the person/Bidder
-            { wch: 18 }  // Contact #
+            { wch: 18 }, // Contact #
+            { wch: 18 }, // Paid Amount (BHD)
+            { wch: 18 }, // Balance Due (BHD)
+            { wch: 16 }, // Payment Status
+            { wch: 14 }, // Auction Date
+            { wch: 18 }, // Category
+            { wch: 22 }, // Donor Name
+            { wch: 20 }, // Estimated Value (BHD)
+            { wch: 16 }, // CPR
+            { wch: 20 }, // Prayer Group
+            { wch: 20 }, // Receipt Voucher No
+            { wch: 20 }, // Promise Voucher No
+            { wch: 18 }, // Manual Receipt No
+            { wch: 22 }, // Budget Event
+            { wch: 26 }, // Receipt Dr Ledger
+            { wch: 26 }, // Receipt Cr Ledger
+            { wch: 26 }, // Promise Dr Ledger
+            { wch: 26 }, // Promise Cr Ledger
+            { wch: 28 }  // Notes
         ];
 
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, `Live_Auction_${year}`);
         XLSX.writeFile(wb, `cathedral_live_auction_${year}.xlsx`);
-        showToast('success', `Exported ${transactions.length} Live Floor Auction transactions to Excel!`);
+        showToast('success', `Exported ${sortedList.length} Live Floor Auction transactions to Excel!`);
     };
 
     const currentBalance = Math.max(0, (Number(bidAmount) || 0) - (Number(paidAmount) || 0));

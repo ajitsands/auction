@@ -263,7 +263,12 @@ class Auction extends Model {
     }
 
     public function recordAuction(array $data, int $userId): array {
+        $lockAcquired = false;
         try {
+            // Acquire atomic lock across concurrent operators for reference number assignment
+            $lockStmt = $this->db->query("SELECT GET_LOCK('hf_auction_ref_lock', 15)");
+            $lockAcquired = (bool)($lockStmt ? $lockStmt->fetchColumn() : false);
+
             $offeringType = in_array($data['offering_type'] ?? '', ['Gold', 'BedSheet']) ? $data['offering_type'] : 'Auction';
             $isOffering = ($offeringType !== 'Auction');
             $year = !empty($data['applicable_year']) ? (int)$data['applicable_year'] : (int)date('Y');
@@ -328,8 +333,9 @@ class Auction extends Model {
             // Generate unique auction/offering ref no with dedicated prefixes and collision avoidance
             if ($isOffering) {
                 $prefix = ($offeringType === 'Gold') ? 'GLD' : 'BED';
-                $maxStmt = $this->db->prepare("SELECT COALESCE(MAX(CAST(SUBSTRING_INDEX(auction_ref_no, '-', -1) AS UNSIGNED)), 0) FROM hf_auction_transactions WHERE applicable_year = :year AND auction_ref_no LIKE :prefix");
-                $maxStmt->execute(['year' => $year, 'prefix' => "{$prefix}-%"]);
+                $prefixPattern = "{$prefix}-{$year}-%";
+                $maxStmt = $this->db->prepare("SELECT COALESCE(MAX(CAST(SUBSTRING_INDEX(auction_ref_no, '-', -1) AS UNSIGNED)), 0) FROM hf_auction_transactions WHERE auction_ref_no LIKE :pattern");
+                $maxStmt->execute(['pattern' => $prefixPattern]);
                 $seq = (int)$maxStmt->fetchColumn();
                 do {
                     $seq++;
@@ -338,8 +344,9 @@ class Auction extends Model {
                     $chk->execute(['ref' => $auctionRefNo]);
                 } while ($chk->fetchColumn());
             } else {
-                $maxStmt = $this->db->prepare("SELECT COALESCE(MAX(CAST(SUBSTRING_INDEX(auction_ref_no, '-', -1) AS UNSIGNED)), 0) FROM hf_auction_transactions WHERE applicable_year = :year AND auction_ref_no LIKE 'AUC-%'");
-                $maxStmt->execute(['year' => $year]);
+                $prefixPattern = "AUC-{$year}-%";
+                $maxStmt = $this->db->prepare("SELECT COALESCE(MAX(CAST(SUBSTRING_INDEX(auction_ref_no, '-', -1) AS UNSIGNED)), 0) FROM hf_auction_transactions WHERE auction_ref_no LIKE :pattern");
+                $maxStmt->execute(['pattern' => $prefixPattern]);
                 $seq = (int)$maxStmt->fetchColumn();
                 do {
                     $seq++;
@@ -820,6 +827,12 @@ class Auction extends Model {
             ];
         } catch (\Exception $e) {
             throw $e;
+        } finally {
+            if ($lockAcquired) {
+                try {
+                    $this->db->query("SELECT RELEASE_LOCK('hf_auction_ref_lock')");
+                } catch (\Throwable $t) {}
+            }
         }
     }
 

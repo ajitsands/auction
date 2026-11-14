@@ -18,7 +18,12 @@ class Payment extends Model {
     }
 
     public function recordPayment(array $data, int $userId): array {
+        $lockAcquired = false;
         try {
+            // Acquire atomic lock across concurrent settlement operators
+            $lockStmt = $this->db->query("SELECT GET_LOCK('hf_payment_receipt_lock', 15)");
+            $lockAcquired = (bool)($lockStmt ? $lockStmt->fetchColumn() : false);
+
             $transactionId = (int)$data['transaction_id'];
             $amount = (float)$data['amount_paid'];
             if ($amount <= 0) {
@@ -77,12 +82,18 @@ class Payment extends Model {
                 ? (int)$trans['acc_promise_id'] 
                 : (!empty($prom['acc_promise_id']) ? (int)$prom['acc_promise_id'] : 0);
 
-            // Generate receipt no
+            // Generate receipt no with collision avoidance
             $year = (int)$trans['applicable_year'];
-            $payCount = $this->db->prepare("SELECT COUNT(*) FROM hf_payments");
-            $payCount->execute();
-            $pSeq = $payCount->fetchColumn() + 1;
-            $receiptNo = sprintf("RCPT-%d-%04d", $year, $pSeq);
+            $rcptPattern = "RCPT-{$year}-%";
+            $maxRcptStmt = $this->db->prepare("SELECT COALESCE(MAX(CAST(SUBSTRING_INDEX(receipt_no, '-', -1) AS UNSIGNED)), 0) FROM hf_payments WHERE receipt_no LIKE :pattern");
+            $maxRcptStmt->execute(['pattern' => $rcptPattern]);
+            $pSeq = (int)$maxRcptStmt->fetchColumn();
+            do {
+                $pSeq++;
+                $receiptNo = sprintf("RCPT-%d-%04d", $year, $pSeq);
+                $chkR = $this->db->prepare("SELECT 1 FROM hf_payments WHERE receipt_no = :r LIMIT 1");
+                $chkR->execute(['r' => $receiptNo]);
+            } while ($chkR->fetchColumn());
             $paymentDate = !empty($data['payment_date']) ? $data['payment_date'] : date('Y-m-d');
 
             // Determine member code_m
@@ -374,6 +385,12 @@ class Payment extends Model {
             ];
         } catch (\Exception $e) {
             throw $e;
+        } finally {
+            if ($lockAcquired) {
+                try {
+                    $this->db->query("SELECT RELEASE_LOCK('hf_payment_receipt_lock')");
+                } catch (\Throwable $t) {}
+            }
         }
     }
 

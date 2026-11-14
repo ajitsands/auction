@@ -392,11 +392,17 @@ class Auction extends Model {
             $receiptBookNo = !empty($data['receipt_book_no']) ? trim($data['receipt_book_no']) : '0';
             $receiptNoInput = !empty($data['receipt_no']) ? trim($data['receipt_no']) : '0';
 
-            // Generate receipt number sequence if no manual receipt number provided
-            $payCount = $this->db->prepare("SELECT COUNT(*) FROM hf_payments");
-            $payCount->execute();
-            $pSeq = $payCount->fetchColumn() + 1;
-            $generatedReceiptNo = sprintf("RCPT-%d-%04d", $year, $pSeq);
+            // Generate receipt number sequence with collision avoidance if no manual receipt number provided
+            $rcptPattern = "RCPT-{$year}-%";
+            $maxRcptStmt = $this->db->prepare("SELECT COALESCE(MAX(CAST(SUBSTRING_INDEX(receipt_no, '-', -1) AS UNSIGNED)), 0) FROM hf_payments WHERE receipt_no LIKE :pattern");
+            $maxRcptStmt->execute(['pattern' => $rcptPattern]);
+            $pSeq = (int)$maxRcptStmt->fetchColumn();
+            do {
+                $pSeq++;
+                $generatedReceiptNo = sprintf("RCPT-%d-%04d", $year, $pSeq);
+                $chkR = $this->db->prepare("SELECT 1 FROM hf_payments WHERE receipt_no = :r LIMIT 1");
+                $chkR->execute(['r' => $generatedReceiptNo]);
+            } while ($chkR->fetchColumn());
             $effectiveReceiptNo = ($receiptNoInput !== '0' && $receiptNoInput !== '') ? $receiptNoInput : $generatedReceiptNo;
 
             // Resolve default heads from admin settings based on offering type
@@ -719,10 +725,7 @@ class Auction extends Model {
             $receiptNo = null;
             // --- 4. Record payment in hf_payments if paidAmount > 0 ---
             if ($paidAmount > 0) {
-                $payCount = $this->db->prepare("SELECT COUNT(*) FROM hf_payments");
-                $payCount->execute();
-                $pSeq = $payCount->fetchColumn() + 1;
-                $receiptNo = sprintf("RCPT-%d-%04d", $year, $pSeq);
+                $receiptNo = $effectiveReceiptNo;
 
                 $payStmt = $this->db->prepare("
                     INSERT INTO hf_payments (
